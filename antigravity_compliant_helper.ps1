@@ -8795,13 +8795,8 @@ function Ensure-SlotObjectSchema {
 
 
         gemini5hPct      = $null
-
-
-
         geminiWeeklyPct  = $null
-
-
-
+        argonWeeklyPct   = $null
         claude5hPct      = $null
 
 
@@ -8811,13 +8806,8 @@ function Ensure-SlotObjectSchema {
 
 
         resetTime5h      = $null
-
-
-
         resetTimeWeekly  = $null
-
-
-
+        resetTimeArgon   = $null
         planName         = $null
 
 
@@ -8999,41 +8989,23 @@ function Invoke-WithPoolStateMutex {
 
 
 function Save-SlotPoolState {
-
-
-
     param([Parameter(Mandatory=$true)]$State)
-
-
-
     if (-not (Test-Path $HelperRoot)) {
-
-
-
         New-Item -ItemType Directory -Path $HelperRoot -Force | Out-Null
-
-
-
     }
-
-
-
-    $json = $State | ConvertTo-Json -Depth 6
-
-
-
-    Invoke-WithPoolStateMutex {
-
-
-
-        Write-Utf8NoBom -Path $PoolStatePath -Content $json
-
-
-
-    }
-
-
-
+    try {
+        $json = $State | ConvertTo-Json -Depth 6
+        Invoke-WithPoolStateMutex {
+            for ($retry = 0; $retry -lt 3; $retry++) {
+                try {
+                    Write-Utf8NoBom -Path $PoolStatePath -Content $json
+                    break
+                } catch {
+                    Start-Sleep -Milliseconds 60
+                }
+            }
+        }
+    } catch {}
 }
 
 
@@ -9935,704 +9907,235 @@ $Script:CachedLsEndpoint      = $null
 
 
 function Parse-QuotaSummaryPayload {
-
-
-
     param([string]$RawJson)
-
-
-
     if ([string]::IsNullOrWhiteSpace($RawJson)) { return $null }
-
-
-
     try {
-
-
-
         $obj = $RawJson | ConvertFrom-Json -ErrorAction Stop
-
-
-
     } catch {
-
-
-
         return $null
-
-
-
     }
 
-
-
-    $gemini5h      = $null
-
-
-
-    $geminiWeekly  = $null
-
-
-
-    $claude5h      = $null
-
-
-
-    $claudeWeekly  = $null
-
-
-
-    $reset5h       = $null
-
-
-
-    $resetWeekly   = $null
-
-
-
-    $planName      = $null
-
-
-
-    $detectedEmail = $null
-
-
+    $gemini5h          = $null
+    $geminiWeekly      = $null
+    $gemini5hDisabled  = $false
+    $argonWeekly       = $null
+    $resetArgon        = $null
+    $claude5h          = $null
+    $claudeWeekly      = $null
+    $claude5hDisabled  = $false
+    $reset5h           = $null
+    $resetWeekly       = $null
+    $resetClaudeWeekly = $null
+    $planName          = $null
+    $detectedEmail     = $null
 
     # 格式 A: RetrieveUserQuotaSummary -> { response: { groups: [ { displayName, buckets: [...] } ] } }
-
-
-
     $groups = $null
-
-
-
     if ($obj.PSObject.Properties["response"] -and $obj.response -and $obj.response.PSObject.Properties["groups"]) {
-
-
-
         $groups = $obj.response.groups
-
-
-
     } elseif ($obj.PSObject.Properties["groups"]) {
-
-
-
         $groups = $obj.groups
-
-
-
     }
 
-
-
     if ($groups) {
-
-
-
         foreach ($g in $groups) {
-
-
-
             $gName = if ($g.PSObject.Properties["displayName"]) { [string]$g.displayName } else { "" }
-
-
-
-            $isGemini = ($gName -match '(?i)gemini')
-
-
-
+            $isArgon  = ($gName -match '(?i)argon')
             $isClaude = ($gName -match '(?i)claude|gpt|3p')
-
-
+            $isGemini = ($gName -match '(?i)gemini' -and -not $isArgon)
 
             if (-not $g.PSObject.Properties["buckets"] -or (-not $g.buckets)) { continue }
 
-
-
             foreach ($b in $g.buckets) {
-
-
-
                 $bId   = if ($b.PSObject.Properties["bucketId"])    { [string]$b.bucketId }    else { "" }
-
-
-
                 $win   = if ($b.PSObject.Properties["window"])      { [string]$b.window }      else { "" }
-
-
-
                 $dName = if ($b.PSObject.Properties["displayName"]) { [string]$b.displayName } else { "" }
-
-
+                $isDisabled = ($b.PSObject.Properties["disabled"] -and $b.disabled -eq $true)
 
                 $rf = $null
-
-
-
                 if ($b.PSObject.Properties["remainingFraction"] -and $null -ne $b.remainingFraction) {
-
-
-
                     $rf = [double]$b.remainingFraction
-
-
-
                 } elseif ($b.PSObject.Properties["remaining"] -and $b.remaining -and $b.remaining.PSObject.Properties["remainingFraction"] -and $null -ne $b.remaining.remainingFraction) {
-
-
-
                     $rf = [double]$b.remaining.remainingFraction
-
-
-
                 } elseif ($b.PSObject.Properties["resetTime"] -and $b.resetTime) {
-
-
-
                     $rf = 0.0
-
-
-
                 }
-
-
 
                 if ($null -eq $rf) { continue }
-
-
-
                 $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round($rf * 100.0)))
-
-
-
                 $rTime = if ($b.PSObject.Properties["resetTime"] -and $b.resetTime) { [string]$b.resetTime } else { $null }
 
-
-
                 $is5hBucket = ($win -eq "5h" -or $bId -match '5h' -or $dName -match '(?i)Five Hour|5-Hour|5 Hour')
-
-
-
                 $isWkBucket = ($win -eq "weekly" -or $bId -match 'weekly' -or $dName -match '(?i)Weekly')
 
-
-
-                if ($isGemini -or $bId -match '^gemini') {
-
-
-
+                if ($isArgon -or $bId -match 'argon') {
+                    $argonWeekly = $pct
+                    if ($rTime) { $resetArgon = $rTime }
+                } elseif ($isGemini -or ($bId -match '^gemini' -and $bId -notmatch 'argon')) {
                     if ($is5hBucket) {
-
-
-
                         $gemini5h = $pct
-
-
-
+                        if ($isDisabled) { $gemini5hDisabled = $true }
                         if ($rTime) { $reset5h = $rTime }
-
-
-
                     } elseif ($isWkBucket) {
-
-
-
                         $geminiWeekly = $pct
-
-
-
                         if ($rTime) { $resetWeekly = $rTime }
-
-
-
                     }
-
-
-
                 } elseif ($isClaude -or $bId -match '^3p') {
-
-
-
                     if ($is5hBucket) {
-
-
-
                         $claude5h = $pct
-
-
-
+                        if ($isDisabled) { $claude5hDisabled = $true }
                         if (-not $reset5h -and $rTime) { $reset5h = $rTime }
-
-
-
                     } elseif ($isWkBucket) {
-
-
-
                         $claudeWeekly = $pct
-
-
-
-                        if (-not $resetWeekly -and $rTime) { $resetWeekly = $rTime }
-
-
-
+                        if ($rTime) { $resetClaudeWeekly = $rTime }
                     }
-
-
-
                 }
-
-
-
             }
-
-
-
         }
 
-
-
+        # 核心防虚假标记：若某组周限额已归零 (0%) 或 5h 桶被标记为 disabled，5h 必须置为 0% (已耗尽)
+        if ($gemini5hDisabled -or ($null -ne $geminiWeekly -and $geminiWeekly -le 0)) {
+            $gemini5h = 0
+        }
+        if ($claude5hDisabled -or ($null -ne $claudeWeekly -and $claudeWeekly -le 0)) {
+            $claude5h = 0
+        }
     }
-
-
 
     # 格式 B: GetUserStatus -> { userStatus: { email, planStatus: { planInfo: { planName } }, cascadeModelConfigData: { clientModelConfigs: [...] } } }
-
-
-
     $uStatus = if ($obj.PSObject.Properties["userStatus"] -and $obj.userStatus) { $obj.userStatus } else { $null }
-
-
-
     if ($uStatus) {
-
-
-
         if ($uStatus.PSObject.Properties["email"] -and $uStatus.email) {
-
-
-
             $detectedEmail = [string]$uStatus.email
-
-
-
         }
-
-
-
         if ($uStatus.PSObject.Properties["planStatus"] -and $uStatus.planStatus -and $uStatus.planStatus.PSObject.Properties["planInfo"] -and $uStatus.planStatus.planInfo) {
-
-
-
             if ($uStatus.planStatus.planInfo.PSObject.Properties["planName"]) {
-
-
-
                 $planName = [string]$uStatus.planStatus.planInfo.planName
-
-
-
             }
-
-
-
         }
-
-
-
     }
-
-
 
     $configs = $null
-
-
-
     if ($uStatus -and $uStatus.PSObject.Properties["cascadeModelConfigData"] -and $uStatus.cascadeModelConfigData -and $uStatus.cascadeModelConfigData.PSObject.Properties["clientModelConfigs"]) {
-
-
-
         $configs = $uStatus.cascadeModelConfigData.clientModelConfigs
-
-
-
     } elseif ($obj.PSObject.Properties["clientModelConfigs"]) {
-
-
-
         $configs = $obj.clientModelConfigs
-
-
-
     }
-
-
 
     if ($configs) {
-
-
-
-        $gemFlashPct = $null
-
-
-
-        $gemProPct   = $null
-
-
-
+        $gemFlashPct  = $null
+        $gemProPct    = $null
+        $minArgonPct  = $null
         $minClaudePct = $null
-
-
-
         foreach ($cfg in $configs) {
-
-
-
             $lbl = if ($cfg.PSObject.Properties["label"]) { [string]$cfg.label } else { "" }
-
-
-
             if (-not $cfg.PSObject.Properties["quotaInfo"] -or (-not $cfg.quotaInfo)) { continue }
-
-
-
             $qi = $cfg.quotaInfo
-
-
-
             $rf = $null
-
-
-
             if ($qi.PSObject.Properties["remainingFraction"] -and $null -ne $qi.remainingFraction) {
-
-
-
                 $rf = [double]$qi.remainingFraction
-
-
-
             }
-
-
-
             if ($null -eq $rf) { continue }
-
-
-
             $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round($rf * 100.0)))
-
-
-
             $rt = if ($qi.PSObject.Properties["resetTime"] -and $qi.resetTime) { [string]$qi.resetTime } else { $null }
 
-
-
-            if ($lbl -match '(?i)gemini.*flash') {
-
-
-
+            if ($lbl -match '(?i)argon') {
+                if ($null -eq $minArgonPct -or $pct -lt $minArgonPct) {
+                    $minArgonPct = $pct
+                    if ($rt -and (-not $resetArgon)) { $resetArgon = $rt }
+                }
+            } elseif ($lbl -match '(?i)gemini.*flash') {
                 if ($null -eq $gemFlashPct -or $pct -lt $gemFlashPct) {
-
-
-
                     $gemFlashPct = $pct
-
-
-
                     if ($rt -and (-not $reset5h)) { $reset5h = $rt }
-
-
-
                 }
-
-
-
             } elseif ($lbl -match '(?i)gemini.*pro|gemini') {
-
-
-
                 if ($null -eq $gemProPct -or $pct -lt $gemProPct) {
-
-
-
                     $gemProPct = $pct
-
-
-
                     if ($rt -and (-not $reset5h)) { $reset5h = $rt }
-
-
-
                 }
-
-
-
             } elseif ($lbl -match '(?i)claude|gpt') {
-
-
-
                 if ($null -eq $minClaudePct -or $pct -lt $minClaudePct) {
-
-
-
                     $minClaudePct = $pct
-
-
-
                     if ($rt -and (-not $reset5h)) { $reset5h = $rt }
-
-
-
                 }
-
-
-
             }
-
-
-
         }
-
-
-
+        if ($null -eq $argonWeekly -and $null -ne $minArgonPct) { $argonWeekly = $minArgonPct }
         if ($null -eq $gemini5h) {
-
-
-
             if ($null -ne $gemFlashPct -and $null -ne $gemProPct) {
-
-
-
                 $gemini5h = [Math]::Min($gemFlashPct, $gemProPct)
-
-
-
                 if ($null -eq $geminiWeekly) { $geminiWeekly = $gemProPct }
-
-
-
             } elseif ($null -ne $gemProPct) {
-
-
-
                 $gemini5h = $gemProPct
-
-
-
             } elseif ($null -ne $gemFlashPct) {
-
-
-
                 $gemini5h = $gemFlashPct
-
-
-
             }
-
-
-
         }
-
-
-
         if ($null -eq $claude5h -and $null -ne $minClaudePct) { $claude5h = $minClaudePct }
-
-
-
     }
-
-
 
     # 格式 C: Cloud Code fetchAvailableModels -> { models: { "gemini-3-pro": { displayName, quotaInfo: { remainingFraction, resetTime } } } }
-
-
-
     if ($obj.PSObject.Properties["models"] -and $obj.models) {
-
-
-
         $minGem = $null
-
-
-
+        $minArg = $null
         $minCla = $null
-
-
-
         foreach ($mProp in $obj.models.PSObject.Properties) {
-
-
-
             $mVal = $mProp.Value
-
-
-
             if (-not $mVal) { continue }
-
-
-
             if ($mVal.PSObject.Properties["isInternal"] -and $mVal.isInternal -eq $true) { continue }
-
-
-
             $dName = if ($mVal.PSObject.Properties["displayName"]) { [string]$mVal.displayName } else { $mProp.Name }
-
-
-
             if ([string]::IsNullOrWhiteSpace($dName) -or $mProp.Name -match '(?i)tab_|lite|autocomplete|embed') { continue }
-
-
-
             if (-not $mVal.PSObject.Properties["quotaInfo"] -or (-not $mVal.quotaInfo)) { continue }
-
-
-
             $qi = $mVal.quotaInfo
-
-
-
             if (-not $qi.PSObject.Properties["remainingFraction"] -or $null -eq $qi.remainingFraction) { continue }
-
-
-
             $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round([double]$qi.remainingFraction * 100.0)))
-
-
-
             $rt  = if ($qi.PSObject.Properties["resetTime"] -and $qi.resetTime) { [string]$qi.resetTime } else { $null }
 
-
-
-            if ($dName -match '(?i)gemini' -or $mProp.Name -match '(?i)gemini') {
-
-
-
+            if ($dName -match '(?i)argon' -or $mProp.Name -match '(?i)argon') {
+                if ($null -eq $minArg -or $pct -lt $minArg) {
+                    $minArg = $pct
+                    if ($rt -and (-not $resetArgon)) { $resetArgon = $rt }
+                }
+            } elseif ($dName -match '(?i)gemini' -or $mProp.Name -match '(?i)gemini') {
                 if ($null -eq $minGem -or $pct -lt $minGem) {
-
-
-
                     $minGem = $pct
-
-
-
                     if ($rt -and (-not $reset5h)) { $reset5h = $rt }
-
-
-
                 }
-
-
-
             } elseif ($dName -match '(?i)claude|gpt|sonnet|opus') {
-
-
-
                 if ($null -eq $minCla -or $pct -lt $minCla) {
-
-
-
                     $minCla = $pct
-
-
-
                     if ($rt -and (-not $reset5h)) { $reset5h = $rt }
-
-
-
                 }
-
-
-
             }
-
-
-
         }
-
-
-
+        if ($null -eq $argonWeekly -and $null -ne $minArg) { $argonWeekly = $minArg }
         if ($null -eq $gemini5h -and $null -ne $minGem) { $gemini5h = $minGem }
-
-
-
         if ($null -eq $claude5h -and $null -ne $minCla) { $claude5h = $minCla }
-
-
-
     }
 
-
-
-    if ($null -eq $gemini5h -and $null -eq $geminiWeekly -and $null -eq $claude5h -and $null -eq $claudeWeekly) {
-
-
-
+    if ($null -eq $gemini5h -and $null -eq $geminiWeekly -and $null -eq $argonWeekly -and $null -eq $claude5h -and $null -eq $claudeWeekly) {
         return $null
-
-
-
     }
-
-
 
     return [PSCustomObject]@{
-
-
-
-        Gemini5hPct       = $gemini5h
-
-
-
-        GeminiWeeklyPct   = $geminiWeekly
-
-
-
-        Claude5hPct       = $claude5h
-
-
-
-        ClaudeWeeklyPct   = $claudeWeekly
-
-
-
-        ResetTime5h       = $reset5h
-
-
-
-        ResetTimeWeekly   = $resetWeekly
-
-
-
-        PlanName          = $planName
-
-
-
-        Email             = $detectedEmail
-
-
-
-        Is5hExhausted     = (($null -ne $gemini5h -and $gemini5h -le 0))
-
-
-
-        IsWeeklyExhausted = (($null -ne $geminiWeekly -and $geminiWeekly -le 0))
-
-
-
-        UpdatedAt         = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-
-
-
+        Gemini5hPct           = $gemini5h
+        GeminiWeeklyPct       = $geminiWeekly
+        ArgonWeeklyPct        = $argonWeekly
+        Claude5hPct           = $claude5h
+        ClaudeWeeklyPct       = $claudeWeekly
+        ResetTime5h           = $reset5h
+        ResetTimeWeekly       = $resetWeekly
+        ResetTimeArgon        = $resetArgon
+        ResetTimeClaudeWeekly = $resetClaudeWeekly
+        PlanName              = $planName
+        Email                 = $detectedEmail
+        Is5hExhausted         = (($null -ne $gemini5h -and $gemini5h -le 1))
+        IsWeeklyExhausted     = (($null -ne $geminiWeekly -and $geminiWeekly -le 1))
+        IsArgonExhausted      = (($null -ne $argonWeekly -and $argonWeekly -le 1))
+        UpdatedAt             = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     }
-
-
-
 }
-
-
 
 function Invoke-LsQuotaAtEndpoint {
 
@@ -10714,11 +10217,10 @@ function Invoke-LsQuotaAtEndpoint {
 
 
 
+            if ($null -eq $merged.ArgonWeeklyPct -and $null -ne $parsedStat.ArgonWeeklyPct) { $merged.ArgonWeeklyPct = $parsedStat.ArgonWeeklyPct }
             if ($null -eq $merged.Claude5hPct -and $null -ne $parsedStat.Claude5hPct) { $merged.Claude5hPct = $parsedStat.Claude5hPct }
-
-
-
             if (-not $merged.ResetTime5h -and $parsedStat.ResetTime5h) { $merged.ResetTime5h = $parsedStat.ResetTime5h }
+            if (-not $merged.ResetTimeArgon -and $parsedStat.ResetTimeArgon) { $merged.ResetTimeArgon = $parsedStat.ResetTimeArgon }
 
 
 
@@ -11279,176 +10781,52 @@ function Get-SlotRemoteQuotaSummary {
 
 
 function Apply-QuotaSnapshotToSlotObject {
-
-
-
     param(
-
-
-
         $SlotObj,
-
-
-
         $QuotaSnap,
-
-
-
         [bool]$IsCurrentActiveSlot = $false
-
-
-
     )
-
-
-
     if (-not $SlotObj -or (-not $QuotaSnap)) { return }
-
-
-
     Ensure-SlotObjectSchema -SlotObj $SlotObj
-
-
-
     if ($null -ne $QuotaSnap.Gemini5hPct)     { Set-SafeProp $SlotObj "gemini5hPct"     ([int]$QuotaSnap.Gemini5hPct) }
-
-
-
     if ($null -ne $QuotaSnap.GeminiWeeklyPct) { Set-SafeProp $SlotObj "geminiWeeklyPct" ([int]$QuotaSnap.GeminiWeeklyPct) }
-
-
-
+    if ($null -ne $QuotaSnap.ArgonWeeklyPct)  { Set-SafeProp $SlotObj "argonWeeklyPct"  ([int]$QuotaSnap.ArgonWeeklyPct) }
     if ($null -ne $QuotaSnap.Claude5hPct)     { Set-SafeProp $SlotObj "claude5hPct"     ([int]$QuotaSnap.Claude5hPct) }
-
-
-
     if ($null -ne $QuotaSnap.ClaudeWeeklyPct) { Set-SafeProp $SlotObj "claudeWeeklyPct" ([int]$QuotaSnap.ClaudeWeeklyPct) }
-
-
-
     if ($QuotaSnap.ResetTime5h)               { Set-SafeProp $SlotObj "resetTime5h"     ([string]$QuotaSnap.ResetTime5h) }
-
-
-
     if ($QuotaSnap.ResetTimeWeekly)           { Set-SafeProp $SlotObj "resetTimeWeekly" ([string]$QuotaSnap.ResetTimeWeekly) }
-
-
-
+    if ($QuotaSnap.ResetTimeArgon)            { Set-SafeProp $SlotObj "resetTimeArgon"  ([string]$QuotaSnap.ResetTimeArgon) }
     if ($QuotaSnap.PlanName)                  { Set-SafeProp $SlotObj "planName"        ([string]$QuotaSnap.PlanName) }
-
-
-
     Set-SafeProp $SlotObj "lastQuotaSyncAt" (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 
-
-
     $now = Get-Date
-
-
-
-    if ($QuotaSnap.IsWeeklyExhausted) {
-
-
-
+    if ($QuotaSnap.IsWeeklyExhausted -or $QuotaSnap.IsArgonExhausted) {
         if (-not $IsCurrentActiveSlot) { Set-SafeProp $SlotObj "status" "cooldown" }
-
-
-
         Set-SafeProp $SlotObj "cooldownType" "weekly"
-
-
-
-        if ($QuotaSnap.ResetTimeWeekly) {
-
-
-
+        $rTime = if ($QuotaSnap.IsArgonExhausted -and $QuotaSnap.ResetTimeArgon) { $QuotaSnap.ResetTimeArgon } else { $QuotaSnap.ResetTimeWeekly }
+        if ($rTime) {
             try {
-
-
-
-                $dt = [DateTime]::Parse($QuotaSnap.ResetTimeWeekly).ToLocalTime()
-
-
-
+                $dt = [DateTime]::Parse($rTime).ToLocalTime()
                 if ($dt -gt $now) { Set-SafeProp $SlotObj "cooldownUntil" ($dt.ToString("yyyy-MM-dd HH:mm:ss")) }
-
-
-
             } catch {}
-
-
-
         }
-
-
-
     } elseif ($QuotaSnap.Is5hExhausted) {
-
-
-
         if (-not $IsCurrentActiveSlot) { Set-SafeProp $SlotObj "status" "cooldown" }
-
-
-
         Set-SafeProp $SlotObj "cooldownType" "hourly"
-
-
-
         if ($QuotaSnap.ResetTime5h) {
-
-
-
             try {
-
-
-
                 $dt = [DateTime]::Parse($QuotaSnap.ResetTime5h).ToLocalTime()
-
-
-
                 if ($dt -gt $now) { Set-SafeProp $SlotObj "cooldownUntil" ($dt.ToString("yyyy-MM-dd HH:mm:ss")) }
-
-
-
             } catch {}
-
-
-
         }
-
-
-
-    } elseif ($null -ne $QuotaSnap.Gemini5hPct -and $QuotaSnap.Gemini5hPct -gt 0) {
-
-
-
+    } elseif ($null -ne $QuotaSnap.Gemini5hPct -and $QuotaSnap.Gemini5hPct -gt 1) {
         if ($SlotObj.status -eq "cooldown") {
-
-
-
             Set-SafeProp $SlotObj "status" $(if ($IsCurrentActiveSlot) { "active" } else { "ready" })
-
-
-
             Set-SafeProp $SlotObj "cooldownUntil" $null
-
-
-
             Set-SafeProp $SlotObj "cooldownType" "none"
-
-
-
         }
-
-
-
     }
-
-
-
 }
-
-
 
 function Sync-AllSlotsQuotaInfo {
 
@@ -11570,6 +10948,60 @@ function Sync-AllSlotsQuotaInfo {
 
 
 
+function Get-CurrentActiveModelGroup {
+    try {
+        $dbPath = Join-Path $GeminiRoot "antigravity\conversation_summaries.db"
+        if (Test-Path $dbPath) {
+            $pyCode = @'
+import sqlite3, os, sys
+db_path = sys.argv[1].replace('\\', '/')
+try:
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    cur = conn.cursor()
+    cur.execute("SELECT conversation_id FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 1")
+    row = cur.fetchone()
+    if row:
+        cid = row[0]
+        conv_db = os.path.join(os.path.dirname(db_path), 'conversations', f'{cid}.db').replace('\\', '/')
+        if os.path.exists(conv_db):
+            c2 = sqlite3.connect(f"file:{conv_db}?mode=ro", uri=True)
+            cur2 = c2.cursor()
+            cur2.execute("SELECT metadata FROM steps WHERE metadata IS NOT NULL ORDER BY idx DESC LIMIT 10")
+            for m in cur2.fetchall():
+                txt = str(m[0]).lower()
+                if 'argon' in txt:
+                    print('Argon')
+                    sys.exit(0)
+                if any(k in txt for k in ('claude', 'sonnet', 'opus', 'gpt')):
+                    print('Claude')
+                    sys.exit(0)
+                if any(k in txt for k in ('flash', 'gemini')):
+                    print('Gemini')
+                    sys.exit(0)
+except Exception:
+    pass
+print('Gemini')
+'@
+            $res = ($pyCode | & python - "$dbPath" 2>$null)
+            if ($res) {
+                $trimmed = $res.Trim()
+                if ($trimmed -in @("Argon", "Claude", "Gemini")) { return $trimmed }
+            }
+        }
+    } catch {}
+
+    try {
+        $lsLog = Join-Path $env:APPDATA "Antigravity\logs\language_server.log"
+        if (Test-Path $lsLog) {
+            $tail = (Get-Content $lsLog -Tail 50 -ErrorAction SilentlyContinue) -join " "
+            if ($tail -match '(?i)argon') { return "Argon" }
+            if ($tail -match '(?i)claude|sonnet|opus|gpt') { return "Claude" }
+        }
+    } catch {}
+
+    return "Gemini"
+}
+
 function Switch-ToNextAvailableSlot {
 
 
@@ -11598,10 +11030,8 @@ function Switch-ToNextAvailableSlot {
 
 
 
-        [string]$ServerResetTime = ""
-
-
-
+        [string]$ServerResetTime = "",
+        [string]$TargetModelGroup = ""
     )
 
 
@@ -12034,18 +11464,20 @@ function Switch-ToNextAvailableSlot {
 
 
 
-                    $candG5 = Get-SafeProp $candidateObj "gemini5hPct"
-
-
-
-                    if ($pass -eq 1 -and $null -ne $candG5 -and [int]$candG5 -le 0) {
-
-
-
-                        continue
-
-
-
+                    if ($pass -eq 1) {
+                        $grp = if ($TargetModelGroup) { $TargetModelGroup } else { (Get-CurrentActiveModelGroup) }
+                        if ($grp -eq "Argon") {
+                            $candAr = Get-SafeProp $candidateObj "argonWeeklyPct"
+                            if ($null -ne $candAr -and [int]$candAr -le 1) { continue }
+                        } elseif ($grp -eq "Claude") {
+                            $candC5 = Get-SafeProp $candidateObj "claude5hPct"
+                            $candCw = Get-SafeProp $candidateObj "claudeWeeklyPct"
+                            if (($null -ne $candC5 -and [int]$candC5 -le 1) -or ($null -ne $candCw -and [int]$candCw -le 1)) { continue }
+                        } else {
+                            $candG5 = Get-SafeProp $candidateObj "gemini5hPct"
+                            $candGw = Get-SafeProp $candidateObj "geminiWeeklyPct"
+                            if (($null -ne $candG5 -and [int]$candG5 -le 1) -or ($null -ne $candGw -and [int]$candGw -le 1)) { continue }
+                        }
                     }
 
 
@@ -13827,93 +13259,60 @@ function Invoke-DaemonMonitorWorkerLoop {
 
 
         $lsQuota = Get-LocalLanguageServerQuota
-
-
-
         if ($lsQuota -and $currSlot -and $pool.slots.PSObject.Properties[$currSlot]) {
-
-
-
             $currSlotObj = $pool.slots.PSObject.Properties[$currSlot].Value
-
-
-
             Apply-QuotaSnapshotToSlotObject -SlotObj $currSlotObj -QuotaSnap $lsQuota -IsCurrentActiveSlot $true
-
-
-
-            Save-SlotPoolState -State $pool
-
-
+            try { Save-SlotPoolState -State $pool } catch {}
 
             $g5 = if ($null -ne $lsQuota.Gemini5hPct)     { "$($lsQuota.Gemini5hPct)%" }     else { "--" }
-
-
-
             $gw = if ($null -ne $lsQuota.GeminiWeeklyPct) { "$($lsQuota.GeminiWeeklyPct)%" } else { "--" }
-
-
-
+            $ar = if ($null -ne $lsQuota.ArgonWeeklyPct)  { "$($lsQuota.ArgonWeeklyPct)%" }  else { "--" }
             $c5 = if ($null -ne $lsQuota.Claude5hPct)     { "$($lsQuota.Claude5hPct)%" }     else { "--" }
 
-
-
             $readyCnt = @($pool.slots.PSObject.Properties | Where-Object { $_.Value.status -eq "ready" -or $_.Value.status -eq "active" }).Count
+            $quotaLine = "实时剩余: Gemini 5h:$g5 周:$gw | Argon:$ar | Claude 5h:$c5"
+            $tooltip   = "AGY守护[运行中] 槽位:[$currSlot]`nGemini 5h:$g5 周:$gw | Argon:$ar | 备用:$readyCnt"
 
-
-
-            $quotaLine = "实时剩余: Gemini 5h:$g5 周:$gw | Claude 5h:$c5"
-
-
-
-            $tooltip   = "AGY守护[运行中] 槽位:[$currSlot]`nGemini 5h:$g5 周:$gw | 备用:$readyCnt"
-
-
-
-            if (($null -ne $lsQuota.Gemini5hPct -and $lsQuota.Gemini5hPct -le 20) -or ($null -ne $lsQuota.GeminiWeeklyPct -and $lsQuota.GeminiWeeklyPct -le 10)) {
-
-
-
+            if (($null -ne $lsQuota.Gemini5hPct -and $lsQuota.Gemini5hPct -le 20) -or ($null -ne $lsQuota.GeminiWeeklyPct -and $lsQuota.GeminiWeeklyPct -le 10) -or ($null -ne $lsQuota.ArgonWeeklyPct -and $lsQuota.ArgonWeeklyPct -le 10)) {
                 $badgeColor = "Yellow"
-
-
-
             }
 
+            $activeGrp = Get-CurrentActiveModelGroup
+            $shouldSwitch = $false
+            $switchReason = ""
+            $switchResetTime = ""
+            $isWeeklyLimit = $false
 
+            if ($activeGrp -eq "Argon") {
+                if ($null -ne $lsQuota.ArgonWeeklyPct -and $lsQuota.ArgonWeeklyPct -le 1) {
+                    $shouldSwitch = $true
+                    $switchReason = "Local RPC 检测到当前会话使用的 [Gemini 4 Argon] 周配额已耗尽 (剩余 <= 1%)"
+                    $switchResetTime = [string]$lsQuota.ResetTimeArgon
+                    $isWeeklyLimit = $true
+                }
+            } elseif ($activeGrp -eq "Claude") {
+                if (($null -ne $lsQuota.Claude5hPct -and $lsQuota.Claude5hPct -le 1) -or ($null -ne $lsQuota.ClaudeWeeklyPct -and $lsQuota.ClaudeWeeklyPct -le 1)) {
+                    $shouldSwitch = $true
+                    $isWeekly = ($null -ne $lsQuota.ClaudeWeeklyPct -and $lsQuota.ClaudeWeeklyPct -le 1)
+                    $switchReason = if ($isWeekly) { "Local RPC 检测到当前会话使用的 [Claude/GPT] 周配额已耗尽 (剩余 <= 1%)" } else { "Local RPC 检测到当前会话使用的 [Claude/GPT] 5小时限额已耗尽 (剩余 <= 1%)" }
+                    $switchResetTime = if ($isWeekly) { [string]$lsQuota.ResetTimeClaudeWeekly } else { [string]$lsQuota.ResetTime5h }
+                    $isWeeklyLimit = $isWeekly
+                }
+            } else {
+                if (($null -ne $lsQuota.Gemini5hPct -and $lsQuota.Gemini5hPct -le 1) -or ($null -ne $lsQuota.GeminiWeeklyPct -and $lsQuota.GeminiWeeklyPct -le 1) -or $lsQuota.Is5hExhausted -or $lsQuota.IsWeeklyExhausted) {
+                    $shouldSwitch = $true
+                    $isWeekly = ($null -ne $lsQuota.GeminiWeeklyPct -and $lsQuota.GeminiWeeklyPct -le 1) -or $lsQuota.IsWeeklyExhausted
+                    $switchReason = if ($isWeekly) { "Local RPC 检测到当前账号 [Gemini 常规组] 周配额已耗尽 (剩余 <= 1%)" } else { "Local RPC 检测到当前账号 [Gemini 常规组] 5小时配额已耗尽 (剩余 <= 1%)" }
+                    $switchResetTime = if ($isWeekly) { [string]$lsQuota.ResetTimeWeekly } else { [string]$lsQuota.ResetTime5h }
+                    $isWeeklyLimit = $isWeekly
+                }
+            }
 
-            if (($lsQuota.Is5hExhausted -or $lsQuota.IsWeeklyExhausted) -and (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds)) {
-
-
-
+            if ($shouldSwitch -and (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds)) {
                 $lastSwitchTime = $now
-
-
-
-                $isWk  = [bool]$lsQuota.IsWeeklyExhausted
-
-
-
-                $rTime = if ($isWk) { [string]$lsQuota.ResetTimeWeekly } else { [string]$lsQuota.ResetTime5h }
-
-
-
-                $why   = if ($isWk) { "Local RPC 检测到当前账号 Gemini 周配额已耗尽 (0%)" } else { "Local RPC 检测到当前账号 Gemini 5小时配额已耗尽 (0%)" }
-
-
-
-                [void](Switch-ToNextAvailableSlot -Reason $why -AutoRestartApp:$true -IsWeeklyLimit:$isWk -ServerResetTime $rTime)
-
-
-
+                [void](Switch-ToNextAvailableSlot -Reason $switchReason -AutoRestartApp:$true -IsWeeklyLimit:$isWeeklyLimit -ServerResetTime $switchResetTime -TargetModelGroup $activeGrp)
                 continue
-
-
-
             }
-
-
-
         }
 
 
@@ -14770,6 +14169,8 @@ function Show-SlotPoolDashboard {
 
 
 
+    $activeGrp = Get-CurrentActiveModelGroup
+    Write-Host ("  当前活跃会话模型组: [{0}] (守护切号将优先盯紧此模型组水位)" -f $activeGrp) -ForegroundColor Yellow
     Write-Host ("  原会话锁定与RPC源  : 原会话 {0} | {1}" -f $origConvTitle, $lsStatusText) -ForegroundColor Cyan
 
 
@@ -14802,11 +14203,8 @@ function Show-SlotPoolDashboard {
 
 
 
-        Write-Host ("  {0,-4} {1,-6} {2,-8} {3,-22} {4,-14} {5,-14} {6,-18} {7}" -f "#", "槽位", "状态", "账号邮箱", "Gemini(5h/周)", "Claude(5h/周)", "重置/冷却倒计时", "切换") -ForegroundColor White
-
-
-
-        Write-Host "  --------------------------------------------------------------------------------------" -ForegroundColor DarkGray
+        Write-Host ("  {0,-4} {1,-6} {2,-8} {3,-22} {4,-14} {5,-10} {6,-14} {7,-18} {8}" -f "#", "槽位", "状态", "账号邮箱", "Gemini(5h/周)", "Argon(周)", "Claude(5h/周)", "重置/冷却倒计时", "切换") -ForegroundColor White
+        Write-Host "  ------------------------------------------------------------------------------------------------" -ForegroundColor DarkGray
 
 
 
@@ -14890,19 +14288,14 @@ function Show-SlotPoolDashboard {
 
 
 
+            $arVal   = Get-SafeProp $s "argonWeeklyPct"
             $gemCell = Format-QuotaPairCell -Pct5h $g5Val -PctWeekly $gwVal
-
-
-
+            $arCell  = if ($null -ne $arVal -and $arVal -ne "") { "{0,3}%" -f [int]$arVal } else { " -- " }
             $claCell = Format-QuotaPairCell -Pct5h $c5Val -PctWeekly $cwVal
 
-
-
-            $minGem = if ($null -ne $g5Val -and $null -ne $gwVal) { [Math]::Min([int]$g5Val, [int]$gwVal) } elseif ($null -ne $g5Val) { [int]$g5Val } else { $null }
-
-
-
+            $minGem   = if ($null -ne $g5Val -and $null -ne $gwVal) { [Math]::Min([int]$g5Val, [int]$gwVal) } elseif ($null -ne $g5Val) { [int]$g5Val } else { $null }
             $gemColor = if ($null -eq $minGem) { "Gray" } elseif ($minGem -le 15) { "Red" } elseif ($minGem -le 45) { "Yellow" } else { "Green" }
+            $arColor  = if ($null -eq $arVal) { "Gray" } elseif ($arVal -le 15) { "Red" } elseif ($arVal -le 45) { "Yellow" } else { "Green" }
 
 
 
@@ -15111,22 +14504,12 @@ function Show-SlotPoolDashboard {
 
 
             Write-Host ("  [{0,-2}] {1,-6} " -f ($i + 1), $s.slotName) -NoNewline
-
-
-
             Write-Host ("{0,-8} " -f $statusText) -ForegroundColor $statusColor -NoNewline
-
-
-
             Write-Host ("{0,-22} " -f $shortEmail) -NoNewline
-
-
-
             Write-Host ("{0,-14} " -f $gemCell) -ForegroundColor $gemColor -NoNewline
-
-
-
-            Write-Host ("{0,-14} {1,-18} {2}次" -f $claCell, $countdownStr, [int](Get-SafeProp $s "switchCount" 0))
+            Write-Host ("{0,-10} " -f $arCell) -ForegroundColor $arColor -NoNewline
+            Write-Host ("{0,-14} " -f $claCell) -NoNewline
+            Write-Host ("{0,-18} {1}次" -f $countdownStr, [int](Get-SafeProp $s "switchCount" 0))
 
 
 
@@ -15739,8 +15122,14 @@ function Show-StatusDashboard {
 
 
 function Start-InteractiveMenu {
-
-
+    # 自动守护保障：若后台守护未运行，自动静默启动系统托盘常驻守护
+    try {
+        $daemonStatus = Get-DaemonStatus
+        if (-not $daemonStatus.IsRunning) {
+            Write-Host "[*] 检测到后台无人值守守护未运行，正在自动静默启动系统托盘守护..." -ForegroundColor Cyan
+            Start-DaemonBackground -AutoRestartApp -CooldownHours $CooldownHours -PollIntervalSec $PollIntervalSec
+        }
+    } catch {}
 
     # 若后台守护正在运行且启动时间早于当前脚本更新时间，自动静默热重载守护进程以应用最新原会话恢复逻辑
 
