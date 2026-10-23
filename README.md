@@ -1,6 +1,6 @@
 # Antigravity Auto Switcher (AGY 官方原生合规多账号智能轮换与原会话无损续接助手) 🚀
 
-[![Version](https://img.shields.io/badge/Release-v0.1.0-blue.svg)](https://github.com/deancyl/antigravity-auto-switcher/releases)
+[![Version](https://img.shields.io/badge/Release-v0.2.0-blue.svg)](https://github.com/deancyl/antigravity-auto-switcher/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](https://microsoft.com)
 [![Protocol](https://img.shields.io/badge/Protocol-Zero--CDP%20Native%20Connect--RPC-success.svg)](https://github.com/deancyl/antigravity-auto-switcher)
 [![Compliance](https://img.shields.io/badge/Compliance-100%25%20Official%20Native%20(No%20Proxy)-green.svg)](https://github.com/deancyl/antigravity-auto-switcher)
@@ -23,7 +23,7 @@
 切号完成 ──> 探测本地 127.0.0.1 官方 LanguageServer ──> 毫秒级下发 SendUserCascadeMessage ──> 推演核心直接开始推理！(耗时 < 200ms)
 ```
 
-| 维度 | 传统反代方案 (如部分开源工具) | 旧版 CDP DOM 模拟 | **本项目 Zero-CDP 原生方案 (v0.1.0)** |
+| 维度 | 传统反代方案 (如部分开源工具) | 旧版 CDP DOM 模拟 | **本项目 Zero-CDP 原生方案 (v0.2.0)** |
 | :--- | :--- | :--- | :--- |
 | **官方合规性** | ❌ **严重违规** (逆向私有 API，跨号 Token 缝合，高危封号) | ⚠️ **脆弱网页模拟** (把桌面客户端当作网页黑盒) | ✅ **100% 官方正版原生** (基于系统 Windows Credential Keyring，零改包) |
 | **续接机制** | 强行在中途替换 HTTP Token | 模拟 CDP 查找 DOM 输入框与按键 | ✅ **直连 LanguageServer Connect-RPC** (`SendUserCascadeMessage`) |
@@ -33,31 +33,43 @@
 
 ---
 
-## ⚡ 核心功能与特性
+## ⚡ 核心功能与演进能力
 
-### 1. 🔄 5小时/周限额环形冷却槽位池 (Slot Pool)
-- 支持任意多个 Google 账号（如 `slot1`, `slot2`, `a`, `b`, `c` 等）；
-- 本地 Windows DPAPI 硬件级加密保存凭据（位于 `~/.gemini/compliant-switcher/slots/`），严禁明文落地；
-- 具备 5 小时解冻计时器与重置倒计时算法，当当前槽位触发 5 小时限额时，自动无缝切入下一个就绪槽位。
+### 1. 🎯 `/goal` 目标驱动模式与全链路健康度体检
+- **命令调用**：`pwsh antigravity_compliant_helper.ps1 -Action goal` 或交互式菜单按 **`[G]`**；
+- **全链路体检输出**：
+  1. 当前活跃模型名称、模型组归属及原模型严格锁定状态；
+  2. 槽位池账号规模与当前驻留槽位；
+  3. 后台无人值守守护进程 PID 与存活状态；
+  4. Windows 开机自启快捷方式就绪状态；
+  5. 当前活跃模型组在各槽位池的真实可用配额数（如 `3 / 5 个就绪`）；
+  6. 实时配额看板展示。
 
-### 2. 🧠 SQLite WAL 递归 CTE 权威会话状态捕获
-- 彻底废除前端 DOM 文本抓取与英文时间猜解；
-- 直读本地 [`conversation_summaries.db`](file:///C:/Users/deanc/.gemini/antigravity/conversation_summaries.db) 权威数据，通过递归公共表表达式（CTE）算法，100% 精准识别当前处于运行态（`status = RUNNING` 或 `not_fully_idle = 1`）的活跃根会话。
+### 2. ⚡ `/boost` 极速提速模式与实时最优跃迁
+- **命令调用**：`pwsh antigravity_compliant_helper.ps1 -Action boost` 或交互式菜单按 **`[B]`**；
+- **极速跃迁机制**：立即并行拉取槽位池全部账号的云端真实剩余配额，精准识别当前活跃模型组（Gemini / Claude / Argon）配额最高的最佳槽位，若当前槽位配额偏低，则 1 秒内无损切入最优账号并恢复推演。
 
-### 3. 🛡️ 彻底防闪退平滑退役 (Zero-Crash Teardown)
-- **绝对杜绝强杀子进程**：严禁杀 `language_server.exe`，彻底根除 Windows 11 下破坏 ConPTY/Stdio 管道导致的 Electron `0x800700e8` 级联闪退；
-- **CDP `Browser.close` 权威退役**：通过 Chromium 内核级接口通知平滑落盘与安全退出；
-- **内核锁排他检测**：以非阻塞写权限尝试打开 `lockfile`，物理确认句柄完全释放后再拉起新实例，彻底杜绝单实例锁（`SingleInstanceLock`）造成的秒退。
+### 3. 🔒 严格原模型组锁定 (Strict Model Group Locking)
+- **细粒度多模型组监控**：完整支持并区分 **Gemini (5h/周)**、**Argon (周)**、**Claude (5h/周)** 3 大模型桶；
+- **严防模型降智/漂移**：切号前严格核验候选槽位在**当前模型组**的剩余额度必须大于 1%；对于 Argon 模型，强制核验账号是否具备 Argon 权限且配额充足；
+- **耗尽终极锁死**：当当前模型组的所有账号均已耗尽配额时，系统坚决**停止自动切号并声光报警**，严格保护当前复杂推演上下文，绝不跨模型组强切或降级为小模型。
 
-### 4. 🚀 毫秒级原生 RPC 续接 (Zero-CDP Auto-Resume)
-- 调用官方 `GetCascadeModelConfigData` 提取新账号可用模型；
-- 调用官方 `GetResolvedCascadeConfig` 原生合成权威 `cascadeConfig` 环境；
-- 携带完整模型参数调用 `SendUserCascadeMessage`，推演核心直接恢复运行，并通过已建立的 Reactive 流向界面实时广播。
+### 4. 🔕 Windows 开机无感知快捷方式自启 (AV-Friendly)
+- **卡巴斯基/360 零误报**：菜单 **`[A]`** 或托盘右键可一键切换开机自启；
+- **纯快捷方式安全落盘**：仅在 `shell:startup`（`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`）创建纯桌面快捷方式，**严格禁止修改注册表 Run 键**，彻底杜绝杀软拦截；
+- **彻底告别 `.vbs`**：所有守护托管全面采用 Windows 原生脱钩方式，彻底移除 `.vbs` 脚本。
 
-### 5. 🎛️ 桌面托盘常驻与极简交互
-- 支持后台静默常驻，并在右下角系统托盘显示状态小图标 `[A]`；
-- 托盘右键菜单动态集成各账号实时配额概览与待命会话一键直达入口；
-- 配套全套免配置 Windows 批处理入口（`.bat`），开箱即用。
+### 5. 🛡️ 10 大防御性工程重构
+1. **app_storage.json 非破坏性保护**：彻底移除误伤 4 空格缩进的重置逻辑，保留全部用户定制字段，写前自动 `.bak` 备份；
+2. **远程 Google API 证书链强校验**：严格启用 TLS 证书校验，仅对 127.0.0.1 本地 RPC 环回地址放行，请求头统一声明 `User-Agent: antigravity/2.25.0 (windows; amd64)`；
+3. **全量存储写入原子化与回滚机制**：Windows 凭据与 CLI Token 写入前自动快照；一旦发生异常自动回滚至先前状态；
+4. **DPAPI 凭据即时写入深度校验**：槽位保存后即刻解密回读校验，杜绝空凭据落盘；
+5. **守护进程 PID 防重用与启动时间比对**：PID 文件采用 JSON 结构 `{ pid, processName, startTime }`，严防进程退出后 PID 被系统其他进程重用；
+6. **跨进程状态互斥锁超时显式拦截**：`Invoke-WithPoolStateMutex` 获取锁超时抛出明确错误，防止写冲突覆盖；
+7. **PowerShell 7 (Core) 完整程序集支持**：内联 C# 编译显式引入 26 个 Core 运行时程序集并捕获明确编译报错；
+8. **冷却重置与 Argon 权限识别**：`Reset-SlotCooldown` 手动重置时自动将耗尽配额恢复为 100% 并清除各模型重置时间戳；修复活跃槽位匹配时过滤冷却状态的 Bug；
+9. **纯只读状态探测**：状态查看完全剔除剪贴板篡改与菜单自动拉起守护的副作用；
+10. **安全密钥掩码与 Python 子进程超时防卡死**：API Key 交互输入支持 `-AsSecureString` 掩码；会话数据库读取子进程配置 5 秒硬超时与自动 Kill 保护。
 
 ---
 
@@ -65,7 +77,6 @@
 
 ```text
 ├── antigravity_compliant_helper.ps1   # 核心 PowerShell 5.1/7 双引擎合规切换与守护引擎
-├── daemon_runner.vbs                  # Windows 原生无黑框内核级静默后台托管脚本
 ├── 开启自动切号守护.bat                 # 一键启动后台无窗口守护进程与系统托盘图标
 ├── 停止自动切号守护.bat                 # 一键停止后台守护进程
 ├── 查看自动切号状态与槽位池.bat         # 呼出实时全账号配额看板与交互式控制台
@@ -78,41 +89,18 @@
 
 ---
 
-## 🚀 快速上手
+## 🚀 常用操作指令
 
-### 1. 下载安装
-从 [GitHub Releases](https://github.com/deancyl/antigravity-auto-switcher/releases) 下载最新版本的 `Antigravity-Auto-Switcher-v0.1.0.zip`，解压至任意目录（建议存放在固定目录，如 `C:\Users\<YourUser>\Desktop\AGY`）。
-
-### 2. 录入您的多账号槽位
-1. 打开官方 **Google Antigravity 2.0** 桌面客户端，正常登录您的第 1 个 Google 账号；
-2. 双击运行 `保存当前账号至槽位.bat`，根据提示输入槽位名称（例如 `a` 或 `slot1`）；
-3. 在 Antigravity 中登出并登录第 2 个 Google 账号，再次双击 `保存当前账号至槽位.bat` 保存为 `b`；
-4. 重复以上步骤，录入全部备用账号（建议 3~5 个账号组成高可用矩阵）。
-
-### 3. 一键开启后台无人值守守护
-- 双击运行 **`开启自动切号守护.bat`**：
-  - 控制台将瞬间无黑框退出，右下角系统托盘出现 `[A]` 图标；
-  - 守护进程将在后台静默监听 5 小时配额与限额信号；
-  - 一旦触发限额，自动优雅退出旧实例、轮换凭据、拉起新账号，并通过官方 RPC **自动唤醒原会话继续推演**，全程无需人工干预！
-
-### 4. 管理与查看看板
-- 双击 **`查看自动切号状态与槽位池.bat`** 随时唤出实时配额看板，查看所有账号的 5h/周 真实剩余配额与重置倒计时：
-```text
-========================================================================================
-   Antigravity 5小时/周限额全自动切号与全账号实时配额看板 (原会话续接 · 托盘小标)
-========================================================================================
-  无人值守守护状态   : ● 后台无窗口常驻中 (PID: 28412 | 右下角托盘 [A] 图标已常驻)
-  AGY2 界面当前账号  : user_a@gmail.com (槽位: [a] | 指纹: 01e02e6a)
-  原会话锁定与RPC源  : 原会话 [项目重构与优化] | 已连接本地 LanguageServer RPC (127.0.0.1:13006 (Live RPC))
-----------------------------------------------------------------------------------------
-  全账号槽位池实时剩余配额总览 (Gemini 5h/周 & Claude 5h/周 | 按 [R] 刷新全部账号云端配额):
-  #    槽位     状态       账号邮箱                   Gemini(5h/周)   Claude(5h/周)   重置/冷却倒计时           切换
-  --------------------------------------------------------------------------------------
-  [1 ] a      ACTIVE   user_a@gmail.com        74% /  36%    100% /  --     ★ 使用中(03h06m后重置)   1次
-  [2 ] b      READY    user_b@gmail.com       100% /   1%    100% /  --     就绪 (待命备用)          2次
-  [3 ] c      READY    user_c@gmail.com        86% /  15%    100% /  --     就绪(01h23m后重置)      2次
-========================================================================================
-```
+| 场景 | 命令行指令 | 交互菜单按键 | 说明 |
+| :--- | :--- | :--- | :--- |
+| **状态查看** | `pwsh antigravity_compliant_helper.ps1 -Action status` | `[1]` | 纯只读查看各账号配额、活跃会话与模型 |
+| **目标体检** | `pwsh antigravity_compliant_helper.ps1 -Action goal` | `[G]` | 全链路健康度体检与可用槽位数核验 |
+| **极速提速** | `pwsh antigravity_compliant_helper.ps1 -Action boost` | `[B]` | 核验云端实时配额并跃迁至最高槽位 |
+| **开机自启** | - | `[A]` | 一键开启/关闭 Windows 开机无感自启 |
+| **保存槽位** | `pwsh antigravity_compliant_helper.ps1 -Action save -Slot <Name>` | `[2]` | 将当前客户端登录态加密快照存入槽位 |
+| **手动切号** | `pwsh antigravity_compliant_helper.ps1 -Action switch -Slot <Name>` | `[3]` | 切换至指定槽位并自动重启续接 |
+| **重置冷却** | `pwsh antigravity_compliant_helper.ps1 -Action reset-cooldown -Slot all` | `[9]` | 重置所有槽位冷却状态与配额基线 |
+| **刷新配额** | `pwsh antigravity_compliant_helper.ps1 -Action refresh-quota` | `[R]` | 强制从云端接口同步各账号最新配额 |
 
 ---
 

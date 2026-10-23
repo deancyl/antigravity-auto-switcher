@@ -74,7 +74,7 @@ param(
 
 
 
-    [ValidateSet("menu", "status", "save", "switch", "delete", "mode", "handover", "daemon", "daemon-worker", "start-daemon", "stop-daemon", "daemon-status", "next-slot", "pool-status", "reset-cooldown", "repair-storage", "auto-resume", "refresh-quota")]
+    [ValidateSet("menu", "status", "save", "switch", "delete", "mode", "handover", "daemon", "daemon-worker", "start-daemon", "stop-daemon", "daemon-status", "next-slot", "pool-status", "reset-cooldown", "repair-storage", "auto-resume", "refresh-quota", "goal", "boost", "/goal", "/boost")]
 
 
 
@@ -174,7 +174,10 @@ $Script:CachedMonitoredFiles = @()
 
 
 
-$Script:LastFileScanTime     = [DateTime]::MinValue
+$Script:LastFileScanTime         = [DateTime]::MinValue
+$Script:CachedActiveModelInfo    = $null
+$Script:ActiveModelInfoCachedAt  = [DateTime]::MinValue
+$Script:LockedActiveModelEnum    = $null
 
 
 
@@ -383,58 +386,60 @@ function Read-Utf8StripBom {
 
 
 function Repair-FileUtf8BomIfPresent {
-
-
-
     param([string]$Path)
-
-
-
     if ([string]::IsNullOrWhiteSpace($Path) -or (-not (Test-Path $Path))) { return $false }
-
-
-
     try {
-
-
-
         $bytes = [System.IO.File]::ReadAllBytes($Path)
-
-
-
         if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
-
-
-
             $cleanBytes = New-Object byte[] ($bytes.Length - 3)
-
-
-
             [System.Buffer]::BlockCopy($bytes, 3, $cleanBytes, 0, $cleanBytes.Length)
-
-
-
             [System.IO.File]::WriteAllBytes($Path, $cleanBytes)
-
-
-
             return $true
-
-
-
         }
-
-
-
     } catch {}
-
-
-
     return $false
-
-
-
 }
+
+function Write-AtomicUtf8NoBom {
+    param([Parameter(Mandatory=$true)][string]$Path, [Parameter(Mandatory=$true)][string]$Content)
+    $dir = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($dir) -and -not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    $tmpPath = "$Path.$([System.Guid]::NewGuid().ToString('N')).tmp"
+    try {
+        [System.IO.File]::WriteAllText($tmpPath, $Content, $Utf8NoBomEncoding)
+        if ([System.IO.File]::Exists($Path)) {
+            [System.IO.File]::Delete($Path)
+        }
+        [System.IO.File]::Move($tmpPath, $Path)
+    } finally {
+        if ([System.IO.File]::Exists($tmpPath)) {
+            try { [System.IO.File]::Delete($tmpPath) } catch {}
+        }
+    }
+}
+
+function Write-AtomicAscii {
+    param([Parameter(Mandatory=$true)][string]$Path, [Parameter(Mandatory=$true)][string]$Content)
+    $dir = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($dir) -and -not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    $tmpPath = "$Path.$([System.Guid]::NewGuid().ToString('N')).tmp"
+    try {
+        [System.IO.File]::WriteAllText($tmpPath, $Content, [System.Text.Encoding]::ASCII)
+        if ([System.IO.File]::Exists($Path)) {
+            [System.IO.File]::Delete($Path)
+        }
+        [System.IO.File]::Move($tmpPath, $Path)
+    } finally {
+        if ([System.IO.File]::Exists($tmpPath)) {
+            try { [System.IO.File]::Delete($tmpPath) } catch {}
+        }
+    }
+}
+
 
 
 
@@ -455,9 +460,7 @@ function Repair-FileUtf8BomIfPresent {
 
 
 $CSharpSource = @'
-
-
-
+#pragma warning disable
 using System;
 
 
@@ -2110,46 +2113,24 @@ namespace AntigravityCompliantHelper
 
 
 
-                bool looksCorruptedByPs = raw.StartsWith("{\r\n    \"") || raw.StartsWith("{\n    \"") || !raw.StartsWith("{") || !raw.EndsWith("}");
-
-
-
-                if (looksCorruptedByPs)
-
-
-
+                // 安全备份原配置文件
+                try
                 {
+                    File.Copy(filePath, filePath + ".bak", true);
+                }
+                catch {}
 
-
-
+                // 仅当文件完全不是合法 JSON 边界（非 { 开头或非 } 结尾）时才判定受损重置，严禁因 4 空格缩进误判重置！
+                bool isInvalidJson = !raw.StartsWith("{") || !raw.EndsWith("}");
+                if (isInvalidJson)
+                {
                     try
-
-
-
                     {
-
-
-
-                        File.Copy(filePath, filePath + ".ps_corrupt.bak", true);
-
-
-
+                        File.Copy(filePath, filePath + ".corrupt.bak", true);
                     }
-
-
-
                     catch {}
-
-
-
                     File.WriteAllText(filePath, minimalCleanJson, new UTF8Encoding(false));
-
-
-
                     return;
-
-
-
                 }
 
 
@@ -2866,7 +2847,15 @@ namespace AntigravityCompliantHelper
 
 
 
-                req.ServerCertificateValidationCallback = delegate(object s, X509Certificate cert, X509Chain chain, SslPolicyErrors err) { return true; };
+                req.ServerCertificateValidationCallback = delegate(object s, X509Certificate cert, X509Chain chain, SslPolicyErrors err)
+                {
+                    HttpWebRequest r = s as HttpWebRequest;
+                    if (r != null && (r.RequestUri.IsLoopback || r.RequestUri.Host == "127.0.0.1" || r.RequestUri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return true;
+                    }
+                    return err == SslPolicyErrors.None;
+                };
 
 
 
@@ -3266,27 +3255,11 @@ namespace AntigravityCompliantHelper
 
 
 
-                req.ServerCertificateValidationCallback = delegate(object s, X509Certificate cert, X509Chain chain, SslPolicyErrors err) { return true; };
-
-
-
                 IWebProxy proxy = GetEffectiveProxy();
-
-
-
                 if (proxy != null) req.Proxy = proxy;
-
-
-
                 req.Method = "POST";
-
-
-
                 req.ContentType = "application/json";
-
-
-
-                req.UserAgent = "antigravity";
+                req.UserAgent = "antigravity/2.25.0 (windows; amd64)";
 
 
 
@@ -3643,41 +3616,16 @@ namespace AntigravityCompliantHelper
 
 
 if (-not ("AntigravityCompliantHelper.NativeVaultV4" -as [type])) {
-
-
-
     $refAssemblies = if ($PSVersionTable.PSEdition -eq "Core") {
-
-
-
-        @("System.Security.Cryptography.ProtectedData", "System.Net.WebSockets.Client", "System.Net.WebSockets", "System.Text.RegularExpressions")
-
-
-
+        @("netstandard", "System.Runtime", "System.IO", "System.Text.Encoding", "System.Text.Encoding.Extensions", "System.Text.RegularExpressions", "System.Security.Cryptography.ProtectedData", "System.Security.Cryptography.X509Certificates", "System.Security.Cryptography", "System.Net.WebSockets.Client", "System.Net.WebSockets", "System.Diagnostics.Process", "System.ComponentModel.Primitives", "System.Net.Primitives", "System.Net.Security", "System.Net.Requests", "System.Net.ServicePoint", "System.Net.WebHeaderCollection", "System.Net.WebProxy", "System.Net.Sockets", "System.Net.NameResolution", "System.Net.Http", "System.Runtime.InteropServices", "System.Collections.Specialized", "System.Collections", "System.Threading", "System.Threading.Thread")
     } else {
-
-
-
         @("System.Security", "System.Net.Http", "System")
-
-
-
     }
-
-
-
     try {
-
-
-
-        Add-Type -TypeDefinition $CSharpSource -ReferencedAssemblies $refAssemblies -ErrorAction SilentlyContinue
-
-
-
-    } catch {}
-
-
-
+        Add-Type -TypeDefinition $CSharpSource -ReferencedAssemblies $refAssemblies -WarningAction SilentlyContinue -ErrorAction Stop
+    } catch {
+        throw "内联 C# 编译失败 (NativeVaultV4): $($_.Exception.Message)`n请确认当前 PowerShell 环境是否支持 Add-Type 及所需程序集。"
+    }
 }
 
 
@@ -3851,45 +3799,20 @@ foreach ($targetFile in @($AppStorageJson, $AgyCliTokenPath, $AgyCliConfigPath, 
 
 
 if (Test-Path $AppStorageJson) {
-
-
-
     try {
-
-
-
         $rawStorage = Read-Utf8StripBom -Path $AppStorageJson
-
-
-
-        if ($rawStorage -and ($rawStorage.StartsWith("{`r`n    `"") -or $rawStorage.StartsWith("{`n    `""))) {
-
-
-
-            $savedEmail = [AntigravityCompliantHelper.NativeVaultV4]::ReadJsonStringFieldRegex($AppStorageJson, "jetski.onboarding.lastLoginUsername")
-
-
-
-            if (-not $savedEmail) { $savedEmail = "user@gmail.com" }
-
-
-
-            [AntigravityCompliantHelper.NativeVaultV4]::UpdateAppStorageEmailSafely($AppStorageJson, $savedEmail, $true)
-
-
-
-            Write-Host "[✓] 检测到 app_storage.json 曾被 PowerShell ConvertTo-Json 改写（会导致 AGY2 闪退），已自动修复为纯净官方格式！" -ForegroundColor Green
-
-
-
+        if ($rawStorage) {
+            $trimmed = $rawStorage.Trim()
+            $isInvalidBoundary = (-not $trimmed.StartsWith("{")) -or (-not $trimmed.EndsWith("}"))
+            if ($isInvalidBoundary) {
+                Write-Host "[!] 检测到 app_storage.json 结构受损，正在自动安全备份并重置为纯净官方格式..." -ForegroundColor Yellow
+                $currSummary = Get-CurrentActiveAccountSummary
+                $keepEmail = if ($currSummary.ActiveEmail -and $currSummary.ActiveEmail -notmatch '未检测') { $currSummary.ActiveEmail } else { "user@gmail.com" }
+                [AntigravityCompliantHelper.NativeVaultV4]::UpdateAppStorageEmailSafely($AppStorageJson, $keepEmail, $true)
+                Write-Host "[✓] app_storage.json 已自动安全备份并重置完成。" -ForegroundColor Green
+            }
         }
-
-
-
     } catch {}
-
-
-
 }
 
 
@@ -5938,19 +5861,14 @@ except Exception as e:
 
 
 
-        $sw.Close()
-
-
-
-        $manifestJson = $proc.StandardOutput.ReadToEnd()
-
-
-
-        [void]$proc.WaitForExit(5000)
-
-
-
-        $null = $stderrTask.GetAwaiter().GetResult()
+                $sw.Close()
+        if (-not $proc.WaitForExit(5000)) {
+            try { $proc.Kill() } catch {}
+            Write-Host "    [!] 读取会话元数据 Python 进程超时 (5s)，已安全终止。" -ForegroundColor Yellow
+        } else {
+            $manifestJson = $proc.StandardOutput.ReadToEnd()
+            $null = $stderrTask.GetAwaiter().GetResult()
+        }
 
 
 
@@ -6041,6 +5959,16 @@ except Exception as e:
     }
 
 
+
+    try {
+        $actModel = Get-CurrentActiveModelInfo
+        if ($actModel -and $actModel.ModelEnum) {
+            $manifest | Add-Member -MemberType NoteProperty -Name "locked_model_enum" -Value $actModel.ModelEnum -Force
+            $manifest | Add-Member -MemberType NoteProperty -Name "locked_model_label" -Value $actModel.Label -Force
+            $manifest | Add-Member -MemberType NoteProperty -Name "locked_model_group" -Value $actModel.Group -Force
+            $Script:LockedActiveModelEnum = $actModel.ModelEnum
+        }
+    } catch {}
 
     Write-Utf8NoBom -Path $ResumeManifestPath -Content ($manifest | ConvertTo-Json -Depth 6)
 
@@ -6446,11 +6374,7 @@ function Get-LatestConversationContextInfo {
 
 
 
-    $resumePrompt = "请继续执行刚才被限额打断的未完成任务，直接接着上一步继续推进。"
-
-
-
-    try { Set-Clipboard -Value $resumePrompt -ErrorAction SilentlyContinue } catch {}
+        $resumePrompt = "请继续执行刚才被限额打断的未完成任务，直接接着上一步继续推进。" 
 
 
 
@@ -6706,242 +6630,97 @@ function Invoke-UnattendedConversationResume {
 
 
 
-            # 1. 动态获取当前客户端可用模型与官方权威配置
-
-
-
-            $targetModel = "MODEL_PLACEHOLDER_M320" # 默认 fallback
-
-
+            # 1. 动态获取当前客户端可用模型与官方权威配置（优先锁定切号前使用的真实模型，绝不硬编码降级为 Flash Low）
+            $lockedEnum = $null
+            if ($Script:LockedActiveModelEnum) {
+                $lockedEnum = $Script:LockedActiveModelEnum
+            } elseif ($Script:LastActiveManifest -and $Script:LastActiveManifest.locked_model_enum) {
+                $lockedEnum = [string]$Script:LastActiveManifest.locked_model_enum
+            } elseif (Test-Path $ResumeManifestPath) {
+                try {
+                    $mfObj = (Read-Utf8StripBom -Path $ResumeManifestPath) | ConvertFrom-Json
+                    if ($mfObj.locked_model_enum) { $lockedEnum = [string]$mfObj.locked_model_enum }
+                } catch {}
+            }
+            if (-not $lockedEnum) {
+                try {
+                    $st = Get-SlotPoolState
+                    if ($st.lockedModelEnum) { $lockedEnum = [string]$st.lockedModelEnum }
+                } catch {}
+            }
+            if (-not $lockedEnum) {
+                $lockedEnum = (Get-CurrentActiveModelInfo).ModelEnum
+            }
+            $targetModel = if ($lockedEnum) { $lockedEnum } else { "MODEL_PLACEHOLDER_M318" }
 
             $modelDataResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/GetCascadeModelConfigData", $csrf, "{}", 2000)
-
-
-
             if ($modelDataResp -match '^200\|(.+)$') {
-
-
-
                 try {
-
-
-
                     $mData = $Matches[1] | ConvertFrom-Json
-
-
-
-                    if ($mData.defaultOverrideModelConfig -and $mData.defaultOverrideModelConfig.modelOrAlias -and $mData.defaultOverrideModelConfig.modelOrAlias.model) {
-
-
-
-                        $targetModel = [string]$mData.defaultOverrideModelConfig.modelOrAlias.model
-
-
-
-                    } elseif ($mData.clientModelConfigs -and $mData.clientModelConfigs.Count -gt 0) {
-
-
-
-                        $targetModel = [string]$mData.clientModelConfigs[0].modelOrAlias.model
-
-
-
+                    if (-not $lockedEnum) {
+                        if ($mData.defaultOverrideModelConfig -and $mData.defaultOverrideModelConfig.modelOrAlias -and $mData.defaultOverrideModelConfig.modelOrAlias.model) {
+                            $targetModel = [string]$mData.defaultOverrideModelConfig.modelOrAlias.model
+                        } elseif ($mData.clientModelConfigs -and $mData.clientModelConfigs.Count -gt 0) {
+                            $targetModel = [string]$mData.clientModelConfigs[0].modelOrAlias.model
+                        }
                     }
-
-
-
                 } catch {}
-
-
-
             }
-
-
 
             # 2. 调用官方 GetResolvedCascadeConfig 生成完整环境配置 (包含 planModel 与完整工具链)
-
-
-
             $resolvePayload = @"
-
-
-
 {
-
-
-
     "overrideConfig": {
-
-
-
         "plannerConfig": {
-
-
-
             "planModel": "$targetModel"
-
-
-
         }
-
-
-
     }
-
-
-
 }
-
-
-
 "@
-
-
-
             $resolvedConfigJson = $null
-
-
-
             $resConfigResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/GetResolvedCascadeConfig", $csrf, $resolvePayload, 3000)
-
-
-
             if ($resConfigResp -match '^200\|(.+)$') {
-
-
-
                 try {
-
-
-
                     $resObj = $Matches[1] | ConvertFrom-Json
-
-
-
                     if ($resObj.cascadeConfig) {
-
-
-
                         $resolvedConfigJson = ($resObj.cascadeConfig | ConvertTo-Json -Depth 20 -Compress)
-
-
-
                     }
-
-
-
                 } catch {}
-
-
-
             }
 
-
-
             # 3. 组装官方完整 SendUserCascadeMessage 载荷 (补齐 cascadeConfig 与 customAgentSpec 杜绝 plan model not specified 报错)
-
-
-
             $cleanPrompt = $safePrompt.Replace('\', '\\').Replace('"', '\"').Replace("`r", "").Replace("`n", "\n")
-
-
-
             $agentSpecJson = '{"builtinAgent":{"defaultAgent":{"isGoogle":false,"isInteractive":true,"surface":"AGENT_SURFACE_HUB"}}}'
-
-
-
             $configField = if ($resolvedConfigJson) { "`"cascadeConfig`": $resolvedConfigJson," } else { "" }
-
-
-
             $rpcPayload = @"
-
-
-
 {
-
-
-
     "cascadeId": "$targetConvId",
-
-
-
     "items": [
-
-
-
         {
-
-
-
             "text": "$cleanPrompt"
-
-
-
         }
-
-
-
     ],
-
-
-
     $configField
-
-
-
     "customAgentSpec": $agentSpecJson
-
-
-
 }
-
-
-
 "@
-
-
-
             Write-Host ("    [*] 正在通过 LanguageServer RPC (SendUserCascadeMessage) 注入模型配置 ({0}) 并唤醒会话 [{1}]..." -f $targetModel, $targetConvId) -ForegroundColor Gray
 
-
-
-            $sendResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/SendUserCascadeMessage", $csrf, $rpcPayload, 5000)
-
-
-
-            if ($sendResp -match '^200\|') {
-
-
-
-                Start-Sleep -Milliseconds 600
-
-
-
-                $lsSuccess = $true
-
-
-
-                Write-Host ("    [✓] 已通过 LanguageServer 官方原生 RPC 成功将续接指令与完整模型环境注入推演核心，模型已正常恢复生成！") -ForegroundColor Green
-
-
-
-            } elseif ($sendResp -match 'trajectory not found') {
-
-
-
-                Write-Host ("    [~] 该会话 Trajectory 正在由客户端加载，已配置剪贴板，点开原会话按 Ctrl+V 即可续接。") -ForegroundColor Yellow
-
-
-
-            } else {
-
-
-
-                Write-Host ("    [~] RPC 响应状态: {0}" -f $sendResp) -ForegroundColor Gray
-
-
-
+            $maxResumeRetries = 5
+            for ($attempt = 1; $attempt -le $maxResumeRetries; $attempt++) {
+                $sendResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/SendUserCascadeMessage", $csrf, $rpcPayload, 5000)
+                if ($sendResp -match '^200\|') {
+                    Start-Sleep -Milliseconds 600
+                    $lsSuccess = $true
+                    Write-Host ("    [✓] 已通过 LanguageServer 官方原生 RPC 成功将续接指令与完整模型环境注入推演核心，模型已正常恢复生成！") -ForegroundColor Green
+                    break
+                } elseif ($sendResp -match 'trajectory not found') {
+                    Write-Host ("    [~] 客户端会话轨迹加载中 (尝试 {0}/{1})..." -f $attempt, $maxResumeRetries) -ForegroundColor Yellow
+                    Start-Sleep -Milliseconds (800 * $attempt)
+                } else {
+                    Write-Host ("    [~] RPC 响应状态: {0}" -f $sendResp) -ForegroundColor Gray
+                    break
+                }
             }
 
 
@@ -7902,55 +7681,31 @@ function Save-CredentialSlot {
 
 
 
-    $encryptedBlob = [AntigravityCompliantHelper.NativeVaultV4]::ProtectText($plainJson)
-
-
-
+        $encryptedBlob = [AntigravityCompliantHelper.NativeVaultV4]::ProtectText($plainJson)
     $slotFile = Join-Path $SlotsDir "$SlotName.dpapi"
-
-
-
     $metaFile = Join-Path $SlotsDir "$SlotName.meta.json"
 
-
-
-    Set-Content -Path $slotFile -Value $encryptedBlob -Encoding ASCII -NoNewline
-
-
+    Write-AtomicAscii -Path $slotFile -Content $encryptedBlob
 
     $metaObj = [PSCustomObject]@{
-
-
-
         slotName         = $SlotName
-
-
-
         detectedEmail    = $snapshot.detectedEmail
-
-
-
         tokenFingerprint = $fingerprint
-
-
-
         savedAt          = $snapshot.savedAt
-
-
-
         hasWinCred       = $true
-
-
-
         hasCliToken      = $true
-
-
-
     }
+    Write-AtomicUtf8NoBom -Path $metaFile -Content ($metaObj | ConvertTo-Json)
 
-
-
-    Write-Utf8NoBom -Path $metaFile -Content ($metaObj | ConvertTo-Json)
+    # 写入后即刻解密与读取校验 (Credential Write Verification)
+    $verifyPlain = [AntigravityCompliantHelper.NativeVaultV4]::UnprotectText((Get-Content $slotFile -Raw -Encoding ASCII))
+    if ([string]::IsNullOrWhiteSpace($verifyPlain)) {
+        throw "槽位凭据写入校验失败：DPAPI 回读解密为空！"
+    }
+    $verifyMeta = Read-Utf8StripBom -Path $metaFile | ConvertFrom-Json
+    if (-not $verifyMeta -or -not $verifyMeta.slotName) {
+        throw "槽位元数据写入校验失败：meta.json 回读解析为空！"
+    }
 
 
 
@@ -7967,327 +7722,143 @@ function Save-CredentialSlot {
 
 
 function Write-AllStoresForSnapshot {
-
-
-
     param([Parameter(Mandatory=$true)]$Snapshot)
 
-
-
     $email = if ($Snapshot.PSObject.Properties["detectedEmail"] -and $Snapshot.detectedEmail -notmatch '未检测|未解析') { [string]$Snapshot.detectedEmail } else { "" }
-
-
-
     $at = if ($Snapshot.PSObject.Properties["accessToken"]) { [string]$Snapshot.accessToken } else { "" }
-
-
-
     $rt = if ($Snapshot.PSObject.Properties["refreshToken"]) { [string]$Snapshot.refreshToken } else { "" }
-
-
-
     $expSec = if ($Snapshot.PSObject.Properties["expiryTimestamp"] -and $Snapshot.expiryTimestamp) { [long]$Snapshot.expiryTimestamp } else { [long]0 }
-
-
-
     $idt = if ($Snapshot.PSObject.Properties["idToken"]) { [string]$Snapshot.idToken } else { "" }
-
-
-
     $pidVal = if ($Snapshot.PSObject.Properties["projectId"]) { [string]$Snapshot.projectId } else { "" }
 
-
-
     if ([string]::IsNullOrWhiteSpace($at) -or [string]::IsNullOrWhiteSpace($rt)) {
-
-
-
         $parsedOld = Parse-CredentialStorePayload -RawPayload ([string]$Snapshot.windowsCred)
-
-
-
         if ($parsedOld) {
-
-
-
             $at = $parsedOld.accessToken
-
-
-
             $rt = $parsedOld.refreshToken
-
-
-
             $expSec = $parsedOld.expiryTimestamp
-
-
-
             if (-not $idt) { $idt = $parsedOld.idToken }
-
-
-
             if (-not $pidVal) { $pidVal = $parsedOld.projectId }
-
-
-
             if (-not $email -and $parsedOld.email) { $email = $parsedOld.email }
-
-
-
         }
-
-
-
     }
-
-
 
     if ($expSec -le 0) {
-
-
-
         $expSec = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 3600
-
-
-
     }
 
-
-
-    # 1. 写入 Windows 凭据管理器 (gemini:antigravity)
-
-
-
+    # 1. 构造标准 Windows 凭据载荷
     $winCredPayload = if (-not [string]::IsNullOrWhiteSpace($at) -and -not [string]::IsNullOrWhiteSpace($rt)) {
-
-
-
         Build-OfficialCredentialPayloadJson -AccessToken $at -RefreshToken $rt -ExpiryTimestamp $expSec -IdToken $idt -ProjectId $pidVal
-
-
-
     } else {
-
-
-
         [string]$Snapshot.windowsCred
-
-
-
     }
 
+    # 备份当前系统全量凭据状态以支持原子回滚 (Rollback)
+    $backupWinCred = $null
+    try { $backupWinCred = [AntigravityCompliantHelper.NativeVaultV4]::ReadGenericCredential($CredTarget) } catch {}
+    $backupAppStorage = if (Test-Path $AppStorageJson) { try { [System.IO.File]::ReadAllBytes($AppStorageJson) } catch { $null } } else { $null }
+    $backupAgyCliToken = if (Test-Path $AgyCliTokenPath) { try { [System.IO.File]::ReadAllBytes($AgyCliTokenPath) } catch { $null } } else { $null }
+    $backupJetski = if (Test-Path $JetskiStandalonePath) { try { [System.IO.File]::ReadAllBytes($JetskiStandalonePath) } catch { $null } } else { $null }
+    $backupOAuth = if (Test-Path $OAuthCredsPath) { try { [System.IO.File]::ReadAllBytes($OAuthCredsPath) } catch { $null } } else { $null }
+    $backupAccounts = if (Test-Path $AccountsJsonPath) { try { [System.IO.File]::ReadAllBytes($AccountsJsonPath) } catch { $null } } else { $null }
 
-
-    if (-not [string]::IsNullOrEmpty($winCredPayload)) {
-
-
-
-        [AntigravityCompliantHelper.NativeVaultV4]::WriteGenericCredential($CredTarget, $CredUser, $winCredPayload)
-
-
-
-        Write-Host "    [+] 已同步 Windows 凭据管理器 (gemini:antigravity)" -ForegroundColor Cyan
-
-
-
-    }
-
-
-
-    # 2. 原地无损更新 AGY 2.0 桌面端 app_storage.json（绝不用 ConvertTo-Json 破坏数组结构！）
-
-
-
-    if ($email) {
-
-
-
-        Set-AppStorageLoginEmail -Email $email
-
-
-
-    }
-
-
-
-    # 3. 同步 ~/.gemini 下的 CLI 与通用 OAuth 凭据文件（无 BOM）
-
-
-
-    if (-not (Test-Path $AgyCliDir)) {
-
-
-
-        New-Item -ItemType Directory -Path $AgyCliDir -Force | Out-Null
-
-
-
-    }
-
-
-
-    if (-not [string]::IsNullOrEmpty($winCredPayload)) {
-
-
-
-        Write-Utf8NoBom -Path $AgyCliTokenPath -Content $winCredPayload
-
-
-
-        if (Test-Path $JetskiStandalonePath) {
-
-
-
-            Write-Utf8NoBom -Path $JetskiStandalonePath -Content $winCredPayload
-
-
-
+    try {
+        if (-not [string]::IsNullOrEmpty($winCredPayload)) {
+            [AntigravityCompliantHelper.NativeVaultV4]::WriteGenericCredential($CredTarget, $CredUser, $winCredPayload)
+            Write-Host "    [+] 已同步 Windows 凭据管理器 (gemini:antigravity)" -ForegroundColor Cyan
         }
 
-
-
-    } elseif (-not [string]::IsNullOrEmpty($Snapshot.agyCliToken)) {
-
-
-
-        Write-Utf8NoBom -Path $AgyCliTokenPath -Content ([string]$Snapshot.agyCliToken)
-
-
-
-    }
-
-
-
-    if (-not [string]::IsNullOrWhiteSpace($at) -and -not [string]::IsNullOrWhiteSpace($rt)) {
-
-
-
-        $oauthCredsMap = [ordered]@{
-
-
-
-            access_token  = $at
-
-
-
-            refresh_token = $rt
-
-
-
-            token_type    = "Bearer"
-
-
-
-            expiry_date   = ($expSec * 1000)
-
-
-
+        # 2. 原地无损更新 AGY 2.0 桌面端 app_storage.json
+        if ($email) {
+            Set-AppStorageLoginEmail -Email $email
         }
 
-
-
-        if ($idt) { $oauthCredsMap["id_token"] = $idt }
-
-
-
-        Write-Utf8NoBom -Path $OAuthCredsPath -Content ($oauthCredsMap | ConvertTo-Json -Depth 5)
-
-
-
-    } elseif (-not [string]::IsNullOrEmpty($Snapshot.oauthCredsJson)) {
-
-
-
-        Write-Utf8NoBom -Path $OAuthCredsPath -Content ([string]$Snapshot.oauthCredsJson)
-
-
-
-    }
-
-
-
-    if ($email) {
-
-
-
-        $oldList = @()
-
-
-
-        if (Test-Path $AccountsJsonPath) {
-
-
-
-            try {
-
-
-
-                $cleanAcc = Read-Utf8StripBom -Path $AccountsJsonPath
-
-
-
-                $currAcc = $cleanAcc | ConvertFrom-Json
-
-
-
-                if ($currAcc.PSObject.Properties["old"] -and $currAcc.old) {
-
-
-
-                    $oldList = @($currAcc.old | Where-Object { $_ -ne $email })
-
-
-
-                }
-
-
-
-                if ($currAcc.PSObject.Properties["active"] -and $currAcc.active -and $currAcc.active -ne $email -and ($oldList -notcontains $currAcc.active)) {
-
-
-
-                    $oldList += [string]$currAcc.active
-
-
-
-                }
-
-
-
-            } catch {}
-
-
-
+        # 3. 同步 ~/.gemini 下的 CLI 与通用 OAuth 凭据文件（无 BOM 原子写入）
+        if (-not (Test-Path $AgyCliDir)) {
+            New-Item -ItemType Directory -Path $AgyCliDir -Force | Out-Null
         }
 
+        if (-not [string]::IsNullOrEmpty($winCredPayload)) {
+            Write-AtomicUtf8NoBom -Path $AgyCliTokenPath -Content $winCredPayload
+            if (Test-Path $JetskiStandalonePath) {
+                Write-AtomicUtf8NoBom -Path $JetskiStandalonePath -Content $winCredPayload
+            }
+        } elseif (-not [string]::IsNullOrEmpty($Snapshot.agyCliToken)) {
+            Write-AtomicUtf8NoBom -Path $AgyCliTokenPath -Content ([string]$Snapshot.agyCliToken)
+        }
 
+        if (-not [string]::IsNullOrWhiteSpace($at) -and -not [string]::IsNullOrWhiteSpace($rt)) {
+            $oauthCredsMap = [ordered]@{
+                access_token  = $at
+                refresh_token = $rt
+                token_type    = "Bearer"
+                expiry_date   = ($expSec * 1000)
+            }
+            if ($idt) { $oauthCredsMap["id_token"] = $idt }
+            Write-AtomicUtf8NoBom -Path $OAuthCredsPath -Content ($oauthCredsMap | ConvertTo-Json -Depth 5)
+        } elseif (-not [string]::IsNullOrEmpty($Snapshot.oauthCredsJson)) {
+            Write-AtomicUtf8NoBom -Path $OAuthCredsPath -Content ([string]$Snapshot.oauthCredsJson)
+        }
 
-        Write-Utf8NoBom -Path $AccountsJsonPath -Content (@{ active = $email; old = $oldList } | ConvertTo-Json -Depth 4)
+        if ($email) {
+            $oldList = @()
+            if (Test-Path $AccountsJsonPath) {
+                try {
+                    $cleanAcc = Read-Utf8StripBom -Path $AccountsJsonPath
+                    $currAcc = $cleanAcc | ConvertFrom-Json
+                    if ($currAcc.PSObject.Properties["old"] -and $currAcc.old) {
+                        $oldList = @($currAcc.old | Where-Object { $_ -ne $email })
+                    }
+                    if ($currAcc.PSObject.Properties["active"] -and $currAcc.active -and $currAcc.active -ne $email -and ($oldList -notcontains $currAcc.active)) {
+                        $oldList += [string]$currAcc.active
+                    }
+                } catch {}
+            }
+            Write-AtomicUtf8NoBom -Path $AccountsJsonPath -Content (@{ active = $email; old = $oldList } | ConvertTo-Json -Depth 4)
+        } elseif (-not [string]::IsNullOrEmpty($Snapshot.googleAccounts)) {
+            Write-AtomicUtf8NoBom -Path $AccountsJsonPath -Content ([string]$Snapshot.googleAccounts)
+        }
 
+        # 4. 深度回读校验 (Deep Verification)
+        if (-not [string]::IsNullOrEmpty($winCredPayload)) {
+            $vWin = [AntigravityCompliantHelper.NativeVaultV4]::ReadGenericCredential($CredTarget)
+            if ([string]::IsNullOrWhiteSpace($vWin)) {
+                throw "Windows 凭据回读校验失败：内容为空！"
+            }
+        }
+        if (Test-Path $AgyCliTokenPath) {
+            $vTok = Read-Utf8StripBom -Path $AgyCliTokenPath
+            if ([string]::IsNullOrWhiteSpace($vTok)) {
+                throw "CLI 凭据文件回读校验失败：$AgyCliTokenPath 为空！"
+            }
+        }
 
-
-    } elseif (-not [string]::IsNullOrEmpty($Snapshot.googleAccounts)) {
-
-
-
-        Write-Utf8NoBom -Path $AccountsJsonPath -Content ([string]$Snapshot.googleAccounts)
-
-
-
+        Write-Host "    [+] 已完成全量凭据存储深度校验与状态落盘。" -ForegroundColor Cyan
+        return (Get-StringFingerprint -Text $(if ($rt) { $rt } else { $at }))
+    } catch {
+        Write-Host "    [!] 写入或校验全量凭据存储失败，正在执行全链路状态自动回滚..." -ForegroundColor Red
+        if ($backupWinCred) {
+            try { [AntigravityCompliantHelper.NativeVaultV4]::WriteGenericCredential($CredTarget, $CredUser, $backupWinCred) } catch {}
+        }
+        if ($backupAppStorage) {
+            try { [System.IO.File]::WriteAllBytes($AppStorageJson, $backupAppStorage) } catch {}
+        }
+        if ($backupAgyCliToken) {
+            try { [System.IO.File]::WriteAllBytes($AgyCliTokenPath, $backupAgyCliToken) } catch {}
+        }
+        if ($backupJetski) {
+            try { [System.IO.File]::WriteAllBytes($JetskiStandalonePath, $backupJetski) } catch {}
+        }
+        if ($backupOAuth) {
+            try { [System.IO.File]::WriteAllBytes($OAuthCredsPath, $backupOAuth) } catch {}
+        }
+        if ($backupAccounts) {
+            try { [System.IO.File]::WriteAllBytes($AccountsJsonPath, $backupAccounts) } catch {}
+        }
+        throw "全量凭据同步失败且已安全回滚: $($_.Exception.Message)"
     }
-
-
-
-    Write-Host "    [+] 已同步 ~/.gemini/ CLI 凭据与 google_accounts.json" -ForegroundColor Cyan
-
-
-
-    return (Get-StringFingerprint -Text $(if ($rt) { $rt } else { $at }))
-
-
-
 }
-
 
 
 function Switch-CredentialSlot {
@@ -8845,145 +8416,47 @@ function Ensure-SlotObjectSchema {
 
 
 function Invoke-WithPoolStateMutex {
-
-
-
     param([scriptblock]$ScriptBlock)
-
-
-
     $mutex = $null
-
-
-
     $hasLock = $false
-
-
-
     $retries = 5
-
-
-
     $baseWaitMs = 50
 
-
-
     for ($i = 0; $i -lt $retries; $i++) {
-
-
-
         try {
-
-
-
             if (-not $mutex) {
-
-
-
                 try {
-
-
-
                     $mutex = New-Object System.Threading.Mutex($false, "Global\AntigravityPoolStateMutex")
-
-
-
                 } catch [System.UnauthorizedAccessException] {
-
-
-
                     $mutex = New-Object System.Threading.Mutex($false, "AntigravityPoolStateMutex")
-
-
-
                 }
-
-
-
             }
-
-
-
             $waitMs = [int]($baseWaitMs * [Math]::Pow(2, $i))
-
-
-
             $hasLock = $mutex.WaitOne($waitMs)
-
-
-
             if ($hasLock) { break }
-
-
-
         } catch [System.Threading.AbandonedMutexException] {
-
-
-
             $hasLock = $true
-
-
-
             break
-
-
-
         } catch {
-
-
-
             Start-Sleep -Milliseconds ($baseWaitMs * ($i + 1))
-
-
-
         }
-
-
-
     }
 
-
+    if (-not $hasLock) {
+        if ($mutex) { try { $mutex.Dispose() } catch {} }
+        throw "获取跨进程状态互斥锁超时 (Global\AntigravityPoolStateMutex)，可能有其他切号或守护进程正在执行写操作。"
+    }
 
     try {
-
-
-
         return (& $ScriptBlock)
-
-
-
     } finally {
-
-
-
         if ($hasLock -and $mutex) {
-
-
-
             try { $mutex.ReleaseMutex() } catch {}
-
-
-
         }
-
-
-
         if ($mutex) {
-
-
-
             try { $mutex.Dispose() } catch {}
-
-
-
         }
-
-
-
     }
-
-
-
 }
 
 
@@ -8993,19 +8466,20 @@ function Save-SlotPoolState {
     if (-not (Test-Path $HelperRoot)) {
         New-Item -ItemType Directory -Path $HelperRoot -Force | Out-Null
     }
-    try {
-        $json = $State | ConvertTo-Json -Depth 6
-        Invoke-WithPoolStateMutex {
-            for ($retry = 0; $retry -lt 3; $retry++) {
-                try {
-                    Write-Utf8NoBom -Path $PoolStatePath -Content $json
-                    break
-                } catch {
-                    Start-Sleep -Milliseconds 60
+    $json = $State | ConvertTo-Json -Depth 6
+    Invoke-WithPoolStateMutex {
+        for ($retry = 0; $retry -lt 3; $retry++) {
+            try {
+                Write-AtomicUtf8NoBom -Path $PoolStatePath -Content $json
+                return
+            } catch {
+                if ($retry -eq 2) {
+                    throw "保存槽位池状态失败 (pool_state.json): $($_.Exception.Message)"
                 }
+                Start-Sleep -Milliseconds 60
             }
         }
-    } catch {}
+    }
 }
 
 
@@ -9547,21 +9021,43 @@ function Get-SlotPoolState {
 
 
                     Set-SafeProp $slot "gemini5hPct" 100
-
-
-
+                    if ($null -ne $slot.claude5hPct -and [int]$slot.claude5hPct -le 1) { Set-SafeProp $slot "claude5hPct" 100 }
                     Set-SafeProp $slot "resetTime5h" $null
-
-
-
                 }
-
-
-
             } catch {}
+        }
 
+        $rtGw = Get-SafeProp $slot "resetTimeWeekly"
+        if ($rtGw) {
+            try {
+                $rtDt = [DateTime]::Parse([string]$rtGw).ToLocalTime()
+                if ($now -ge $rtDt) {
+                    Set-SafeProp $slot "geminiWeeklyPct" 100
+                    Set-SafeProp $slot "resetTimeWeekly" $null
+                }
+            } catch {}
+        }
 
+        $rtCw = Get-SafeProp $slot "resetTimeClaudeWeekly"
+        if ($rtCw) {
+            try {
+                $rtDt = [DateTime]::Parse([string]$rtCw).ToLocalTime()
+                if ($now -ge $rtDt) {
+                    Set-SafeProp $slot "claudeWeeklyPct" 100
+                    Set-SafeProp $slot "resetTimeClaudeWeekly" $null
+                }
+            } catch {}
+        }
 
+        $rtAr = Get-SafeProp $slot "resetTimeArgon"
+        if ($rtAr) {
+            try {
+                $rtDt = [DateTime]::Parse([string]$rtAr).ToLocalTime()
+                if ($now -ge $rtDt) {
+                    Set-SafeProp $slot "argonWeeklyPct" 100
+                    Set-SafeProp $slot "resetTimeArgon" $null
+                }
+            } catch {}
         }
 
 
@@ -9622,7 +9118,7 @@ function Get-SlotPoolState {
 
 
 
-                    if ((Get-SafeProp $slot "tokenFingerprint") -eq $summary.TokenFingerprint -and $slot.status -ne "cooldown") {
+                    if ((Get-SafeProp $slot "tokenFingerprint") -eq $summary.TokenFingerprint) {
 
 
 
@@ -9690,7 +9186,7 @@ function Get-SlotPoolState {
 
 
 
-                    if ($slot.email -eq $summary.ActiveEmail -and $slot.status -ne "cooldown") {
+                    if ($slot.email -eq $summary.ActiveEmail) {
 
 
 
@@ -9719,17 +9215,20 @@ function Get-SlotPoolState {
 
 
         if ($matchedActiveSlot) {
-
-
-
             Set-SafeProp $state "currentSlot" $matchedActiveSlot
-
-
-
         }
-
-
-
+    }
+    # 自动自愈：若当前槽位仍为空，则从标记为 active 的槽位或首个可用槽位恢复
+    if ([string]::IsNullOrWhiteSpace($state.currentSlot)) {
+        foreach ($prop in $state.slots.PSObject.Properties) {
+            if ($prop.Value.status -eq "active") {
+                Set-SafeProp $state "currentSlot" $prop.Name
+                break
+            }
+        }
+        if ([string]::IsNullOrWhiteSpace($state.currentSlot) -and @($state.slotOrder).Count -gt 0) {
+            Set-SafeProp $state "currentSlot" $state.slotOrder[0]
+        }
     }
 
 
@@ -9779,105 +9278,44 @@ function Get-SlotPoolState {
 
 
 function Reset-SlotCooldown {
-
-
-
     param([string]$SlotName = "")
 
-
-
     $state = Get-SlotPoolState
-
-
-
-    if ([string]::IsNullOrWhiteSpace($SlotName) -or $SlotName -eq "all") {
-
-
-
-        foreach ($prop in $state.slots.PSObject.Properties) {
-
-
-
-            $s = $prop.Value
-
-
-
-            if ($s.status -eq "cooldown") {
-
-
-
-                Set-SafeProp $s "status" "ready"
-
-
-
-                Set-SafeProp $s "cooldownUntil" $null
-
-
-
-                Set-SafeProp $s "cooldownType" "none"
-
-
-
-            }
-
-
-
-        }
-
-
-
-        Save-SlotPoolState -State $state
-
-
-
-        Write-Host "[✓] 已重置所有槽位的 5 小时冷却计时器，全部恢复为就绪 (Ready) 状态。" -ForegroundColor Green
-
-
-
-    } else {
-
-
-
-        $prop = $state.slots.PSObject.Properties[$SlotName]
-
-
-
-        if (-not $prop) {
-
-
-
-            throw "未找到槽位 [$SlotName]。"
-
-
-
-        }
-
-
-
-        Set-SafeProp $prop.Value "status" "ready"
-
-
-
-        Set-SafeProp $prop.Value "cooldownUntil" $null
-
-
-
-        Set-SafeProp $prop.Value "cooldownType" "none"
-
-
-
-        Save-SlotPoolState -State $state
-
-
-
-        Write-Host ("[✓] 已重置槽位 [{0}] 的 5 小时冷却计时器，恢复为就绪 (Ready) 状态。" -f $SlotName) -ForegroundColor Green
-
-
-
+    $resetSlotAction = {
+        param($s)
+        Set-SafeProp $s "status" "ready"
+        Set-SafeProp $s "cooldownUntil" $null
+        Set-SafeProp $s "cooldownType" "none"
+        if ($null -eq $s.gemini5hPct -or [int]$s.gemini5hPct -le 1) { Set-SafeProp $s "gemini5hPct" 100 }
+        if ($null -eq $s.geminiWeeklyPct -or [int]$s.geminiWeeklyPct -le 1) { Set-SafeProp $s "geminiWeeklyPct" 100 }
+        if ($null -eq $s.claude5hPct -or [int]$s.claude5hPct -le 1) { Set-SafeProp $s "claude5hPct" 100 }
+        if ($null -eq $s.claudeWeeklyPct -or [int]$s.claudeWeeklyPct -le 1) { Set-SafeProp $s "claudeWeeklyPct" 100 }
+        # 如果该账号支持 Argon 且配额 <= 1，才重置 Argon
+        if ($null -ne $s.argonWeeklyPct -and [int]$s.argonWeeklyPct -le 1) { Set-SafeProp $s "argonWeeklyPct" 100 }
+        Set-SafeProp $s "resetTime5h" $null
+        Set-SafeProp $s "resetTimeWeekly" $null
+        Set-SafeProp $s "resetTimeGemini5h" $null
+        Set-SafeProp $s "resetTimeGeminiWeekly" $null
+        Set-SafeProp $s "resetTimeClaude5h" $null
+        Set-SafeProp $s "resetTimeClaudeWeekly" $null
+        Set-SafeProp $s "resetTimeArgonWeekly" $null
     }
 
-
-
+    if ([string]::IsNullOrWhiteSpace($SlotName) -or $SlotName -eq "all") {
+        foreach ($prop in $state.slots.PSObject.Properties) {
+            & $resetSlotAction $prop.Value
+        }
+        Save-SlotPoolState -State $state
+        Write-Host "[✓] 已重置所有槽位的 5小时/周限额冷却与配额，全部恢复为就绪 (Ready / 100%) 状态。" -ForegroundColor Green
+    } else {
+        $prop = $state.slots.PSObject.Properties[$SlotName]
+        if (-not $prop) {
+            throw "未找到槽位 [$SlotName]。"
+        }
+        & $resetSlotAction $prop.Value
+        Save-SlotPoolState -State $state
+        Write-Host ("[✓] 已重置槽位 [{0}] 的 5小时/周限额冷却与配额，恢复为就绪 (Ready / 100%) 状态。" -f $SlotName) -ForegroundColor Green
+    }
 }
 
 
@@ -10034,6 +9472,8 @@ function Parse-QuotaSummaryPayload {
             $rf = $null
             if ($qi.PSObject.Properties["remainingFraction"] -and $null -ne $qi.remainingFraction) {
                 $rf = [double]$qi.remainingFraction
+            } elseif ($qi.PSObject.Properties["resetTime"] -and $qi.resetTime) {
+                $rf = 0.0
             }
             if ($null -eq $rf) { continue }
             $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round($rf * 100.0)))
@@ -10088,8 +9528,14 @@ function Parse-QuotaSummaryPayload {
             if ([string]::IsNullOrWhiteSpace($dName) -or $mProp.Name -match '(?i)tab_|lite|autocomplete|embed') { continue }
             if (-not $mVal.PSObject.Properties["quotaInfo"] -or (-not $mVal.quotaInfo)) { continue }
             $qi = $mVal.quotaInfo
-            if (-not $qi.PSObject.Properties["remainingFraction"] -or $null -eq $qi.remainingFraction) { continue }
-            $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round([double]$qi.remainingFraction * 100.0)))
+            $rf = $null
+            if ($qi.PSObject.Properties["remainingFraction"] -and $null -ne $qi.remainingFraction) {
+                $rf = [double]$qi.remainingFraction
+            } elseif ($qi.PSObject.Properties["resetTime"] -and $qi.resetTime) {
+                $rf = 0.0
+            }
+            if ($null -eq $rf) { continue }
+            $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round($rf * 100.0)))
             $rt  = if ($qi.PSObject.Properties["resetTime"] -and $qi.resetTime) { [string]$qi.resetTime } else { $null }
 
             if ($dName -match '(?i)argon' -or $mProp.Name -match '(?i)argon') {
@@ -10219,7 +9665,10 @@ function Invoke-LsQuotaAtEndpoint {
 
             if ($null -eq $merged.ArgonWeeklyPct -and $null -ne $parsedStat.ArgonWeeklyPct) { $merged.ArgonWeeklyPct = $parsedStat.ArgonWeeklyPct }
             if ($null -eq $merged.Claude5hPct -and $null -ne $parsedStat.Claude5hPct) { $merged.Claude5hPct = $parsedStat.Claude5hPct }
+            if ($null -eq $merged.ClaudeWeeklyPct -and $null -ne $parsedStat.ClaudeWeeklyPct) { $merged.ClaudeWeeklyPct = $parsedStat.ClaudeWeeklyPct }
             if (-not $merged.ResetTime5h -and $parsedStat.ResetTime5h) { $merged.ResetTime5h = $parsedStat.ResetTime5h }
+            if (-not $merged.ResetTimeWeekly -and $parsedStat.ResetTimeWeekly) { $merged.ResetTimeWeekly = $parsedStat.ResetTimeWeekly }
+            if (-not $merged.ResetTimeClaudeWeekly -and $parsedStat.ResetTimeClaudeWeekly) { $merged.ResetTimeClaudeWeekly = $parsedStat.ResetTimeClaudeWeekly }
             if (-not $merged.ResetTimeArgon -and $parsedStat.ResetTimeArgon) { $merged.ResetTimeArgon = $parsedStat.ResetTimeArgon }
 
 
@@ -10661,21 +10110,10 @@ function Get-SlotRemoteQuotaSummary {
 
 
         $endpoints = @(
-
-
-
-            @{ Url = "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";     Body = "{}" },
-
-
-
+            @{ Url = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary";       Body = $(if ($pidVal) { "{`"project`":`"$pidVal`"}" } else { "{}" }) },
+            @{ Url = "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"; Body = $(if ($pidVal) { "{`"project`":`"$pidVal`"}" } else { "{}" }) },
             @{ Url = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";           Body = "{}" },
-
-
-
-            @{ Url = "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"; Body = $(if ($pidVal) { "{`"project`":`"$pidVal`"}" } else { "{}" }) }
-
-
-
+            @{ Url = "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";     Body = "{}" }
         )
 
 
@@ -10796,34 +10234,39 @@ function Apply-QuotaSnapshotToSlotObject {
     if ($QuotaSnap.ResetTime5h)               { Set-SafeProp $SlotObj "resetTime5h"     ([string]$QuotaSnap.ResetTime5h) }
     if ($QuotaSnap.ResetTimeWeekly)           { Set-SafeProp $SlotObj "resetTimeWeekly" ([string]$QuotaSnap.ResetTimeWeekly) }
     if ($QuotaSnap.ResetTimeArgon)            { Set-SafeProp $SlotObj "resetTimeArgon"  ([string]$QuotaSnap.ResetTimeArgon) }
+    if ($QuotaSnap.ResetTimeClaudeWeekly)     { Set-SafeProp $SlotObj "resetTimeClaudeWeekly" ([string]$QuotaSnap.ResetTimeClaudeWeekly) }
     if ($QuotaSnap.PlanName)                  { Set-SafeProp $SlotObj "planName"        ([string]$QuotaSnap.PlanName) }
     Set-SafeProp $SlotObj "lastQuotaSyncAt" (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 
     $now = Get-Date
-    if ($QuotaSnap.IsWeeklyExhausted -or $QuotaSnap.IsArgonExhausted) {
+    # 判定各组是否耗尽 (<= 1%)
+    $gemExhausted = ($null -ne $SlotObj.geminiWeeklyPct -and [int]$SlotObj.geminiWeeklyPct -le 1) -or ($null -ne $SlotObj.gemini5hPct -and [int]$SlotObj.gemini5hPct -le 1)
+    $claExhausted = ($null -ne $SlotObj.claudeWeeklyPct -and [int]$SlotObj.claudeWeeklyPct -le 1) -or ($null -ne $SlotObj.claude5hPct -and [int]$SlotObj.claude5hPct -le 1)
+    $hasArgon     = ($null -ne $SlotObj.argonWeeklyPct -and ([string]$SlotObj.argonWeeklyPct).Trim() -ne "")
+    $argExhausted = $hasArgon -and ([int]$SlotObj.argonWeeklyPct -le 1)
+
+    # 仅当全部支持的模型组均已耗尽时，才将整体槽位状态标记为 cooldown
+    $allExhausted = $gemExhausted -and $claExhausted -and (-not $hasArgon -or $argExhausted)
+
+    if ($allExhausted) {
         if (-not $IsCurrentActiveSlot) { Set-SafeProp $SlotObj "status" "cooldown" }
-        Set-SafeProp $SlotObj "cooldownType" "weekly"
-        $rTime = if ($QuotaSnap.IsArgonExhausted -and $QuotaSnap.ResetTimeArgon) { $QuotaSnap.ResetTimeArgon } else { $QuotaSnap.ResetTimeWeekly }
+        $isWeekly = ($null -ne $SlotObj.geminiWeeklyPct -and [int]$SlotObj.geminiWeeklyPct -le 1) -or ($null -ne $SlotObj.claudeWeeklyPct -and [int]$SlotObj.claudeWeeklyPct -le 1)
+        Set-SafeProp $SlotObj "cooldownType" $(if ($isWeekly) { "weekly" } else { "hourly" })
+        $rTime = if ($SlotObj.resetTimeWeekly) { $SlotObj.resetTimeWeekly } elseif ($SlotObj.resetTimeClaudeWeekly) { $SlotObj.resetTimeClaudeWeekly } else { $SlotObj.resetTime5h }
         if ($rTime) {
             try {
                 $dt = [DateTime]::Parse($rTime).ToLocalTime()
                 if ($dt -gt $now) { Set-SafeProp $SlotObj "cooldownUntil" ($dt.ToString("yyyy-MM-dd HH:mm:ss")) }
             } catch {}
         }
-    } elseif ($QuotaSnap.Is5hExhausted) {
-        if (-not $IsCurrentActiveSlot) { Set-SafeProp $SlotObj "status" "cooldown" }
-        Set-SafeProp $SlotObj "cooldownType" "hourly"
-        if ($QuotaSnap.ResetTime5h) {
-            try {
-                $dt = [DateTime]::Parse($QuotaSnap.ResetTime5h).ToLocalTime()
-                if ($dt -gt $now) { Set-SafeProp $SlotObj "cooldownUntil" ($dt.ToString("yyyy-MM-dd HH:mm:ss")) }
-            } catch {}
-        }
-    } elseif ($null -ne $QuotaSnap.Gemini5hPct -and $QuotaSnap.Gemini5hPct -gt 1) {
-        if ($SlotObj.status -eq "cooldown") {
+    } else {
+        # 只要存在可用模型组，若槽位先前处于 cooldown，且不是 active，则恢复为 ready
+        if ($SlotObj.status -eq "cooldown" -or [string]::IsNullOrWhiteSpace($SlotObj.status)) {
             Set-SafeProp $SlotObj "status" $(if ($IsCurrentActiveSlot) { "active" } else { "ready" })
-            Set-SafeProp $SlotObj "cooldownUntil" $null
-            Set-SafeProp $SlotObj "cooldownType" "none"
+            if (-not $IsCurrentActiveSlot) {
+                Set-SafeProp $SlotObj "cooldownUntil" $null
+                Set-SafeProp $SlotObj "cooldownType" "none"
+            }
         }
     }
 }
@@ -10913,14 +10356,11 @@ function Sync-AllSlotsQuotaInfo {
 
 
                 $g5 = if ($null -ne $remoteQ.Gemini5hPct) { "$($remoteQ.Gemini5hPct)%" } else { "N/A" }
-
-
-
                 $gw = if ($null -ne $remoteQ.GeminiWeeklyPct) { "$($remoteQ.GeminiWeeklyPct)%" } else { "N/A" }
-
-
-
-                Write-Host ("    [+] 槽位 [{0}] ({1}) -> Gemini 5h剩余: {2} | 周/Pro剩余: {3}" -f $sName, $sObj.email, $g5, $gw) -ForegroundColor Green
+                $c5 = if ($null -ne $remoteQ.Claude5hPct) { "$($remoteQ.Claude5hPct)%" } else { "N/A" }
+                $cw = if ($null -ne $remoteQ.ClaudeWeeklyPct) { "$($remoteQ.ClaudeWeeklyPct)%" } else { "N/A" }
+                $ar = if ($null -ne $remoteQ.ArgonWeeklyPct) { "$($remoteQ.ArgonWeeklyPct)%" } else { "--" }
+                Write-Host ("    [+] 槽位 [{0}] ({1}) -> Gemini: {2}/{3} | Claude: {4}/{5} | Argon: {6}" -f $sName, $sObj.email, $g5, $gw, $c5, $cw, $ar) -ForegroundColor Green
 
 
 
@@ -10948,58 +10388,195 @@ function Sync-AllSlotsQuotaInfo {
 
 
 
-function Get-CurrentActiveModelGroup {
+function Get-CurrentActiveModelInfo {
+    param([switch]$ForceRefresh)
+    $now = Get-Date
+    if (-not $ForceRefresh -and $null -ne $Script:CachedActiveModelInfo -and $null -ne $Script:ActiveModelInfoCachedAt) {
+        if (($now - $Script:ActiveModelInfoCachedAt).TotalSeconds -lt 8.0) {
+            return $Script:CachedActiveModelInfo
+        }
+    }
+
+    $ret = [PSCustomObject]@{
+        ModelId   = "MODEL_PLACEHOLDER_M318"
+        ModelEnum = "MODEL_PLACEHOLDER_M318"
+        Label     = "Gemini 3.8 Flash (High)"
+        Group     = "Gemini"
+        Source    = "fallback"
+    }
+
     try {
-        $dbPath = Join-Path $GeminiRoot "antigravity\conversation_summaries.db"
-        if (Test-Path $dbPath) {
-            $pyCode = @'
-import sqlite3, os, sys
-db_path = sys.argv[1].replace('\\', '/')
-try:
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    cur = conn.cursor()
-    cur.execute("SELECT conversation_id FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 1")
-    row = cur.fetchone()
-    if row:
-        cid = row[0]
-        conv_db = os.path.join(os.path.dirname(db_path), 'conversations', f'{cid}.db').replace('\\', '/')
-        if os.path.exists(conv_db):
-            c2 = sqlite3.connect(f"file:{conv_db}?mode=ro", uri=True)
-            cur2 = c2.cursor()
-            cur2.execute("SELECT metadata FROM steps WHERE metadata IS NOT NULL ORDER BY idx DESC LIMIT 10")
-            for m in cur2.fetchall():
-                txt = str(m[0]).lower()
-                if 'argon' in txt:
-                    print('Argon')
-                    sys.exit(0)
-                if any(k in txt for k in ('claude', 'sonnet', 'opus', 'gpt')):
-                    print('Claude')
-                    sys.exit(0)
-                if any(k in txt for k in ('flash', 'gemini')):
-                    print('Gemini')
-                    sys.exit(0)
-except Exception:
-    pass
-print('Gemini')
-'@
-            $res = ($pyCode | & python - "$dbPath" 2>$null)
-            if ($res) {
-                $trimmed = $res.Trim()
-                if ($trimmed -in @("Argon", "Claude", "Gemini")) { return $trimmed }
+        $q = Get-LocalLanguageServerQuota
+        $ep = $Script:CachedLsEndpoint
+        if ($ep) {
+            $reqBody = '{"metadata":{"ideName":"antigravity","extensionName":"antigravity","ideVersion":"unknown","locale":"en"}}'
+            $resp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$($ep.BaseUrl)/GetUserStatus", $ep.Csrf, $reqBody, 1500)
+            if ($resp -match '^200\|(.*)$') {
+                $obj = $Matches[1] | ConvertFrom-Json
+                $cascade = $obj.userStatus.cascadeModelConfigData
+                if ($cascade) {
+                    $activeId = $null
+                    if ($cascade.defaultOverrideModelConfig -and $cascade.defaultOverrideModelConfig.modelOrAlias) {
+                        $activeId = [string]$cascade.defaultOverrideModelConfig.modelOrAlias.model
+                    }
+                    $configs = $cascade.clientModelConfigs
+                    if ($configs) {
+                        $matchedCfg = $null
+                        if ($activeId) {
+                            $matchedCfg = $configs | Where-Object { $_.modelOrAlias -and $_.modelOrAlias.model -eq $activeId } | Select-Object -First 1
+                        }
+                        if (-not $matchedCfg -and $configs.Count -gt 0) {
+                            $matchedCfg = $configs[0]
+                        }
+                        if ($matchedCfg) {
+                            $lbl = [string]$matchedCfg.label
+                            $mId = [string]$matchedCfg.modelOrAlias.model
+                            $grp = "Gemini"
+                            if ($lbl -match '(?i)argon') {
+                                $grp = "Argon"
+                            } elseif ($lbl -match '(?i)claude|sonnet|opus|gpt|3p') {
+                                $grp = "Claude"
+                            }
+                            $ret = [PSCustomObject]@{
+                                ModelId   = $mId
+                                ModelEnum = $mId
+                                Label     = $lbl
+                                Group     = $grp
+                                Source    = "127.0.0.1:$($ep.Port) (Live RPC GetUserStatus)"
+                            }
+                            $Script:CachedActiveModelInfo = $ret
+                            $Script:ActiveModelInfoCachedAt = $now
+                            $Script:LockedActiveModelEnum = $mId
+                            try {
+                                $st = Get-SlotPoolState -SkipAutoMatch
+                                if ($st) {
+                                    $st | Add-Member -MemberType NoteProperty -Name "lockedModelEnum" -Value $mId -Force
+                                    Save-SlotPoolState -State $st
+                                }
+                            } catch {}
+                            return $ret
+                        }
+                    }
+                }
             }
         }
     } catch {}
 
-    try {
-        $lsLog = Join-Path $env:APPDATA "Antigravity\logs\language_server.log"
-        if (Test-Path $lsLog) {
-            $tail = (Get-Content $lsLog -Tail 50 -ErrorAction SilentlyContinue) -join " "
-            if ($tail -match '(?i)argon') { return "Argon" }
-            if ($tail -match '(?i)claude|sonnet|opus|gpt') { return "Claude" }
-        }
-    } catch {}
+    return $ret
+}
 
-    return "Gemini"
+function Get-CurrentActiveModelGroup {
+    return (Get-CurrentActiveModelInfo).Group
+}
+
+function Test-SlotGroupAvailable {
+    param(
+        [Parameter(Mandatory=$true)]$SlotObj,
+        [Parameter(Mandatory=$true)][string]$ModelGroup,
+        [DateTime]$Now = (Get-Date)
+    )
+    if (-not $SlotObj) { return $false }
+    Ensure-SlotObjectSchema -SlotObj $SlotObj
+
+    if ($ModelGroup -eq "Argon") {
+        # 1. 权限检测：若该账号无 argonWeeklyPct 字段或为空，表示不具备 Argon 权限
+        $ar = Get-SafeProp $SlotObj "argonWeeklyPct"
+        if ($null -eq $ar -or ([string]$ar).Trim() -eq "") { return $false }
+        # 2. 额度检测：若额度 <= 1%，视为耗尽
+        if ([int]$ar -le 1) { return $false }
+        # 3. 冷却时间检测：若存在 resetTimeArgon 且在未来，检查是否已解冻
+        $rtAr = Get-SafeProp $SlotObj "resetTimeArgon"
+        if ($rtAr) {
+            try {
+                $thaw = [DateTime]::Parse([string]$rtAr).ToLocalTime()
+                if ($Now -lt $thaw -and [int]$ar -le 1) { return $false }
+            } catch {}
+        }
+        return $true
+    } elseif ($ModelGroup -eq "Claude") {
+        $c5 = Get-SafeProp $SlotObj "claude5hPct"
+        $cw = Get-SafeProp $SlotObj "claudeWeeklyPct"
+        # 若已知配额且 <= 1%，检查冷却倒计时
+        if ($null -ne $c5 -and [int]$c5 -le 1) {
+            $rt5 = Get-SafeProp $SlotObj "resetTime5h"
+            if ($rt5) {
+                try {
+                    $thaw = [DateTime]::Parse([string]$rt5).ToLocalTime()
+                    if ($Now -lt $thaw) { return $false }
+                } catch { return $false }
+            } else {
+                return $false
+            }
+        }
+        if ($null -ne $cw -and [int]$cw -le 1) {
+            $rtCw = Get-SafeProp $SlotObj "resetTimeClaudeWeekly"
+            if ($rtCw) {
+                try {
+                    $thaw = [DateTime]::Parse([string]$rtCw).ToLocalTime()
+                    if ($Now -lt $thaw) { return $false }
+                } catch { return $false }
+            } else {
+                return $false
+            }
+        }
+        return $true
+    } else {
+        # Gemini 模型组
+        $g5 = Get-SafeProp $SlotObj "gemini5hPct"
+        $gw = Get-SafeProp $SlotObj "geminiWeeklyPct"
+        if ($null -ne $g5 -and [int]$g5 -le 1) {
+            $rt5 = Get-SafeProp $SlotObj "resetTime5h"
+            if ($rt5) {
+                try {
+                    $thaw = [DateTime]::Parse([string]$rt5).ToLocalTime()
+                    if ($Now -lt $thaw) { return $false }
+                } catch { return $false }
+            } else {
+                return $false
+            }
+        }
+        if ($null -ne $gw -and [int]$gw -le 1) {
+            $rtGw = Get-SafeProp $SlotObj "resetTimeWeekly"
+            if ($rtGw) {
+                try {
+                    $thaw = [DateTime]::Parse([string]$rtGw).ToLocalTime()
+                    if ($Now -lt $thaw) { return $false }
+                } catch { return $false }
+            } else {
+                return $false
+            }
+        }
+        return $true
+    }
+}
+
+function Test-SlotNeedsLiveVerify {
+    param(
+        [Parameter(Mandatory=$true)]$SlotObj,
+        [Parameter(Mandatory=$true)][string]$ModelGroup
+    )
+    if (-not $SlotObj) { return $true }
+    $lastSync = Get-SafeProp $SlotObj "lastQuotaSyncAt"
+    if (-not $lastSync) { return $true }
+    try {
+        $syncTime = [DateTime]::Parse([string]$lastSync)
+        if (((Get-Date) - $syncTime).TotalMinutes -ge 15.0) { return $true }
+    } catch {
+        return $true
+    }
+    if ($ModelGroup -eq "Argon") {
+        $ar = Get-SafeProp $SlotObj "argonWeeklyPct"
+        if ($null -eq $ar -or ([string]$ar).Trim() -eq "") { return $true }
+    } elseif ($ModelGroup -eq "Claude") {
+        $c5 = Get-SafeProp $SlotObj "claude5hPct"
+        $cw = Get-SafeProp $SlotObj "claudeWeeklyPct"
+        if ($null -eq $c5 -or $null -eq $cw) { return $true }
+    } else {
+        $g5 = Get-SafeProp $SlotObj "gemini5hPct"
+        $gw = Get-SafeProp $SlotObj "geminiWeeklyPct"
+        if ($null -eq $g5 -or $null -eq $gw) { return $true }
+    }
+    return $false
 }
 
 function Switch-ToNextAvailableSlot {
@@ -11007,59 +10584,34 @@ function Switch-ToNextAvailableSlot {
 
 
     param(
-
-
-
         [string]$Reason = "检测到限额",
-
-
-
         [switch]$AutoRestartApp = $true,
-
-
-
+        [switch]$AutoResumeConversation = $true,
         [switch]$GenerateHandover,
-
-
-
         [string]$WorkspacePath = (Get-Location).Path,
-
-
-
         [switch]$IsWeeklyLimit = $false,
-
-
-
         [string]$ServerResetTime = "",
         [string]$TargetModelGroup = ""
     )
 
-
-
     if ($WaitParentPid -eq 0 -and (Test-IsRunningInsideAntigravityTerminal)) {
-
-
-
         Write-Host "[!] 检测到当前在 AGY2 内置终端中运行，正在派生独立系统进程完成关闭、轮换与重启..." -ForegroundColor Yellow
-
-
-
         $scriptPath = $Script:ResolvedScriptPath
-
-
-
-        $detachedArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`" -Action next-slot -AutoRestartApp -WaitParentPid $PID"
-
-
-
+        try {
+            $actInfo = Get-CurrentActiveModelInfo
+            if ($actInfo -and $actInfo.ModelEnum) {
+                $Script:LockedActiveModelEnum = $actInfo.ModelEnum
+                $st = Get-SlotPoolState -SkipAutoMatch
+                if ($st) {
+                    $st | Add-Member -MemberType NoteProperty -Name "lockedModelEnum" -Value $actInfo.ModelEnum -Force
+                    Save-SlotPoolState -State $st
+                }
+            }
+        } catch {}
+        $tmgArg = if ($TargetModelGroup) { " -TargetModelGroup `"$TargetModelGroup`"" } else { "" }
+        $detachedArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`" -Action next-slot -AutoRestartApp$tmgArg -WaitParentPid $PID"
         [void][AntigravityCompliantHelper.NativeVaultV4]::LaunchHiddenBackgroundProcess("powershell.exe", $detachedArgs, (Split-Path -Parent $scriptPath))
-
-
-
         return
-
-
-
     }
 
 
@@ -11288,22 +10840,26 @@ function Switch-ToNextAvailableSlot {
 
 
 
-        if ($cooldownType -eq "weekly") {
-
-
-
-            Set-SafeProp $currSlotObj "geminiWeeklyPct" 0
-
-
-
+        $grp = if ($TargetModelGroup) { $TargetModelGroup } else { (Get-CurrentActiveModelGroup) }
+        if ($grp -eq "Argon") {
+            Set-SafeProp $currSlotObj "argonWeeklyPct" 0
+            if ($exactThaw) { Set-SafeProp $currSlotObj "resetTimeArgon" $exactThaw }
+        } elseif ($grp -eq "Claude") {
+            if ($cooldownType -eq "weekly") {
+                Set-SafeProp $currSlotObj "claudeWeeklyPct" 0
+                if ($exactThaw) { Set-SafeProp $currSlotObj "resetTimeClaudeWeekly" $exactThaw }
+            } else {
+                Set-SafeProp $currSlotObj "claude5hPct" 0
+                if ($exactThaw) { Set-SafeProp $currSlotObj "resetTime5h" $exactThaw }
+            }
         } else {
-
-
-
-            Set-SafeProp $currSlotObj "gemini5hPct" 0
-
-
-
+            if ($cooldownType -eq "weekly") {
+                Set-SafeProp $currSlotObj "geminiWeeklyPct" 0
+                if ($exactThaw) { Set-SafeProp $currSlotObj "resetTimeWeekly" $exactThaw }
+            } else {
+                Set-SafeProp $currSlotObj "gemini5hPct" 0
+                if ($exactThaw) { Set-SafeProp $currSlotObj "resetTime5h" $exactThaw }
+            }
         }
 
 
@@ -11444,52 +11000,28 @@ function Switch-ToNextAvailableSlot {
 
 
 
-                if ($candidateObj.status -eq "ready" -or [string]::IsNullOrWhiteSpace($candidateObj.status)) {
+                $candFp = [string](Get-SafeProp $candidateObj "tokenFingerprint" "")
+                if ($pass -eq 1 -and $currentFingerprint -and $candFp -eq $currentFingerprint -and $currentFingerprint -ne "none") {
+                    continue
+                }
 
+                $grp = if ($TargetModelGroup) { $TargetModelGroup } else { (Get-CurrentActiveModelGroup) }
 
-
-                    $candFp = [string](Get-SafeProp $candidateObj "tokenFingerprint" "")
-
-
-
-                    if ($pass -eq 1 -and $currentFingerprint -and $candFp -eq $currentFingerprint -and $currentFingerprint -ne "none") {
-
-
-
-                        continue
-
-
-
-                    }
-
-
-
-                    if ($pass -eq 1) {
-                        $grp = if ($TargetModelGroup) { $TargetModelGroup } else { (Get-CurrentActiveModelGroup) }
-                        if ($grp -eq "Argon") {
-                            $candAr = Get-SafeProp $candidateObj "argonWeeklyPct"
-                            if ($null -ne $candAr -and [int]$candAr -le 1) { continue }
-                        } elseif ($grp -eq "Claude") {
-                            $candC5 = Get-SafeProp $candidateObj "claude5hPct"
-                            $candCw = Get-SafeProp $candidateObj "claudeWeeklyPct"
-                            if (($null -ne $candC5 -and [int]$candC5 -le 1) -or ($null -ne $candCw -and [int]$candCw -le 1)) { continue }
-                        } else {
-                            $candG5 = Get-SafeProp $candidateObj "gemini5hPct"
-                            $candGw = Get-SafeProp $candidateObj "geminiWeeklyPct"
-                            if (($null -ne $candG5 -and [int]$candG5 -le 1) -or ($null -ne $candGw -and [int]$candGw -le 1)) { continue }
+                # 切号前实时核验（配额未知或缓存超 15 分钟）
+                if (Test-SlotNeedsLiveVerify -SlotObj $candidateObj -ModelGroup $grp) {
+                    try {
+                        $liveQ = Get-SlotRemoteQuotaSummary -SlotName $candidateName
+                        if ($liveQ) {
+                            Apply-QuotaSnapshotToSlotObject -SlotObj $candidateObj -QuotaSnap $liveQ -IsCurrentActiveSlot $false
+                            Save-SlotPoolState -State $state
                         }
-                    }
+                    } catch {}
+                }
 
-
-
+                # 严格按当前模型组检测额度与可用性（Argon/Claude/Gemini 全量覆盖）
+                if (Test-SlotGroupAvailable -SlotObj $candidateObj -ModelGroup $grp -Now $now) {
                     $nextSlotName = $candidateName
-
-
-
                     break
-
-
-
                 }
 
 
@@ -11574,91 +11106,40 @@ function Switch-ToNextAvailableSlot {
 
 
 
-        Save-SlotPoolState -State $state
-
-
-
+                Save-SlotPoolState -State $state
         $waitMinutes = if ($earliestSlot) { [Math]::Max(0, [int](($earliestTime - $now).TotalMinutes)) } else { 0 }
+        $grp = if ($TargetModelGroup) { $TargetModelGroup } else { (Get-CurrentActiveModelGroup) }
 
-
-
+        # 严格模型组锁定红线：若当前活跃会话属于 Claude 或 Argon，绝不能跨模型强切为 Gemini API Key！
         $userKey = [Environment]::GetEnvironmentVariable("GEMINI_API_KEY", "User")
-
-
-
         $hasKey = (-not [string]::IsNullOrWhiteSpace($env:GEMINI_API_KEY)) -or (-not [string]::IsNullOrWhiteSpace($userKey))
 
-
-
-        if ($hasKey) {
-
-
-
+        if ($grp -eq "Gemini" -and $hasKey) {
             Write-Host "================================================================" -ForegroundColor Red
-
-
-
-            Write-Host "【终极安全阀触发】所有账号的 5小时/周配额均已耗尽！" -ForegroundColor Red
-
-
-
+            Write-Host "【终极安全阀触发】所有账号的 Gemini 配额均已耗尽！" -ForegroundColor Red
             Write-Host "[★] 正在无缝激活官方 Gemini API Key 按量计费兜底模式..." -ForegroundColor Green
-
-
-
             Write-Host "================================================================" -ForegroundColor Red
-
-
-
             Set-AntigravityCliAuthMode -TargetMode "apikey"
-
-
-
-            Send-DesktopNotification -Title "Antigravity 全部账号冷却 - 已切入 API Key" -Message "所有账号均已耗尽配额，已自动切入官方 Gemini API Key 兜底模式。"
-
-
-
+            Send-DesktopNotification -Title "Antigravity 全部账号冷却 - 已切入 API Key" -Message "所有账号均已耗尽 Gemini 配额，已自动切入官方 Gemini API Key 兜底模式。"
             return [PSCustomObject]@{
-
-
-
                 Success    = $true
-
-
-
                 FromSlot   = $currentSlotName
-
-
-
                 ToSlot     = "API_KEY_FALLBACK"
-
-
-
                 Email      = "Google AI Studio API Key"
-
-
-
                 SwitchedAt = $now
-
-
-
             }
-
-
-
         } else {
-
-
-
-            $msg = "【限额警告】所有 $($order.Count) 个账号槽位均处于冷却中！最早解冻槽位为 [$($earliestSlot.slotName)] (预计 $waitMinutes 分钟后解冻)。可执行 [重置冷却] 或配置 GEMINI_API_KEY 兜底。"
-
-
-
+            Write-Host "================================================================" -ForegroundColor Red
+            Write-Host ("【限额报警】当前活跃模型组 [{0}] 的全部可用槽位配额均已耗尽！" -f $grp) -ForegroundColor Red
+            Write-Host "为了严格保护当前会话推演上下文不发生模型降级或漂移，已坚决停止自动切号。" -ForegroundColor Yellow
+            Write-Host "================================================================" -ForegroundColor Red
+            $msg = if ($earliestSlot -and $waitMinutes -gt 0) {
+                "【限额警告】所有 $($order.Count) 个账号槽位在 [$grp] 模型组均已耗尽或冷却！最早解冻槽位为 [$($earliestSlot.slotName)] (预计 $waitMinutes 分钟后解冻)。已严格锁定原模型停止自动切号。"
+            } else {
+                "【限额警告】所有 $($order.Count) 个账号槽位在 [$grp] 模型组均已耗尽或冷却！已严格锁定原模型并停止自动切号。"
+            }
             Write-Host $msg -ForegroundColor Red
-
-
-
-            Send-DesktopNotification -Title "Antigravity 账号池全部冷却中" -Message $msg
+            Send-DesktopNotification -Title "Antigravity 模型组 [$grp] 配额耗尽" -Message $msg
 
 
 
@@ -12270,7 +11751,13 @@ function Start-PassiveLogWatcher {
 
 
 
-    $PID | Set-Content -Path $DaemonPidPath -Encoding ASCII
+    $myProc = Get-Process -Id $PID -ErrorAction SilentlyContinue
+    $pidInfo = [ordered]@{
+        pid         = $PID
+        processName = if ($myProc) { $myProc.ProcessName } else { "powershell" }
+        startTime   = if ($myProc -and $myProc.StartTime) { $myProc.StartTime.ToString("o") } else { (Get-Date).ToString("o") }
+    }
+    Write-AtomicUtf8NoBom -Path $DaemonPidPath -Content ($pidInfo | ConvertTo-Json -Compress)
 
 
 
@@ -12657,6 +12144,30 @@ function Start-PassiveLogWatcher {
         })
 
 
+
+        $itemBoost = $ctxMenu.Items.Add("⚡ /boost 立即核验并切至最高配额槽位")
+        $itemBoost.Add_Click({
+            try {
+                $bArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$($Script:TrayScriptPath)`" -Action boost"
+                [void](Start-TrulyHiddenDetachedProcess -FilePath "powershell.exe" -Arguments $bArgs -WorkingDirectory $Script:TrayScriptDir)
+            } catch {}
+        })
+
+        $itemGoal = $ctxMenu.Items.Add("🎯 /goal 目标达成与健康度体检")
+        $itemGoal.Add_Click({
+            try {
+                $gArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$($Script:TrayScriptPath)`" -Action goal"
+                Start-Process "powershell.exe" -ArgumentList $gArgs
+            } catch {}
+        })
+
+        $itemAutoStart = $ctxMenu.Items.Add("🚀 开机自启守护: " + (if (Test-AutoStartEnabled) { "已开启 [ON]" } else { "已关闭 [OFF]" }))
+        $itemAutoStart.Add_Click({
+            try {
+                $newState = Toggle-AutoStart
+                $itemAutoStart.Text = "🚀 开机自启守护: " + (if ($newState) { "已开启 [ON]" } else { "已关闭 [OFF]" })
+            } catch {}
+        })
 
         $itemOpenLog = $ctxMenu.Items.Add("📂 查看后台守护日志 (daemon.log)")
 
@@ -13158,13 +12669,9 @@ function Invoke-DaemonMonitorWorkerLoop {
 
 
 
-    $debounceSeconds = 60
-
-
-
+        $debounceSeconds = 60
     $tickCount = 0
-
-
+    $lastSilentSyncTime = [DateTime]::Now
 
     while ($true) {
 
@@ -13175,33 +12682,19 @@ function Invoke-DaemonMonitorWorkerLoop {
 
 
         if (-not $RunOnce -and (Test-Path $DaemonPidPath)) {
-
-
-
             try {
-
-
-
-                $trayPid = [int](Get-Content $DaemonPidPath -Raw -Encoding ASCII).Trim()
-
-
-
-                if ($trayPid -gt 0 -and (-not (Get-Process -Id $trayPid -ErrorAction SilentlyContinue))) {
-
-
-
-                    break
-
-
-
+                $rawPid = (Get-Content $DaemonPidPath -Raw -Encoding ASCII).Trim()
+                $trayPid = 0
+                if ($rawPid.StartsWith("{")) {
+                    $pObj = $rawPid | ConvertFrom-Json
+                    if ($pObj.pid) { $trayPid = [int]$pObj.pid }
+                } elseif ($rawPid -match '^\d+$') {
+                    $trayPid = [int]$rawPid
                 }
-
-
-
+                if ($trayPid -gt 0 -and (-not (Get-Process -Id $trayPid -ErrorAction SilentlyContinue))) {
+                    break
+                }
             } catch {}
-
-
-
         }
 
 
@@ -13474,37 +12967,30 @@ function Invoke-DaemonMonitorWorkerLoop {
 
 
                     if ($newContent -match $quotaRegex) {
-
-
-
                         $matchedText = $Matches[0]
-
-
-
                         $now = Get-Date
-
-
-
                         if (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds) {
-
-
-
-                            $lastSwitchTime = $now
-
-
-
-                            $reasonStr = "系统日志捕获限额特征: '$matchedText' (来源: $([System.IO.Path]::GetFileName($filePath)))"
-
-
-
-                            [void](Switch-ToNextAvailableSlot -Reason $reasonStr -AutoRestartApp:$true)
-
-
-
+                            $activeGrp = Get-CurrentActiveModelGroup
+                            # 强制先检查本地 RPC 当前活跃模型组真实配额，若剩余配额 > 1% 则直接忽略，严防因后台子任务报错误判切号
+                            $liveLocalQuota = Get-LocalLanguageServerQuota
+                            $isReallyExhausted = $true
+                            if ($liveLocalQuota) {
+                                if ($activeGrp -eq "Argon") {
+                                    if ($null -ne $liveLocalQuota.ArgonWeeklyPct -and $liveLocalQuota.ArgonWeeklyPct -gt 1) { $isReallyExhausted = $false }
+                                } elseif ($activeGrp -eq "Claude") {
+                                    if (($null -ne $liveLocalQuota.Claude5hPct -and $liveLocalQuota.Claude5hPct -gt 1) -and ($null -ne $liveLocalQuota.ClaudeWeeklyPct -and $liveLocalQuota.ClaudeWeeklyPct -gt 1)) { $isReallyExhausted = $false }
+                                } else {
+                                    if (($null -ne $liveLocalQuota.Gemini5hPct -and $liveLocalQuota.Gemini5hPct -gt 1) -and ($null -ne $liveLocalQuota.GeminiWeeklyPct -and $liveLocalQuota.GeminiWeeklyPct -gt 1)) { $isReallyExhausted = $false }
+                                }
+                            }
+                            if ($isReallyExhausted) {
+                                $lastSwitchTime = $now
+                                $reasonStr = "系统日志捕获限额特征且本地配额已见底 (<=1%): '$matchedText' (来源: $([System.IO.Path]::GetFileName($filePath)))"
+                                [void](Switch-ToNextAvailableSlot -Reason $reasonStr -AutoRestartApp:$true -TargetModelGroup $activeGrp)
+                            } else {
+                                Write-Host ("[*] 日志捕获限额特征 [$matchedText]，但本地当前模型组 [$activeGrp] 剩余配额充足，已忽略后台误报。") -ForegroundColor DarkGray
+                            }
                         }
-
-
-
                     }
 
 
@@ -13521,10 +13007,15 @@ function Invoke-DaemonMonitorWorkerLoop {
 
 
 
+        # 后台每 30 分钟低频静默同步一次全池配额
+        if (((Get-Date) - $lastSilentSyncTime).TotalMinutes -ge 30.0) {
+            try {
+                [void](Sync-AllSlotsQuotaInfo -Silent)
+            } catch {}
+            $lastSilentSyncTime = Get-Date
+        }
+
         if ($RunOnce) { break }
-
-
-
         Start-Sleep -Seconds $PollIntervalSec
 
 
@@ -13561,54 +13052,40 @@ function Get-DaemonStatus {
 
 
 
-    if (Test-Path $DaemonPidPath) {
-
-
-
+        if (Test-Path $DaemonPidPath) {
         try {
-
-
-
-            $savedPid = (Get-Content $DaemonPidPath -Raw -Encoding ASCII).Trim()
-
-
-
-            if ($savedPid -match '^\d+$') {
-
-
-
-                $p = Get-Process -Id ([int]$savedPid) -ErrorAction SilentlyContinue
-
-
-
-                if ($p -and $p.ProcessName -match 'powershell|pwsh') {
-
-
-
-                    $isRunning = $true
-
-
-
-                    $pidNum = [int]$savedPid
-
-
-
-                    $proc = $p
-
-
-
-                }
-
-
-
+            $rawPid = (Get-Content $DaemonPidPath -Raw -Encoding UTF8).Trim()
+            $savedPid = $null
+            $savedStartTime = $null
+            $savedProcName = $null
+            if ($rawPid.StartsWith("{")) {
+                $pidObj = $rawPid | ConvertFrom-Json
+                $savedPid = [int]$pidObj.pid
+                $savedStartTime = $pidObj.startTime
+                $savedProcName = $pidObj.processName
+            } elseif ($rawPid -match '^\d+$') {
+                $savedPid = [int]$rawPid
             }
-
-
-
+            if ($savedPid -gt 0) {
+                $p = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
+                if ($p -and $p.ProcessName -match 'powershell|pwsh') {
+                    $startTimeMatches = $true
+                    if ($savedStartTime) {
+                        try {
+                            $savedDt = [DateTime]::Parse($savedStartTime)
+                            if ([Math]::Abs(($p.StartTime - $savedDt).TotalSeconds) -gt 3.0) {
+                                $startTimeMatches = $false
+                            }
+                        } catch {}
+                    }
+                    if ($startTimeMatches) {
+                        $isRunning = $true
+                        $pidNum = $savedPid
+                        $proc = $p
+                    }
+                }
+            }
         } catch {}
-
-
-
     }
 
 
@@ -14005,14 +13482,8 @@ function Format-QuotaPairCell {
 
 
 
-    $s5 = if ($null -ne $Pct5h -and $Pct5h -ne "") { "{0,3}%" -f [int]$Pct5h } else { " -- " }
-
-
-
-    $sw = if ($null -ne $PctWeekly -and $PctWeekly -ne "") { "{0,3}%" -f [int]$PctWeekly } else { " -- " }
-
-
-
+    $s5 = if ($null -ne $Pct5h -and ([string]$Pct5h).Trim() -ne "") { "{0,3}%" -f [int]$Pct5h } else { " -- " }
+    $sw = if ($null -ne $PctWeekly -and ([string]$PctWeekly).Trim() -ne "") { "{0,3}%" -f [int]$PctWeekly } else { " -- " }
     return "$s5 / $sw"
 
 
@@ -14290,12 +13761,14 @@ function Show-SlotPoolDashboard {
 
             $arVal   = Get-SafeProp $s "argonWeeklyPct"
             $gemCell = Format-QuotaPairCell -Pct5h $g5Val -PctWeekly $gwVal
-            $arCell  = if ($null -ne $arVal -and $arVal -ne "") { "{0,3}%" -f [int]$arVal } else { " -- " }
+            $arCell  = if ($null -ne $arVal -and ([string]$arVal).Trim() -ne "") { "{0,3}%" -f [int]$arVal } else { " -- " }
             $claCell = Format-QuotaPairCell -Pct5h $c5Val -PctWeekly $cwVal
 
             $minGem   = if ($null -ne $g5Val -and $null -ne $gwVal) { [Math]::Min([int]$g5Val, [int]$gwVal) } elseif ($null -ne $g5Val) { [int]$g5Val } else { $null }
             $gemColor = if ($null -eq $minGem) { "Gray" } elseif ($minGem -le 15) { "Red" } elseif ($minGem -le 45) { "Yellow" } else { "Green" }
             $arColor  = if ($null -eq $arVal) { "Gray" } elseif ($arVal -le 15) { "Red" } elseif ($arVal -le 45) { "Yellow" } else { "Green" }
+            $minCla   = if ($null -ne $c5Val -and $null -ne $cwVal) { [Math]::Min([int]$c5Val, [int]$cwVal) } elseif ($null -ne $c5Val) { [int]$c5Val } else { $null }
+            $claColor = if ($null -eq $minCla) { "Gray" } elseif ($minCla -le 15) { "Red" } elseif ($minCla -le 45) { "Yellow" } else { "Green" }
 
 
 
@@ -14508,7 +13981,7 @@ function Show-SlotPoolDashboard {
             Write-Host ("{0,-22} " -f $shortEmail) -NoNewline
             Write-Host ("{0,-14} " -f $gemCell) -ForegroundColor $gemColor -NoNewline
             Write-Host ("{0,-10} " -f $arCell) -ForegroundColor $arColor -NoNewline
-            Write-Host ("{0,-14} " -f $claCell) -NoNewline
+            Write-Host ("{0,-14} " -f $claCell) -ForegroundColor $claColor -NoNewline
             Write-Host ("{0,-18} {1}次" -f $countdownStr, [int](Get-SafeProp $s "switchCount" 0))
 
 
@@ -14737,7 +14210,8 @@ function Set-AntigravityCliAuthMode {
 
 
 
-                    $inputKey = Read-Host "请输入你的 Google AI Studio GEMINI_API_KEY（留空则稍后自行设置）"
+                    $secKey = Read-Host "请输入你的 Google AI Studio GEMINI_API_KEY（输入内容已掩码保护，留空则跳过）" -AsSecureString
+                    $inputKey = if ($secKey) { [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secKey)) } else { "" }
 
 
 
@@ -14962,22 +14436,10 @@ function New-WorkspaceHandoverFile {
 
 
 - **生成时间**：$timestamp
-
-
-
-- **项目路径**：`$resolvedPath`
-
-
-
-- **最近活跃会话 ID**：`$lastConvId`
-
-
-
-- **本地记忆目录**：`$($ctx.BrainDir)`
-
-
-
-- **当前 Git 分支**：`$gitBranch`
+- **项目路径**：``$resolvedPath``
+- **最近活跃会话 ID**：``$lastConvId``
+- **本地记忆目录**：``$($ctx.BrainDir)``
+- **当前 Git 分支**：``$gitBranch``
 
 
 
@@ -15121,15 +14583,190 @@ function Show-StatusDashboard {
 
 
 
-function Start-InteractiveMenu {
-    # 自动守护保障：若后台守护未运行，自动静默启动系统托盘常驻守护
+# ============================================================================
+# 开机自启守护管理与 /goal /boost 扩展能力
+# ============================================================================
+
+$StartupDir          = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
+$StartupShortcutPath = Join-Path $StartupDir "Antigravity Auto-Switcher.lnk"
+
+function Test-AutoStartEnabled {
+    return (Test-Path $StartupShortcutPath)
+}
+
+function Set-AutoStartEnabled {
+    param([Parameter(Mandatory=$true)][bool]$Enable)
     try {
-        $daemonStatus = Get-DaemonStatus
-        if (-not $daemonStatus.IsRunning) {
-            Write-Host "[*] 检测到后台无人值守守护未运行，正在自动静默启动系统托盘守护..." -ForegroundColor Cyan
-            Start-DaemonBackground -AutoRestartApp -CooldownHours $CooldownHours -PollIntervalSec $PollIntervalSec
+        if ($Enable) {
+            if (-not (Test-Path $StartupDir)) {
+                New-Item -ItemType Directory -Path $StartupDir -Force | Out-Null
+            }
+            $scriptPath = $Script:ResolvedScriptPath
+            $workDir    = $Script:ResolvedScriptDir
+            $wsh = New-Object -ComObject WScript.Shell
+            $sc = $wsh.CreateShortcut($StartupShortcutPath)
+            $sc.TargetPath = "powershell.exe"
+            $sc.Arguments = "-NoLogo -NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`" -Action daemon -AutoRestartApp"
+            $sc.WorkingDirectory = $workDir
+            $sc.Description = "Antigravity 5小时限额全自动切号与系统托盘后台守护"
+            $sc.WindowStyle = 7 # Minimized
+            $sc.Save()
+            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($sc) | Out-Null
+            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($wsh) | Out-Null
+            Write-Host "[✓] 已在 Windows 启动目录创建纯桌面快捷方式，开机自启守护已开启！" -ForegroundColor Green
+            Write-Host ("    快捷方式位置: {0}" -f $StartupShortcutPath) -ForegroundColor Gray
+            return $true
+        } else {
+            if (Test-Path $StartupShortcutPath) {
+                Remove-Item $StartupShortcutPath -Force -ErrorAction SilentlyContinue
+            }
+            Write-Host "[✓] 已移除 Windows 启动快捷方式，开机自启守护已关闭。" -ForegroundColor Green
+            return $false
         }
-    } catch {}
+    } catch {
+        Write-Host ("[!] 配置开机自启失败: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+        return (Test-AutoStartEnabled)
+    }
+}
+
+function Toggle-AutoStart {
+    $curr = Test-AutoStartEnabled
+    $newState = -not $curr
+    return (Set-AutoStartEnabled -Enable $newState)
+}
+
+function Invoke-BoostAction {
+    Write-Host ""
+    Write-Host "================================================================================================" -ForegroundColor Cyan
+    Write-Host "   /boost 极速加速模式：全池实时配额核验与最高配额槽位无感跃迁                                  " -ForegroundColor Cyan
+    Write-Host "================================================================================================" -ForegroundColor Cyan
+
+    $activeInfo = Get-CurrentActiveModelInfo -ForceRefresh
+    $activeGrp  = [string]$activeInfo.Group
+    Write-Host ("[*] 当前活跃会话模型组: [{0}] (当前模型: {1})" -f $activeGrp, $activeInfo.Label) -ForegroundColor Yellow
+
+    Write-Host "[*] 正在并行核验槽位池全部账号云端实时 5h/周配额..." -ForegroundColor Cyan
+    $state = Sync-AllSlotsQuotaInfo
+
+    $currSlotName = [string]$state.currentSlot
+    $order = @($state.slotOrder)
+    if ($order.Count -eq 0) {
+        Write-Host "[!] 槽位池为空，无法执行 /boost 轮换。" -ForegroundColor Yellow
+        return
+    }
+
+    # 寻找当前模型组配额最高且可用的槽位
+    $bestSlot = $null
+    $maxQuota = -1
+    $now = Get-Date
+
+    foreach ($name in $order) {
+        $prop = $state.slots.PSObject.Properties[$name]
+        if (-not $prop) { continue }
+        $s = $prop.Value
+        if (-not (Test-SlotGroupAvailable -SlotObj $s -ModelGroup $activeGrp -Now $now)) { continue }
+
+        $qVal = 0
+        if ($activeGrp -eq "Argon") {
+            $qVal = if ($null -ne $s.argonWeeklyPct) { [int]$s.argonWeeklyPct } else { 0 }
+        } elseif ($activeGrp -eq "Claude") {
+            $q5 = if ($null -ne $s.claude5hPct) { [int]$s.claude5hPct } else { 0 }
+            $qw = if ($null -ne $s.claudeWeeklyPct) { [int]$s.claudeWeeklyPct } else { 0 }
+            $qVal = [Math]::Min($q5, $qw)
+        } else {
+            $g5 = if ($null -ne $s.gemini5hPct) { [int]$s.gemini5hPct } else { 0 }
+            $gw = if ($null -ne $s.geminiWeeklyPct) { [int]$s.geminiWeeklyPct } else { 0 }
+            $qVal = [Math]::Min($g5, $gw)
+        }
+
+        if ($qVal -gt $maxQuota) {
+            $maxQuota = $qVal
+            $bestSlot = $name
+        }
+    }
+
+    if ($bestSlot -and $bestSlot -ne $currSlotName) {
+        Write-Host ("[✓] 发现更高配额候选槽位 [{0}] (模型组 [{1}] 剩余: {2}%)，正在触发极速跃迁..." -f $bestSlot, $activeGrp, $maxQuota) -ForegroundColor Green
+        
+        # 严格锁定切号前活跃模型
+        $Script:LockedActiveModelEnum = $activeInfo.ModelEnum
+        $state.lockedModelEnum = $activeInfo.ModelEnum
+
+        $switchedEmail = Switch-CredentialSlot -SlotName $bestSlot -WorkspacePath $ProjectDir -CloseProcesses:$true
+        
+        # 权威更新并持久化 pool_state.json 状态与历史记录
+        $bestObj = $state.slots.PSObject.Properties[$bestSlot].Value
+        Ensure-SlotObjectSchema -SlotObj $bestObj
+        Set-SafeProp $bestObj "status" "active"
+        Set-SafeProp $bestObj "cooldownType" "none"
+        Set-SafeProp $bestObj "lastSwitchedAt" ($now.ToString("yyyy-MM-dd HH:mm:ss"))
+        Set-SafeProp $bestObj "switchCount" ([int](Get-SafeProp $bestObj "switchCount" 0) + 1)
+        Set-SafeProp $state "currentSlot" $bestSlot
+
+        $histList = [System.Collections.Generic.List[object]]::new()
+        if ($state.history) { foreach ($h in $state.history) { $histList.Add($h) } }
+        $histList.Add([PSCustomObject]@{
+            timestamp = $now.ToString("yyyy-MM-dd HH:mm:ss")
+            fromSlot  = $currSlotName
+            toSlot    = $bestSlot
+            reason    = "/boost 极速跃迁至模型组 [$activeGrp] 最高配额槽位 ($maxQuota%)"
+            type      = "boost"
+        })
+        if ($histList.Count -gt 50) { $histList.RemoveRange(0, $histList.Count - 50) }
+        Set-SafeProp $state "history" ($histList.ToArray())
+        Save-SlotPoolState -State $state
+
+        Restart-AntigravityApp -TargetEmail $switchedEmail -AutoResume:$true
+    } elseif ($bestSlot -eq $currSlotName) {
+        Write-Host ("[✓] 当前槽位 [{0}] 已经是模型组 [{1}] 配额最高的槽位 (剩余: {2}%)，状态最优！" -f $currSlotName, $activeGrp, $maxQuota) -ForegroundColor Green
+    } else {
+        Write-Host ("[!] 模型组 [{0}] 所有槽位配额均处于耗尽或冷却状态。" -f $activeGrp) -ForegroundColor Yellow
+    }
+
+    # 确保后台守护运行
+    $st = Get-DaemonStatus
+    if (-not $st.IsRunning) {
+        Write-Host "[*] 后台守护未运行，正在自动拉起无人值守守护..." -ForegroundColor Cyan
+        Start-DaemonBackground -AutoRestartApp
+    }
+
+    Show-SlotPoolDashboard
+}
+
+function Invoke-GoalAction {
+    Write-Host ""
+    Write-Host "================================================================================================" -ForegroundColor Cyan
+    Write-Host "   /goal 目标驱动模式：槽位池目标状态达成与全链路健康度体检                                     " -ForegroundColor Cyan
+    Write-Host "================================================================================================" -ForegroundColor Cyan
+
+    $activeInfo = Get-CurrentActiveModelInfo -ForceRefresh
+    $activeGrp  = [string]$activeInfo.Group
+    $state = Get-SlotPoolState
+    $daemonStatus = Get-DaemonStatus
+    $autoStart = Test-AutoStartEnabled
+
+    Write-Host ("1. 当前活跃模型: {0} (模型组: [{1}] | 原模型锁定: 严格生效)" -f $activeInfo.Label, $activeGrp) -ForegroundColor Green
+    Write-Host ("2. 槽位池账号数: {0} 个 (当前槽位: [{1}])" -f @($state.slotOrder).Count, $(if ($state.currentSlot) { $state.currentSlot } else { "未匹配" })) -ForegroundColor Green
+    Write-Host ("3. 后台守护状态: {0}" -f $(if ($daemonStatus.IsRunning) { "运行中 (PID: $($daemonStatus.PID))" } else { "未运行" })) -ForegroundColor $(if ($daemonStatus.IsRunning) { "Green" } else { "Yellow" })
+    Write-Host ("4. 开机自启守护: {0}" -f $(if ($autoStart) { "已开启 [ON]" } else { "已关闭 [OFF]" })) -ForegroundColor $(if ($autoStart) { "Green" } else { "Gray" })
+
+    $now = Get-Date
+    $availCount = 0
+    foreach ($name in $state.slotOrder) {
+        $prop = $state.slots.PSObject.Properties[$name]
+        if ($prop -and (Test-SlotGroupAvailable -SlotObj $prop.Value -ModelGroup $activeGrp -Now $now)) {
+            $availCount++
+        }
+    }
+    Write-Host ("5. 当前模型组可用槽位: {0} / {1} 个就绪" -f $availCount, @($state.slotOrder).Count) -ForegroundColor $(if ($availCount -gt 0) { "Green" } else { "Red" })
+
+    Write-Host "------------------------------------------------------------------------------------------------" -ForegroundColor DarkGray
+    Write-Host "[*] 正在展示最新槽位池看板..." -ForegroundColor Cyan
+    Show-SlotPoolDashboard
+}
+
+
+function Start-InteractiveMenu {
 
     # 若后台守护正在运行且启动时间早于当前脚本更新时间，自动静默热重载守护进程以应用最新原会话恢复逻辑
 
@@ -15232,10 +14869,11 @@ function Start-InteractiveMenu {
 
 
         Write-Host "  [9] 重置槽位 5 小时冷却计时器      (Reset Cooldown Timers)"
-
-
-
-        Write-Host "  [D] 删除已保存的加密槽位           (Delete Slot)"
+        Write-Host "  [A] 开机自启守护切换               (Auto-Start on Boot: " -NoNewline
+        Write-Host ($(if (Test-AutoStartEnabled) { "已开启 [ON])" } else { "已关闭 [OFF])" })) -ForegroundColor $(if (Test-AutoStartEnabled) { "Green" } else { "DarkGray" })
+        Write-Host "  [B] /boost 立即核验并切至最高配额  (Boost Quota & Immediate Jump)"
+        Write-Host "  [G] /goal 目标状态达成与全链路体检 (Goal Health Inspection)"
+        Write-Host "  [D] 删除已保存的加密槽位           (Delete Slot)" 
 
 
 
@@ -15411,22 +15049,31 @@ function Start-InteractiveMenu {
 
 
 
-                "9" {
-
-
-
+                                "9" {
                     $s = Read-Host "请输入要重置的槽位名称（输入 all 重置所有槽位）"
-
-
-
                     Reset-SlotCooldown -SlotName $s
-
-
-
                 }
-
-
-
+                "A" {
+                    [void](Toggle-AutoStart)
+                }
+                "B" {
+                    Invoke-BoostAction
+                }
+                "/BOOST" {
+                    Invoke-BoostAction
+                }
+                "BOOST" {
+                    Invoke-BoostAction
+                }
+                "G" {
+                    Invoke-GoalAction
+                }
+                "/GOAL" {
+                    Invoke-GoalAction
+                }
+                "GOAL" {
+                    Invoke-GoalAction
+                }
                 "D" {
 
 
@@ -15644,9 +15291,10 @@ switch ($Action) {
 
 
     "refresh-quota"  { [void](Sync-AllSlotsQuotaInfo); Show-SlotPoolDashboard }
-
-
-
+    "goal"           { Invoke-GoalAction }
+    "/goal"          { Invoke-GoalAction }
+    "boost"          { Invoke-BoostAction }
+    "/boost"         { Invoke-BoostAction }
 }
 
 
