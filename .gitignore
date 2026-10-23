@@ -1,0 +1,19 @@
+# Runtime & Session Cache
+slots/
+*.dpapi
+*.meta.json
+pool_state.json
+manifest.json
+last_active_conversation.txt
+*.log
+
+# Windows & IDE
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+
+# Temp
+*.tmp
+*.bak
+*.zip
