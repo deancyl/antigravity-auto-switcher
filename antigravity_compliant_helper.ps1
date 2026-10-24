@@ -74,7 +74,7 @@ param(
 
 
 
-    [ValidateSet("menu", "status", "save", "switch", "delete", "mode", "handover", "daemon", "daemon-worker", "start-daemon", "stop-daemon", "daemon-status", "next-slot", "pool-status", "reset-cooldown", "repair-storage", "auto-resume", "refresh-quota", "goal", "boost", "/goal", "/boost", "load-only")]
+    [ValidateSet("menu", "status", "save", "switch", "delete", "mode", "handover", "daemon", "daemon-worker", "start-daemon", "stop-daemon", "daemon-status", "next-slot", "pool-status", "reset-cooldown", "repair-storage", "auto-resume", "refresh-quota", "goal", "boost", "/goal", "/boost", "load-only", "log")]
 
 
 
@@ -3841,6 +3841,32 @@ $DaemonLogPath        = Join-Path $HelperRoot "daemon.log"
 
 
 $DaemonStopSignal     = Join-Path $HelperRoot "daemon.stop"
+
+function Write-DaemonLog {
+    param(
+        [string]$Message,
+        [ValidateSet("INFO", "WARN", "ERROR", "SWITCH", "QUOTA", "DEBUG")]
+        [string]$Level = "INFO"
+    )
+    try {
+        if (-not (Test-Path $HelperRoot)) {
+            New-Item -ItemType Directory -Path $HelperRoot -Force -ErrorAction SilentlyContinue | Out-Null
+        }
+        $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        $logLine = "[$timestamp] [$Level] $Message`r`n"
+        if (Test-Path $DaemonLogPath) {
+            $f = Get-Item $DaemonLogPath -ErrorAction SilentlyContinue
+            if ($f -and $f.Length -gt 5MB) {
+                $oldPath = "$DaemonLogPath.old"
+                try {
+                    if (Test-Path $oldPath) { Remove-Item $oldPath -Force -ErrorAction SilentlyContinue }
+                    Move-Item $DaemonLogPath $oldPath -Force -ErrorAction SilentlyContinue
+                } catch {}
+            }
+        }
+        [System.IO.File]::AppendAllText($DaemonLogPath, $logLine, [System.Text.Encoding]::UTF8)
+    } catch {}
+}
 
 
 
@@ -7732,6 +7758,7 @@ function Write-AllStoresForSnapshot {
         return (Get-StringFingerprint -Text $(if ($rt) { $rt } else { $at }))
     } catch {
         Write-Host "    [!] 写入或校验全量凭据存储失败，正在执行全链路状态自动回滚..." -ForegroundColor Red
+        Write-DaemonLog "写入或校验全量凭据存储失败，已触发全链路状态自动回滚: $($_.Exception.Message)" "ERROR"
         if ($backupWinCred) {
             try { [AntigravityCompliantHelper.NativeVaultV4]::WriteGenericCredential($CredTarget, $CredUser, $backupWinCred) } catch {}
         } else {
@@ -10583,6 +10610,7 @@ function Switch-ToNextAvailableSlot {
         [string]$TargetModelGroup = ""
     )
 
+    Write-DaemonLog ">> 开始执行账号轮换流程: 触发原因: $Reason | 目标模型组: $TargetModelGroup" "SWITCH"
     if ($WaitParentPid -eq 0 -and (Test-IsRunningInsideAntigravityTerminal)) {
         Write-Host "[!] 检测到当前在 AGY2 内置终端中运行，正在派生独立系统进程完成关闭、轮换与重启..." -ForegroundColor Yellow
         $scriptPath = $Script:ResolvedScriptPath
@@ -11128,6 +11156,7 @@ function Switch-ToNextAvailableSlot {
                 "【限额警告】所有 $($order.Count) 个账号槽位在 [$grp] 模型组均已耗尽或冷却！已严格锁定原模型并停止自动切号。"
             }
             Write-Host $msg -ForegroundColor Red
+            Write-DaemonLog $msg "WARN"
             Send-DesktopNotification -Title "Antigravity 模型组 [$grp] 配额耗尽" -Message $msg
 
 
@@ -11169,6 +11198,7 @@ function Switch-ToNextAvailableSlot {
 
 
     Write-Host ("[▶] 正在关闭旧 AGY2 实例并全量切换至槽位: [{0}]..." -f $nextSlotName) -ForegroundColor Cyan
+    Write-DaemonLog ("选定目标可用槽位: [{0}]，正在关闭旧实例并写入凭据..." -f $nextSlotName) "SWITCH"
 
 
 
@@ -11276,6 +11306,7 @@ function Switch-ToNextAvailableSlot {
 
 
 
+        Write-DaemonLog ("已写入凭据并完成一致性校验，正在重启 Antigravity 并恢复会话 (AutoResume: {0})..." -f $AutoResumeConversation) "INFO"
         Restart-AntigravityApp -TargetEmail $switchedEmail -AutoResume:$AutoResumeConversation
 
 
@@ -11289,6 +11320,7 @@ function Switch-ToNextAvailableSlot {
 
 
     Write-Host ("[✓] " + $notifyMsg) -ForegroundColor Green
+    Write-DaemonLog ("<< 账号轮换圆满完成！" + $notifyMsg) "SWITCH"
 
 
 
@@ -12132,11 +12164,11 @@ function Start-PassiveLogWatcher {
 
         })
 
-        $itemAutoStart = $ctxMenu.Items.Add("🚀 开机自启守护: " + (if (Test-AutoStartEnabled) { "已开启 [ON]" } else { "已关闭 [OFF]" }))
+        $itemAutoStart = $ctxMenu.Items.Add("🚀 开机自启守护: " + $(if (Test-AutoStartEnabled) { "已开启 [ON]" } else { "已关闭 [OFF]" }))
         $itemAutoStart.Add_Click({
             try {
                 $newState = Toggle-AutoStart
-                $itemAutoStart.Text = "🚀 开机自启守护: " + (if ($newState) { "已开启 [ON]" } else { "已关闭 [OFF]" })
+                $itemAutoStart.Text = "🚀 开机自启守护: " + $(if ($newState) { "已开启 [ON]" } else { "已关闭 [OFF]" })
             } catch {}
         })
 
@@ -12640,7 +12672,10 @@ function Invoke-DaemonMonitorWorkerLoop {
 
 
 
-        $debounceSeconds = 60
+    $debounceSeconds = 60
+    $lastHeartbeatLogTime = [DateTime]::Now
+    $hasLoggedLsConnect = $false
+    Write-DaemonLog ("后台守护监控循环已就绪 (PID: {0}, 轮询: {1}s, 模式: 托盘常驻)" -f $PID, $PollIntervalSec) "INFO"
     $tickCount = 0
     $lastSilentSyncTime = [DateTime]::Now
 
@@ -12648,7 +12683,10 @@ function Invoke-DaemonMonitorWorkerLoop {
 
 
 
-        if (Test-Path $DaemonStopSignal) { break }
+        if (Test-Path $DaemonStopSignal) {
+            Write-DaemonLog "收到停止信号，后台守护进程安全退出" "INFO"
+            break
+        }
 
 
 
@@ -12736,6 +12774,14 @@ function Invoke-DaemonMonitorWorkerLoop {
             $readyCnt = @($pool.slots.PSObject.Properties | Where-Object { $_.Value.status -eq "ready" -or $_.Value.status -eq "active" }).Count
             $quotaLine = "实时剩余: Gemini 5h:$g5 周:$gw | Argon:$ar | Claude 5h:$c5"
             $tooltip   = "AGY守护[运行中] 槽位:[$currSlot]`nGemini 5h:$g5 周:$gw | Argon:$ar | 备用:$readyCnt"
+            if (-not $hasLoggedLsConnect) {
+                $hasLoggedLsConnect = $true
+                Write-DaemonLog ("已建立与本地 LanguageServer 配额连接 (槽位: [{0}], Gemini: 5h={1} 周={2} | Argon={3} | Claude: 5h={4})" -f $currSlot, $g5, $gw, $ar, $c5) "INFO"
+            }
+            if (($now - $lastHeartbeatLogTime).TotalMinutes -ge 10) {
+                $lastHeartbeatLogTime = $now
+                Write-DaemonLog ("【守护心跳正常】当前槽位: [{0}] ({1}) | Gemini 5h:{2} 周:{3} | Argon:{4} | 备用可用槽位:{5}" -f $currSlot, $currEmail, $g5, $gw, $ar, $readyCnt) "INFO"
+            }
 
             if (($null -ne $lsQuota.Gemini5hPct -and $lsQuota.Gemini5hPct -le 20) -or ($null -ne $lsQuota.GeminiWeeklyPct -and $lsQuota.GeminiWeeklyPct -le 10) -or ($null -ne $lsQuota.ArgonWeeklyPct -and $lsQuota.ArgonWeeklyPct -le 10)) {
                 $badgeColor = "Yellow"
@@ -12772,7 +12818,18 @@ function Invoke-DaemonMonitorWorkerLoop {
                 }
             }
 
-            if ($shouldSwitch -and (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds)) {
+            if ($shouldSwitch) {
+                if (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds) {
+                    Write-DaemonLog ("【触发切号阈值】{0}，准备执行账号轮换与会话恢复..." -f $switchReason) "WARN"
+                    $lastSwitchTime = $now
+                    [void](Switch-ToNextAvailableSlot -Reason $switchReason -AutoRestartApp:$true -IsWeeklyLimit:$isWeeklyLimit -ServerResetTime $switchResetTime -TargetModelGroup $activeGrp)
+                    continue
+                } else {
+                    $remainDebounce = [math]::Max(0, [int]($debounceSeconds - ($now - $lastSwitchTime).TotalSeconds))
+                    Write-DaemonLog ("【限额检测】已检测到配额见底 (<=1%)，但正处于切号防抖冷却期中 (剩余 {0} 秒)，暂缓切换" -f $remainDebounce) "WARN"
+                }
+            }
+            if ($false) {
                 $lastSwitchTime = $now
                 [void](Switch-ToNextAvailableSlot -Reason $switchReason -AutoRestartApp:$true -IsWeeklyLimit:$isWeeklyLimit -ServerResetTime $switchResetTime -TargetModelGroup $activeGrp)
                 continue
@@ -12957,9 +13014,12 @@ function Invoke-DaemonMonitorWorkerLoop {
                             if ($isReallyExhausted) {
                                 $lastSwitchTime = $now
                                 $reasonStr = "系统日志捕获限额特征且本地配额已见底 (<=1%): '$matchedText' (来源: $([System.IO.Path]::GetFileName($filePath)))"
+                                Write-DaemonLog $reasonStr "WARN"
                                 [void](Switch-ToNextAvailableSlot -Reason $reasonStr -AutoRestartApp:$true -TargetModelGroup $activeGrp)
                             } else {
-                                Write-Host ("[*] 日志捕获限额特征 [$matchedText]，但本地当前模型组 [$activeGrp] 剩余配额充足，已忽略后台误报。") -ForegroundColor DarkGray
+                                $ignoreMsg = "日志捕获限额特征 [$matchedText] (来源: $([System.IO.Path]::GetFileName($filePath)))，但本地当前模型组 [$activeGrp] 剩余配额充足，已安全忽略后台误报"
+                                Write-Host ("[*] " + $ignoreMsg) -ForegroundColor DarkGray
+                                Write-DaemonLog $ignoreMsg "INFO"
                             }
                         }
                     }
@@ -14660,7 +14720,8 @@ switch ($Action) {
 
 
 
-            Restart-AntigravityApp -TargetEmail $switchedEmail -AutoResume:$AutoResumeConversation
+            Write-DaemonLog ("已写入凭据并完成一致性校验，正在重启 Antigravity 并恢复会话 (AutoResume: {0})..." -f $AutoResumeConversation) "INFO"
+        Restart-AntigravityApp -TargetEmail $switchedEmail -AutoResume:$AutoResumeConversation
 
 
 
