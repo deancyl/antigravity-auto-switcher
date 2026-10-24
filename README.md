@@ -1,6 +1,6 @@
 # Antigravity Auto Switcher (AGY 官方原生合规多账号智能轮换与原会话无损续接助手) 🚀
 
-[![Version](https://img.shields.io/badge/Release-v0.2.0-blue.svg)](https://github.com/deancyl/antigravity-auto-switcher/releases)
+[![Version](https://img.shields.io/badge/Release-v0.2.1-blue.svg)](https://github.com/deancyl/antigravity-auto-switcher/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](https://microsoft.com)
 [![Protocol](https://img.shields.io/badge/Protocol-Zero--CDP%20Native%20Connect--RPC-success.svg)](https://github.com/deancyl/antigravity-auto-switcher)
 [![Compliance](https://img.shields.io/badge/Compliance-100%25%20Official%20Native%20(No%20Proxy)-green.svg)](https://github.com/deancyl/antigravity-auto-switcher)
@@ -23,7 +23,7 @@
 切号完成 ──> 探测本地 127.0.0.1 官方 LanguageServer ──> 毫秒级下发 SendUserCascadeMessage ──> 推演核心直接开始推理！(耗时 < 200ms)
 ```
 
-| 维度 | 传统反代方案 (如部分开源工具) | 旧版 CDP DOM 模拟 | **本项目 Zero-CDP 原生方案 (v0.2.0)** |
+| 维度 | 传统反代方案 (如部分开源工具) | 旧版 CDP DOM 模拟 | **本项目 Zero-CDP 原生方案 (v0.2.1)** |
 | :--- | :--- | :--- | :--- |
 | **官方合规性** | ❌ **严重违规** (逆向私有 API，跨号 Token 缝合，高危封号) | ⚠️ **脆弱网页模拟** (把桌面客户端当作网页黑盒) | ✅ **100% 官方正版原生** (基于系统 Windows Credential Keyring，零改包) |
 | **续接机制** | 强行在中途替换 HTTP Token | 模拟 CDP 查找 DOM 输入框与按键 | ✅ **直连 LanguageServer Connect-RPC** (`SendUserCascadeMessage`) |
@@ -71,12 +71,24 @@
 9. **纯只读状态探测**：状态查看完全剔除剪贴板篡改与菜单自动拉起守护的副作用；
 10. **安全密钥掩码与 Python 子进程超时防卡死**：API Key 交互输入支持 `-AsSecureString` 掩码；会话数据库读取子进程配置 5 秒硬超时与自动 Kill 保护。
 
+### 6. 💎 v0.2.1 底层可靠性纵深强化与交互操作台重构 (8 项核心缺陷根治)
+针对外部高标准架构审计与企业级连续无人值守运行诉求，v0.2.1 针对底层 I/O、存储事务、并发判定、时区与控制台交互实施了系统性根治：
+1. **Win32 `MoveFileExW` 操作系统内核级真·原子文件替换**：内联引入 `kernel32.dll!MoveFileExW`（`MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`），废除先 Delete 再 Move 的伪原子方案，彻底免疫进程崩溃、并发争用或断电引起的 0 字节损坏；
+2. **切号存储强一致性校验与全量事务回滚**：切号写入 Windows 凭据、`app_storage.json` 与 CLI 凭据后立即执行双向回读指纹与登录邮箱校验，一旦指纹不一致立即自动全量原子回滚并抛出致命异常，绝不吞错静默失效；
+3. **C# 语法树 JSON 递归下降解析校验与现场隔离备份**：配置修复时改写前无条件生成 `.bak` 备份；采用 C# 语法级递归下降状态机替代脆弱的正则，检测损坏文件完整保留现场为 `.corrupt.<timestamp>.bak`，禁止盲目覆写与暴力擦除；
+4. **SQLite 会话树全链路递归活跃判定 (Cascade Tree Search)**：深度递归遍历整个会话与子任务树，只要任意子孙节点包含 `not_fully_idle != 0` 或 `RUNNING` 状态，即准确标记整棵树活跃（`CASCADE_RUN_STATUS_RUNNING`），彻底杜绝轮询中途误杀；
+5. **Argon 配额优先解冻与类型安全防漂移**：配额评估前优先检测云端 `resetTime`，到期毫秒级自动解冻恢复为 100%；引入 `ConvertTo-SafeInt` 与 `ConvertTo-LocalDateTime`，彻底解决空值、`--` 强转异常与本地/UTC 8 小时时区漂移；
+6. **接力档案模板转义纠正**：修复 `New-WorkspaceHandoverFile` here-string 与反引号转义冲突，消除 `\text` 制表符乱码，确保接力文档完美渲染；
+7. **交互操作台降噪与高频看板重构**：默认隐藏 6 个客户端 PID 列表与内部 RPC 端口（支持 `-ShowDiagnostics` 呼出），顶部呈现 4 项核心状态（守护状态、账号与模型、实时额度、数据新鲜度），表格宽度严格约束在 95 列内杜绝换行折叠，状态明确为 `★ 使用中`、`就绪 (可用)`、`5h限额`、`周限额`、`不支持`，危险重置操作增加显式二次确认；
+8. **PowerShell 5.1 / 7 (Core) 双引擎 41 项自动化回归验证**：配备完整的回归自动化测试套件 `verify_fixes.ps1`，双引擎全量通过。
+
 ---
 
 ## 📂 项目结构
 
 ```text
 ├── antigravity_compliant_helper.ps1   # 核心 PowerShell 5.1/7 双引擎合规切换与守护引擎
+├── verify_fixes.ps1                   # 41 项底层可靠性与控制台全量自动化回归测试套件
 ├── 开启自动切号守护.bat                 # 一键启动后台无窗口守护进程与系统托盘图标
 ├── 停止自动切号守护.bat                 # 一键停止后台守护进程
 ├── 查看自动切号状态与槽位池.bat         # 呼出实时全账号配额看板与交互式控制台
