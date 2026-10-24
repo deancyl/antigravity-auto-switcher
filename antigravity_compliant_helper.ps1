@@ -654,12 +654,16 @@ namespace AntigravityCompliantHelper
 
 
         [DllImport("Advapi32.dll", EntryPoint = "CredFree", SetLastError = true)]
-
-
-
         private static extern bool CredFree([In] IntPtr cred);
 
+        [DllImport("Advapi32.dll", EntryPoint = "CredDeleteW", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool CredDelete(string target, int type, int flags);
 
+        public static bool DeleteGenericCredential(string target)
+        {
+            if (string.IsNullOrEmpty(target)) return false;
+            return CredDelete(target, CRED_TYPE_GENERIC, 0);
+        }
 
         public static string ReadGenericCredential(string target)
 
@@ -2103,7 +2107,7 @@ namespace AntigravityCompliantHelper
             while (idx < s.Length)
             {
                 char c = s[idx];
-                if (c == ' ' || c == '\t' || c == '\r' || c == '\n') idx++;
+                if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\uFEFF') idx++;
                 else break;
             }
         }
@@ -3916,14 +3920,13 @@ if (Test-Path $AppStorageJson) {
     try {
         $rawStorage = Read-Utf8StripBom -Path $AppStorageJson
         if ($rawStorage) {
-            $trimmed = $rawStorage.Trim()
-            $isInvalidBoundary = (-not $trimmed.StartsWith("{")) -or (-not $trimmed.EndsWith("}"))
-            if ($isInvalidBoundary) {
-                Write-Host "[!] 检测到 app_storage.json 结构受损，正在自动安全备份并重置为纯净官方格式..." -ForegroundColor Yellow
-                $currSummary = Get-CurrentActiveAccountSummary
-                $keepEmail = if ($currSummary.ActiveEmail -and $currSummary.ActiveEmail -notmatch '未检测') { $currSummary.ActiveEmail } else { "user@gmail.com" }
-                [AntigravityCompliantHelper.NativeVaultV4]::UpdateAppStorageEmailSafely($AppStorageJson, $keepEmail, $true)
-                Write-Host "[✓] app_storage.json 已自动安全备份并重置完成。" -ForegroundColor Green
+            $isValidJson = [AntigravityCompliantHelper.NativeVaultV4]::IsValidJsonObject($rawStorage)
+            if (-not $isValidJson) {
+                $ts = (Get-Date).ToString("yyyyMMdd_HHmmss")
+                $corruptBak = "$AppStorageJson.corrupt.$ts.bak"
+                try { Copy-Item -Path $AppStorageJson -Destination $corruptBak -Force } catch {}
+                Write-Host ("[!] 检测到 app_storage.json 结构受损或非合法 JSON 语法！已完整保留现场至: {0}" -f $corruptBak) -ForegroundColor Yellow
+                Write-Host "    [!] 为保护用户未知设置，严禁启动时暴力自动冲刷配置；如需纯净修复请使用菜单 [7] 应急修复。" -ForegroundColor Yellow
             }
         }
     } catch {}
@@ -7706,8 +7709,10 @@ function Write-AllStoresForSnapshot {
             } else {
                 (Get-StringFingerprint -Text $(if ($rt) { $rt } else { $at }))
             }
-            if ($targetFp -and $vWinFp -and $vWinFp -ne "none" -and $targetFp -ne "none" -and $vWinFp -ne $targetFp) {
-                throw ("Windows 凭据指纹校验失败：回读指纹 [{0}] 与目标槽位指纹 [{1}] 不一致！" -f $vWinFp, $targetFp)
+            if ($targetFp -and $targetFp -ne "none") {
+                if ([string]::IsNullOrWhiteSpace($vWinFp) -or $vWinFp -eq "none" -or $vWinFp -ne $targetFp) {
+                    throw ("Windows 凭据指纹校验失败：回读指纹 [{0}] 与目标槽位指纹 [{1}] 不一致！" -f $vWinFp, $targetFp)
+                }
             }
         }
         if (Test-Path $AgyCliTokenPath) {
@@ -7718,7 +7723,7 @@ function Write-AllStoresForSnapshot {
         }
         if (-not [string]::IsNullOrWhiteSpace($email)) {
             $readEmail = Get-AppStorageLoginEmail
-            if ($readEmail -and $readEmail -ne $email) {
+            if ([string]::IsNullOrWhiteSpace($readEmail) -or ($readEmail.Trim() -ne $email.Trim())) {
                 throw ("app_storage.json 登录邮箱校验失败：回读邮箱 [{0}] 与目标槽位邮箱 [{1}] 不一致！" -f $readEmail, $email)
             }
         }
@@ -7729,21 +7734,33 @@ function Write-AllStoresForSnapshot {
         Write-Host "    [!] 写入或校验全量凭据存储失败，正在执行全链路状态自动回滚..." -ForegroundColor Red
         if ($backupWinCred) {
             try { [AntigravityCompliantHelper.NativeVaultV4]::WriteGenericCredential($CredTarget, $CredUser, $backupWinCred) } catch {}
+        } else {
+            try { [AntigravityCompliantHelper.NativeVaultV4]::DeleteGenericCredential($CredTarget) } catch {}
         }
         if ($backupAppStorage) {
             try { [System.IO.File]::WriteAllBytes($AppStorageJson, $backupAppStorage) } catch {}
+        } else {
+            if (Test-Path $AppStorageJson) { try { Remove-Item $AppStorageJson -Force } catch {} }
         }
         if ($backupAgyCliToken) {
             try { [System.IO.File]::WriteAllBytes($AgyCliTokenPath, $backupAgyCliToken) } catch {}
+        } else {
+            if (Test-Path $AgyCliTokenPath) { try { Remove-Item $AgyCliTokenPath -Force } catch {} }
         }
         if ($backupJetski) {
             try { [System.IO.File]::WriteAllBytes($JetskiStandalonePath, $backupJetski) } catch {}
+        } else {
+            if (Test-Path $JetskiStandalonePath) { try { Remove-Item $JetskiStandalonePath -Force } catch {} }
         }
         if ($backupOAuth) {
             try { [System.IO.File]::WriteAllBytes($OAuthCredsPath, $backupOAuth) } catch {}
+        } else {
+            if (Test-Path $OAuthCredsPath) { try { Remove-Item $OAuthCredsPath -Force } catch {} }
         }
         if ($backupAccounts) {
             try { [System.IO.File]::WriteAllBytes($AccountsJsonPath, $backupAccounts) } catch {}
+        } else {
+            if (Test-Path $AccountsJsonPath) { try { Remove-Item $AccountsJsonPath -Force } catch {} }
         }
         throw "全量凭据同步失败且已安全回滚: $($_.Exception.Message)"
     }
@@ -10115,16 +10132,42 @@ function Apply-QuotaSnapshotToSlotObject {
     )
     if (-not $SlotObj -or (-not $QuotaSnap)) { return }
     Ensure-SlotObjectSchema -SlotObj $SlotObj
-    if ($null -ne $QuotaSnap.Gemini5hPct)     { Set-SafeProp $SlotObj "gemini5hPct"     ([int]$QuotaSnap.Gemini5hPct) }
-    if ($null -ne $QuotaSnap.GeminiWeeklyPct) { Set-SafeProp $SlotObj "geminiWeeklyPct" ([int]$QuotaSnap.GeminiWeeklyPct) }
-    if ($null -ne $QuotaSnap.ArgonWeeklyPct)  { Set-SafeProp $SlotObj "argonWeeklyPct"  ([int]$QuotaSnap.ArgonWeeklyPct) }
-    if ($null -ne $QuotaSnap.Claude5hPct)     { Set-SafeProp $SlotObj "claude5hPct"     ([int]$QuotaSnap.Claude5hPct) }
-    if ($null -ne $QuotaSnap.ClaudeWeeklyPct) { Set-SafeProp $SlotObj "claudeWeeklyPct" ([int]$QuotaSnap.ClaudeWeeklyPct) }
-    if ($QuotaSnap.ResetTime5h)               { Set-SafeProp $SlotObj "resetTime5h"     ([string]$QuotaSnap.ResetTime5h) }
-    if ($QuotaSnap.ResetTimeWeekly)           { Set-SafeProp $SlotObj "resetTimeWeekly" ([string]$QuotaSnap.ResetTimeWeekly) }
-    if ($QuotaSnap.ResetTimeArgon)            { Set-SafeProp $SlotObj "resetTimeArgon"  ([string]$QuotaSnap.ResetTimeArgon) }
-    if ($QuotaSnap.ResetTimeClaudeWeekly)     { Set-SafeProp $SlotObj "resetTimeClaudeWeekly" ([string]$QuotaSnap.ResetTimeClaudeWeekly) }
-    if ($QuotaSnap.PlanName)                  { Set-SafeProp $SlotObj "planName"        ([string]$QuotaSnap.PlanName) }
+
+    $g5Raw = Get-SafeProp $QuotaSnap "Gemini5hPct"
+    $g5 = ConvertTo-SafeInt $g5Raw -Default -1
+    if ($g5 -ge 0) { Set-SafeProp $SlotObj "gemini5hPct" $g5 } elseif ($null -ne $g5Raw) { Set-SafeProp $SlotObj "gemini5hPct" $g5Raw }
+
+    $gwRaw = Get-SafeProp $QuotaSnap "GeminiWeeklyPct"
+    $gw = ConvertTo-SafeInt $gwRaw -Default -1
+    if ($gw -ge 0) { Set-SafeProp $SlotObj "geminiWeeklyPct" $gw } elseif ($null -ne $gwRaw) { Set-SafeProp $SlotObj "geminiWeeklyPct" $gwRaw }
+
+    $arRaw = Get-SafeProp $QuotaSnap "ArgonWeeklyPct"
+    $ar = ConvertTo-SafeInt $arRaw -Default -1
+    if ($ar -ge 0) { Set-SafeProp $SlotObj "argonWeeklyPct" $ar } elseif ($null -ne $arRaw) { Set-SafeProp $SlotObj "argonWeeklyPct" $arRaw }
+
+    $c5Raw = Get-SafeProp $QuotaSnap "Claude5hPct"
+    $c5 = ConvertTo-SafeInt $c5Raw -Default -1
+    if ($c5 -ge 0) { Set-SafeProp $SlotObj "claude5hPct" $c5 } elseif ($null -ne $c5Raw) { Set-SafeProp $SlotObj "claude5hPct" $c5Raw }
+
+    $cwRaw = Get-SafeProp $QuotaSnap "ClaudeWeeklyPct"
+    $cw = ConvertTo-SafeInt $cwRaw -Default -1
+    if ($cw -ge 0) { Set-SafeProp $SlotObj "claudeWeeklyPct" $cw } elseif ($null -ne $cwRaw) { Set-SafeProp $SlotObj "claudeWeeklyPct" $cwRaw }
+
+    $rt5 = Get-SafeProp $QuotaSnap "ResetTime5h"
+    if ($rt5) { Set-SafeProp $SlotObj "resetTime5h" ([string]$rt5) }
+
+    $rtGw = Get-SafeProp $QuotaSnap "ResetTimeWeekly"
+    if ($rtGw) { Set-SafeProp $SlotObj "resetTimeWeekly" ([string]$rtGw) }
+
+    $rtAr = Get-SafeProp $QuotaSnap "ResetTimeArgon"
+    if ($rtAr) { Set-SafeProp $SlotObj "resetTimeArgon" ([string]$rtAr) }
+
+    $rtCw = Get-SafeProp $QuotaSnap "ResetTimeClaudeWeekly"
+    if ($rtCw) { Set-SafeProp $SlotObj "resetTimeClaudeWeekly" ([string]$rtCw) }
+
+    $pn = Get-SafeProp $QuotaSnap "PlanName"
+    if ($pn) { Set-SafeProp $SlotObj "planName" ([string]$pn) }
+
     Set-SafeProp $SlotObj "lastQuotaSyncAt" (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 
     $now = Get-Date
@@ -10405,6 +10448,10 @@ function Test-SlotGroupAvailable {
             if ($thaw5 -and $Now -ge $thaw5) {
                 Set-SafeProp $SlotObj "claude5hPct" 100
                 Set-SafeProp $SlotObj "resetTime5h" $null
+                if ($SlotObj.status -eq "cooldown") {
+                    Set-SafeProp $SlotObj "status" "ready"
+                    Set-SafeProp $SlotObj "cooldownUntil" $null
+                }
             }
         }
         $rtCw = Get-SafeProp $SlotObj "resetTimeClaudeWeekly"
@@ -10413,12 +10460,19 @@ function Test-SlotGroupAvailable {
             if ($thawCw -and $Now -ge $thawCw) {
                 Set-SafeProp $SlotObj "claudeWeeklyPct" 100
                 Set-SafeProp $SlotObj "resetTimeClaudeWeekly" $null
+                if ($SlotObj.status -eq "cooldown") {
+                    Set-SafeProp $SlotObj "status" "ready"
+                    Set-SafeProp $SlotObj "cooldownUntil" $null
+                }
             }
         }
 
-        # 2. 安全数值提取与额度评估
-        $c5Val = ConvertTo-SafeInt (Get-SafeProp $SlotObj "claude5hPct") -Default -1
-        $cwVal = ConvertTo-SafeInt (Get-SafeProp $SlotObj "claudeWeeklyPct") -Default -1
+        # 2. 权限检测：若该账号无 Claude 字段或为 --/空，表示未开通 Claude 权限
+        $c5Raw = Get-SafeProp $SlotObj "claude5hPct"
+        $cwRaw = Get-SafeProp $SlotObj "claudeWeeklyPct"
+        $c5Val = ConvertTo-SafeInt $c5Raw -Default -1
+        $cwVal = ConvertTo-SafeInt $cwRaw -Default -1
+        if ($c5Val -lt 0 -and $cwVal -lt 0) { return $false }
 
         if ($c5Val -ge 0 -and $c5Val -le 1) {
             $rt5Check = Get-SafeProp $SlotObj "resetTime5h"
@@ -10444,6 +10498,10 @@ function Test-SlotGroupAvailable {
             if ($thaw5 -and $Now -ge $thaw5) {
                 Set-SafeProp $SlotObj "gemini5hPct" 100
                 Set-SafeProp $SlotObj "resetTime5h" $null
+                if ($SlotObj.status -eq "cooldown") {
+                    Set-SafeProp $SlotObj "status" "ready"
+                    Set-SafeProp $SlotObj "cooldownUntil" $null
+                }
             }
         }
         $rtGw = Get-SafeProp $SlotObj "resetTimeWeekly"
@@ -10452,6 +10510,10 @@ function Test-SlotGroupAvailable {
             if ($thawGw -and $Now -ge $thawGw) {
                 Set-SafeProp $SlotObj "geminiWeeklyPct" 100
                 Set-SafeProp $SlotObj "resetTimeWeekly" $null
+                if ($SlotObj.status -eq "cooldown") {
+                    Set-SafeProp $SlotObj "status" "ready"
+                    Set-SafeProp $SlotObj "cooldownUntil" $null
+                }
             }
         }
 
@@ -13535,6 +13597,7 @@ function Show-SlotPoolDashboard {
             if (-not $prop) { continue }
             $s = $prop.Value
             Ensure-SlotObjectSchema -SlotObj $s
+            [void](Test-SlotGroupAvailable -SlotObj $s -ModelGroup $activeGrp -Now $now)
 
             $fp = [string](Get-SafeProp $s "tokenFingerprint" "unknown")
             if ($fp -ne "unknown" -and $fp -ne "none") {
@@ -14152,14 +14215,14 @@ function Invoke-BoostAction {
 
         $qVal = 0
         if ($activeGrp -eq "Argon") {
-            $qVal = if ($null -ne $s.argonWeeklyPct) { [int]$s.argonWeeklyPct } else { 0 }
+            $qVal = ConvertTo-SafeInt $s.argonWeeklyPct -Default 0
         } elseif ($activeGrp -eq "Claude") {
-            $q5 = if ($null -ne $s.claude5hPct) { [int]$s.claude5hPct } else { 0 }
-            $qw = if ($null -ne $s.claudeWeeklyPct) { [int]$s.claudeWeeklyPct } else { 0 }
+            $q5 = ConvertTo-SafeInt $s.claude5hPct -Default 0
+            $qw = ConvertTo-SafeInt $s.claudeWeeklyPct -Default 0
             $qVal = [Math]::Min($q5, $qw)
         } else {
-            $g5 = if ($null -ne $s.gemini5hPct) { [int]$s.gemini5hPct } else { 0 }
-            $gw = if ($null -ne $s.geminiWeeklyPct) { [int]$s.geminiWeeklyPct } else { 0 }
+            $g5 = ConvertTo-SafeInt $s.gemini5hPct -Default 0
+            $gw = ConvertTo-SafeInt $s.geminiWeeklyPct -Default 0
             $qVal = [Math]::Min($g5, $gw)
         }
 
@@ -14682,25 +14745,17 @@ switch ($Action) {
 
 
     "repair-storage" {
-
-
-
+        if (-not $Force) {
+            $ans = Read-Host "该操作将备份当前配置并重置为纯净状态。确认备份并重置吗？[Y/N]"
+            if (-not $ans -or $ans.Trim().ToUpperInvariant() -ne "Y") {
+                Write-Host "[-] 用户已取消重置操作。" -ForegroundColor DarkGray
+                return
+            }
+        }
         $currSummary = Get-CurrentActiveAccountSummary
-
-
-
         $keepMail = if ($currSummary.ActiveEmail -and $currSummary.ActiveEmail -notmatch '未检测') { $currSummary.ActiveEmail } else { "user@gmail.com" }
-
-
-
         [AntigravityCompliantHelper.NativeVaultV4]::UpdateAppStorageEmailSafely($AppStorageJson, $keepMail, $true)
-
-
-
         Write-Host ("[✓] 已重置净化 app_storage.json (绑定邮箱: {0})。" -f $keepMail) -ForegroundColor Green
-
-
-
     }
 
 

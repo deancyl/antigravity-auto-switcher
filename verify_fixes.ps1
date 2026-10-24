@@ -66,6 +66,7 @@ Write-Host "`n--- Test 3: True JSON Parsing & UpdateAppStorageEmailSafely ---" -
 # Test 3a: IsValidJsonObject
 Assert-Test "Valid empty JSON obj" ([AntigravityCompliantHelper.NativeVaultV4]::IsValidJsonObject("{}"))
 Assert-Test "Valid nested JSON obj" ([AntigravityCompliantHelper.NativeVaultV4]::IsValidJsonObject('{"a": [1, 2, "str", true, null], "b": {"x": 12.34}}'))
+Assert-Test "Valid JSON with UTF-8 BOM" ([AntigravityCompliantHelper.NativeVaultV4]::IsValidJsonObject([char]0xFEFF + '{"bom": true}'))
 Assert-Test "Invalid JSON: unclosed brace" (-not [AntigravityCompliantHelper.NativeVaultV4]::IsValidJsonObject('{"a": 1'))
 Assert-Test "Invalid JSON: trailing comma or brace" (-not [AntigravityCompliantHelper.NativeVaultV4]::IsValidJsonObject('{"a": 1, }'))
 Assert-Test "Invalid JSON: array at root" (-not [AntigravityCompliantHelper.NativeVaultV4]::IsValidJsonObject('[1, 2, 3]'))
@@ -104,9 +105,9 @@ Assert-Test "Healed file contains target email" ($recoveredContent -match "recov
 Assert-Test "forceCleanReset preserved prior version in .bak" (Test-Path "$appStorageTest.bak")
 
 # ------------------------------------------------------------------------------
-# Test 4: Set-AppStorageLoginEmail Throws on Error
+# Test 4: Set-AppStorageLoginEmail & Write-AllStoresForSnapshot Strong Consistency & Rollback
 # ------------------------------------------------------------------------------
-Write-Host "`n--- Test 4: Set-AppStorageLoginEmail Throws on Error ---" -ForegroundColor Yellow
+Write-Host "`n--- Test 4: Set-AppStorageLoginEmail & Write-AllStoresForSnapshot Strong Consistency & Rollback ---" -ForegroundColor Yellow
 $threw = $false
 try {
     [AntigravityCompliantHelper.NativeVaultV4]::UpdateAppStorageEmailSafely("C:\Invalid:\Path\app_storage.json", "fail@gmail.com", $false)
@@ -114,6 +115,53 @@ try {
     $threw = $true
 }
 Assert-Test "NativeVaultV4 throws on invalid path" $threw
+
+# Test 4b: DeleteGenericCredential
+$testCredTarget = "gemini:antigravity:test_nonexistent"
+$delRes = [AntigravityCompliantHelper.NativeVaultV4]::DeleteGenericCredential($testCredTarget)
+Assert-Test "DeleteGenericCredential returns bool without throwing" ($delRes -is [bool])
+
+# Test 4c: Write-AllStoresForSnapshot Consistency Assertion & Rollback
+$savedAppStoragePath = $AppStorageJson
+$savedCliTokenPath = $AgyCliTokenPath
+$savedCredTarget = $CredTarget
+$sandboxAppStorage = Join-Path $testDir "app_storage_rollback.json"
+$sandboxCliToken = Join-Path $testDir "cli_token_rollback.json"
+
+[System.IO.File]::WriteAllText($sandboxAppStorage, '{"jetski.onboarding.lastLoginUsername": "prior_good@gmail.com"}')
+
+# Point helper paths to sandbox
+$script:AppStorageJson = $sandboxAppStorage
+$script:AgyCliTokenPath = $sandboxCliToken
+$script:CredTarget = "gemini:antigravity:verify_rollback_test"
+
+$rollbackTriggered = $false
+$rollbackMsg = ""
+try {
+    # Provide a snapshot with mismatched tokenFingerprint to intentionally trigger consistency assertion failure
+    $badSnap = [PSCustomObject]@{
+        detectedEmail    = "prior_good@gmail.com"
+        accessToken      = "dummy_at_value"
+        refreshToken     = "dummy_rt_value"
+        tokenFingerprint = "expected_fingerprint_that_will_mismatch"
+    }
+    Write-AllStoresForSnapshot -Snapshot $badSnap | Out-Null
+} catch {
+    $rollbackTriggered = $true
+    $rollbackMsg = $_.Exception.Message
+} finally {
+    # Clean up test credential
+    [AntigravityCompliantHelper.NativeVaultV4]::DeleteGenericCredential($script:CredTarget) | Out-Null
+    $script:AppStorageJson = $savedAppStoragePath
+    $script:AgyCliTokenPath = $savedCliTokenPath
+    $script:CredTarget = $savedCredTarget
+}
+
+Assert-Test "Write-AllStoresForSnapshot throws on consistency assertion failure" $rollbackTriggered
+Assert-Test "Rollback error message confirms rollback occurred" ($rollbackMsg -match "全量凭据同步失败且已安全回滚")
+
+$recoveredAppStorage = [System.IO.File]::ReadAllText($sandboxAppStorage)
+Assert-Test "Rollback restored app_storage.json to prior state" ($recoveredAppStorage -match "prior_good@gmail\.com")
 
 # ------------------------------------------------------------------------------
 # Test 5: Test-SlotGroupAvailable Timing & Argon Handling
@@ -162,17 +210,61 @@ try {
 Assert-Test "Argon with '--' does not throw int conversion error" (-not $noArgonThrew)
 Assert-Test "Argon with '--' returns false (unsupported)" (-not $availNoArgon)
 
-# 5d: Gemini with expired 5h reset -> auto unfreezes to 100%
+# 5d: Gemini with expired 5h reset -> auto unfreezes to 100% and restores ready status
 $slotGemini = [PSCustomObject]@{
     slotName        = "slot_gem"
-    status          = "ready"
+    status          = "cooldown"
+    cooldownUntil   = $pastTime
     gemini5hPct     = 0
     geminiWeeklyPct = 80
     resetTime5h     = $pastTime
 }
 $availGem = Test-SlotGroupAvailable -SlotObj $slotGemini -ModelGroup "Gemini" -Now $now
 Assert-Test "Gemini expired 5h reset auto-unfreezes to 100%" ($slotGemini.gemini5hPct -eq 100)
+Assert-Test "Gemini expired 5h reset unfreezes status to ready" ($slotGemini.status -eq "ready")
 Assert-Test "Gemini slot is available" $availGem
+
+# 5e: Claude with unsupported '--' returns false
+$slotClaudeNo = [PSCustomObject]@{
+    slotName        = "slot_cla_no"
+    status          = "ready"
+    claude5hPct     = "--"
+    claudeWeeklyPct = "--"
+}
+$availClaNo = Test-SlotGroupAvailable -SlotObj $slotClaudeNo -ModelGroup "Claude" -Now $now
+Assert-Test "Claude with '--' returns false (unsupported)" (-not $availClaNo)
+
+# 5f: Claude with expired 5h reset -> auto unfreezes to 100% and restores ready status
+$slotClaudeThaw = [PSCustomObject]@{
+    slotName        = "slot_cla_thaw"
+    status          = "cooldown"
+    cooldownUntil   = $pastTime
+    claude5hPct     = 0
+    claudeWeeklyPct = 90
+    resetTime5h     = $pastTime
+}
+$availClaThaw = Test-SlotGroupAvailable -SlotObj $slotClaudeThaw -ModelGroup "Claude" -Now $now
+Assert-Test "Claude expired 5h reset auto-unfreezes to 100%" ($slotClaudeThaw.claude5hPct -eq 100)
+Assert-Test "Claude expired 5h reset unfreezes status to ready" ($slotClaudeThaw.status -eq "ready")
+Assert-Test "Claude slot is available" $availClaThaw
+
+# 5g: Apply-QuotaSnapshotToSlotObject handles '--' without int casting crash
+$slotSnapTest = [PSCustomObject]@{ slotName = "slot_snap_test" }
+$quotaSnapWithDash = [PSCustomObject]@{
+    Gemini5hPct     = 100
+    GeminiWeeklyPct = 100
+    ArgonWeeklyPct  = "--"
+    Claude5hPct     = "--"
+    ClaudeWeeklyPct = "--"
+}
+$snapThrew = $false
+try {
+    Apply-QuotaSnapshotToSlotObject -SlotObj $slotSnapTest -QuotaSnap $quotaSnapWithDash
+} catch {
+    $snapThrew = $true
+}
+Assert-Test "Apply-QuotaSnapshotToSlotObject does not throw on '--' quota values" (-not $snapThrew)
+Assert-Test "Slot received '--' safely" ($slotSnapTest.argonWeeklyPct -eq "--")
 
 # ------------------------------------------------------------------------------
 # Test 6: SQLite Conversation Tree Traversal
