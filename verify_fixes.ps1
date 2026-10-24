@@ -352,6 +352,51 @@ Assert-Test "Cell format matches '5h: 99% · 周: 25%'" ($cell1 -eq "5h:  99% ·
 $cell2 = Format-QuotaPairCell -Pct5h "--" -PctWeekly 100
 Assert-Test "Cell format handles '--' gracefully" ($cell2 -eq "5h:   -- · 周: 100%")
 
+# ------------------------------------------------------------------------------
+# Test 9: System-level Credential Switch Mutex Protection
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 9: Global Credential Switch Mutex ---" -ForegroundColor Yellow
+$mutexResult = Invoke-WithCredentialSwitchMutex -IsManual {
+    return 42
+}
+Assert-Test "Mutex executes scriptblock and returns value" ($mutexResult -eq 42)
+
+# ------------------------------------------------------------------------------
+# Test 10: Test-PostSwitchCredentialState Strong Verification
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 10: Post-Switch State Verification ---" -ForegroundColor Yellow
+$testStorageDir = Join-Path $testDir "post_switch_test"
+New-Item -ItemType Directory -Path $testStorageDir -Force | Out-Null
+$testStorageFile = Join-Path $testStorageDir "app_storage.json"
+$validStorageContent = '{"jetski.onboarding.lastLoginUsername":"target_user@gmail.com"}'
+[System.IO.File]::WriteAllText($testStorageFile, $validStorageContent, [System.Text.Encoding]::UTF8)
+
+# Temporarily point $AppStorageJson to test file
+$origStorage = $AppStorageJson
+$AppStorageJson = $testStorageFile
+
+# Email mismatch should fail
+$verifyMismatch = Test-PostSwitchCredentialState -ExpectedSlotName "test" -ExpectedEmail "different@gmail.com"
+Assert-Test "Post-switch verification rejects mismatched email" ($verifyMismatch -eq $false)
+
+# Restore $AppStorageJson
+$AppStorageJson = $origStorage
+
+# ------------------------------------------------------------------------------
+# Test 11: Take-CredentialWorkingSnapshot & Restore
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 11: Transactional Working Snapshot ---" -ForegroundColor Yellow
+$snap = Take-CredentialWorkingSnapshot
+Assert-Test "Snapshot timestamp is valid" (-not [string]::IsNullOrWhiteSpace($snap.Timestamp))
+Assert-Test "Snapshot contains CredTarget" ($snap.CredTarget -eq $CredTarget)
+
+# ------------------------------------------------------------------------------
+# Test 12: Test-HasRunningConversations
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 12: Tree-Aware Task Activity Check ---" -ForegroundColor Yellow
+$hasRunning = Test-HasRunningConversations
+Assert-Test "Test-HasRunningConversations returns a boolean" ($hasRunning -is [bool])
+
 # Clean up test sandbox
 Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
 

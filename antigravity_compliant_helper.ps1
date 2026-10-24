@@ -445,9 +445,10 @@ function Write-AtomicUtf8NoBom {
             [AntigravityCompliantHelper.NativeVaultV4]::MoveFileAtomic($tmpPath, $Path)
         } else {
             if ([System.IO.File]::Exists($Path)) {
-                [System.IO.File]::Delete($Path)
+                [System.IO.File]::Replace($tmpPath, $Path, $null)
+            } else {
+                [System.IO.File]::Move($tmpPath, $Path)
             }
-            [System.IO.File]::Move($tmpPath, $Path)
         }
     } finally {
         if ([System.IO.File]::Exists($tmpPath)) {
@@ -469,9 +470,10 @@ function Write-AtomicAscii {
             [AntigravityCompliantHelper.NativeVaultV4]::MoveFileAtomic($tmpPath, $Path)
         } else {
             if ([System.IO.File]::Exists($Path)) {
-                [System.IO.File]::Delete($Path)
+                [System.IO.File]::Replace($tmpPath, $Path, $null)
+            } else {
+                [System.IO.File]::Move($tmpPath, $Path)
             }
-            [System.IO.File]::Move($tmpPath, $Path)
         }
     } finally {
         if ([System.IO.File]::Exists($tmpPath)) {
@@ -5756,211 +5758,111 @@ function Get-LatestConversationContextInfo {
 
 
 
+function Test-HasRunningConversations {
+    try {
+        $convInfo = Get-LatestConversationContextInfo
+        if ($convInfo -and $convInfo.Manifest) {
+            if ($convInfo.Manifest.all) {
+                foreach ($item in $convInfo.Manifest.all) {
+                    $st = [string]$item.status
+                    $nfi = $item.not_fully_idle
+                    if ($st -eq "RUNNING" -or ($null -ne $nfi -and [int]$nfi -ne 0)) {
+                        return $true
+                    }
+                }
+            }
+            if ($convInfo.Manifest.primary) {
+                $p = $convInfo.Manifest.primary
+                if ([string]$p.status -eq "RUNNING" -or ($null -ne $p.not_fully_idle -and [int]$p.not_fully_idle -ne 0)) {
+                    return $true
+                }
+            }
+        }
+    } catch {}
+    return $false
+}
+
 function Invoke-UnattendedConversationResume {
-
-
-
     param(
-
-
-
         [string]$ResumePromptText = "",
-
-
-
         [string]$TargetConversationId = "",
-
-
-
         [string]$TargetProjectId = "",
-
-
-
         [string]$TargetConversationTitle = ""
-
-
-
     )
 
-
-
     $ctx = Get-LatestConversationContextInfo
+    $safePrompt = if ($ResumePromptText) { $ResumePromptText.Trim() } else { "【系统提示】已自动完成账号配额轮换与客户端重启，请继续推进未完成的任务。" }
 
-
-
-    if ([string]::IsNullOrWhiteSpace($ResumePromptText)) {
-
-
-
-        $ResumePromptText = $ctx.ResumePrompt
-
-
-
-    }
-
-
-
-    if ([string]::IsNullOrWhiteSpace($TargetConversationId) -and $ctx.ConversationId) {
-
-
-
-        $TargetConversationId = [string]$ctx.ConversationId
-
-
-
-    }
-
-
-
-    if ([string]::IsNullOrWhiteSpace($TargetConversationTitle)) {
-
-
-
-        $TargetConversationTitle = [string]$ctx.ConversationTitle
-
-
-
-    }
-
-
-
-    Write-Host "    [*] 正在执行【Zero-CDP 官方原生 LanguageServer 协议级续接与人机激活】..." -ForegroundColor Cyan
-
-
-
-    if ($TargetConversationId) {
-
-
-
-        Write-Host ("    [*] 目标 Primary 会话: [{0}] (ID: {1})" -f $TargetConversationTitle, $TargetConversationId) -ForegroundColor Gray
-
-
-
-    }
-
-
-
-    # ========================================================================
-
-
-
-    # 步骤 1：剪贴板注入与 Win32 原生窗口激活 (人机感知通道)
-
-
-
-    # ========================================================================
-
-
-
-    $safePrompt = if ($ResumePromptText) { $ResumePromptText.Trim() } else { "请继续执行刚才被限额打断的未完成任务，直接接着上一步继续推进。" }
-
-
-
+    # 1. 剪贴板注入与 Win32 原生窗口激活
     try {
-
-
-
         Set-Clipboard -Value $safePrompt -ErrorAction SilentlyContinue
-
-
-
     } catch {}
 
-
-
-    # Win32 激活并置顶 Antigravity 主窗口
-
-
-
     try {
-
-
-
         $procs = @(Get-RunningAntigravityProcesses)
-
-
-
         foreach ($p in $procs) {
-
-
-
             if ($p.MainWindowHandle -ne 0) {
-
-
-
                 [void][AntigravityCompliantHelper.NativeVaultV4]::ShowWindow($p.MainWindowHandle, 1)
-
-
-
                 [void][AntigravityCompliantHelper.NativeVaultV4]::SetForegroundWindow($p.MainWindowHandle)
-
-
-
                 break
-
-
-
             }
+        }
+    } catch {}
 
-
-
+    # 2. 收集需要恢复的会话列表（全自动并发整树多任务续接）
+    $conversationsToResume = @()
+    if ($TargetConversationId) {
+        $conversationsToResume += [PSCustomObject]@{
+            ConversationId = $TargetConversationId.Trim()
+            Title          = if ($TargetConversationTitle) { $TargetConversationTitle } else { "主会话" }
+            ProjectId      = $TargetProjectId
+        }
+    } else {
+        $mf = $null
+        if ($Script:LastActiveManifest) {
+            $mf = $Script:LastActiveManifest
+        } elseif (Test-Path $ResumeManifestPath) {
+            try { $mf = (Read-Utf8StripBom -Path $ResumeManifestPath) | ConvertFrom-Json } catch {}
         }
 
+        if ($mf -and $mf.all -and $mf.all.Count -gt 0) {
+            foreach ($c in $mf.all) {
+                if ($c.conversation_id) {
+                    $conversationsToResume += [PSCustomObject]@{
+                        ConversationId = [string]$c.conversation_id
+                        Title          = [string]$c.title
+                        ProjectId      = [string]$c.project_id
+                        Status         = [string]$c.status
+                        NotFullyIdle   = $c.not_fully_idle
+                    }
+                }
+            }
+        } elseif ($ctx -and $ctx.ConversationId) {
+            $conversationsToResume += [PSCustomObject]@{
+                ConversationId = [string]$ctx.ConversationId
+                Title          = [string]$ctx.ConversationTitle
+                ProjectId      = [string]$ctx.ProjectId
+            }
+        }
+    }
 
+    Write-Host "    [*] 正在执行【Zero-CDP 官方原生 LanguageServer 协议级续接与人机激活】..." -ForegroundColor Cyan
+    Write-Host ("    [*] 待续接活跃会话总数: {0}" -f $conversationsToResume.Count) -ForegroundColor Gray
 
-    } catch {}
-
-
-
-    # ========================================================================
-
-
-
-    # 步骤 2：毫秒级通过本地 LanguageServer Connect-RPC 官方协议注入续接指令 (零CDP、零DOM依赖)
-
-
-
-    # ========================================================================
-
-
-
+    # 3. 毫秒级通过本地 LanguageServer Connect-RPC 官方协议注入续接指令
     $lsSuccess = $false
+    $resumedCount = 0
 
-
-
-    $targetConvId = if ($TargetConversationId) { $TargetConversationId.Trim() } else { "" }
-
-
-
-    if ($targetConvId) {
-
-
-
+    if ($conversationsToResume.Count -gt 0) {
         Write-Host "    [*] 正在探测本地已连接的 LanguageServer Connect-RPC 接口..." -ForegroundColor Gray
-
-
-
         $lsQuota = Get-LocalLanguageServerQuota
-
-
-
         $endpoint = $Script:CachedLsEndpoint
 
-
-
         if ($endpoint -and $endpoint.BaseUrl -and $endpoint.Csrf) {
-
-
-
             $baseUrl = [string]$endpoint.BaseUrl
-
-
-
             $csrf = [string]$endpoint.Csrf
 
-
-
-            # 1. 动态获取当前客户端可用模型与官方权威配置（优先锁定切号前使用的真实模型，绝不硬编码降级为 Flash Low）
+            # 解析锁定模型
             $lockedEnum = $null
             if ($Script:LockedActiveModelEnum) {
                 $lockedEnum = $Script:LockedActiveModelEnum
@@ -5997,7 +5899,7 @@ function Invoke-UnattendedConversationResume {
                 } catch {}
             }
 
-            # 2. 调用官方 GetResolvedCascadeConfig 生成完整环境配置 (包含 planModel 与完整工具链)
+            # 调用官方 GetResolvedCascadeConfig
             $resolvePayload = @"
 {
     "overrideConfig": {
@@ -6018,13 +5920,16 @@ function Invoke-UnattendedConversationResume {
                 } catch {}
             }
 
-            # 3. 组装官方完整 SendUserCascadeMessage 载荷 (补齐 cascadeConfig 与 customAgentSpec 杜绝 plan model not specified 报错)
             $cleanPrompt = $safePrompt.Replace('\', '\\').Replace('"', '\"').Replace("`r", "").Replace("`n", "\n")
             $agentSpecJson = '{"builtinAgent":{"defaultAgent":{"isGoogle":false,"isInteractive":true,"surface":"AGENT_SURFACE_HUB"}}}'
             $configField = if ($resolvedConfigJson) { "`"cascadeConfig`": $resolvedConfigJson," } else { "" }
-            $rpcPayload = @"
+
+            foreach ($conv in $conversationsToResume) {
+                $cId = $conv.ConversationId
+                $cTitle = if ($conv.Title) { $conv.Title } else { $cId }
+                $rpcPayload = @"
 {
-    "cascadeId": "$targetConvId",
+    "cascadeId": "$cId",
     "items": [
         {
             "text": "$cleanPrompt"
@@ -6034,58 +5939,36 @@ function Invoke-UnattendedConversationResume {
     "customAgentSpec": $agentSpecJson
 }
 "@
-            Write-Host ("    [*] 正在通过 LanguageServer RPC (SendUserCascadeMessage) 注入模型配置 ({0}) 并唤醒会话 [{1}]..." -f $targetModel, $targetConvId) -ForegroundColor Gray
+                Write-Host ("    [*] 正在通过 LanguageServer RPC 唤醒会话 [{0}] (ID: {1})..." -f $cTitle, $cId) -ForegroundColor Gray
 
-            $maxResumeRetries = 5
-            for ($attempt = 1; $attempt -le $maxResumeRetries; $attempt++) {
-                $sendResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/SendUserCascadeMessage", $csrf, $rpcPayload, 5000)
-                if ($sendResp -match '^200\|') {
-                    Start-Sleep -Milliseconds 600
-                    $lsSuccess = $true
-                    Write-Host ("    [✓] 已通过 LanguageServer 官方原生 RPC 成功将续接指令与完整模型环境注入推演核心，模型已正常恢复生成！") -ForegroundColor Green
-                    break
-                } elseif ($sendResp -match 'trajectory not found') {
-                    Write-Host ("    [~] 客户端会话轨迹加载中 (尝试 {0}/{1})..." -f $attempt, $maxResumeRetries) -ForegroundColor Yellow
-                    Start-Sleep -Milliseconds (800 * $attempt)
-                } else {
-                    Write-Host ("    [~] RPC 响应状态: {0}" -f $sendResp) -ForegroundColor Gray
-                    break
+                $maxResumeRetries = 4
+                for ($attempt = 1; $attempt -le $maxResumeRetries; $attempt++) {
+                    $sendResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/SendUserCascadeMessage", $csrf, $rpcPayload, 5000)
+                    if ($sendResp -match '^200\|') {
+                        Start-Sleep -Milliseconds 400
+                        $resumedCount++
+                        $lsSuccess = $true
+                        Write-Host ("    [✓] 已成功向会话 [{0}] 注入断点续接指令，模型已正常恢复生成！" -f $cTitle) -ForegroundColor Green
+                        Write-DaemonLog ("已成功向会话 [{0}] (ID: {1}) 注入断点续接指令" -f $cTitle, $cId) "RESUME"
+                        break
+                    } elseif ($sendResp -match 'trajectory not found') {
+                        Write-Host ("    [~] 会话轨迹加载中 (尝试 {0}/{1})..." -f $attempt, $maxResumeRetries) -ForegroundColor Yellow
+                        Start-Sleep -Milliseconds (600 * $attempt)
+                    } else {
+                        Write-Host ("    [~] RPC 响应: {0}" -f $sendResp) -ForegroundColor Gray
+                        break
+                    }
                 }
             }
-
-
-
         }
-
-
-
     }
-
-
 
     if (-not $lsSuccess) {
-
-
-
         Write-Host "    [✓] 已将原会话续接指令复制至剪贴板，客户端已激活置顶，点开原会话后按 Ctrl+V 回车即可瞬间继续。" -ForegroundColor Green
-
-
-
     }
 
-
-
-    # 触发桌面气泡通知
-
-
-
-    Send-DesktopNotification -Title "Antigravity 账号已切换" -Message "已切换至新账号，原会话续接指令已就绪。模型已直接启动生成！"
-
-
-
+    Send-DesktopNotification -Title "Antigravity 账号已切换" -Message "已完成账号轮换并恢复客户端，已成功唤醒 $resumedCount 个活跃会话继续生成！"
 }
-
-
 
 function Start-DetachedAntigravityProcess {
     param(
@@ -7123,213 +7006,205 @@ function Write-AllStoresForSnapshot {
 }
 
 
-function Switch-CredentialSlot {
-
-
-
+function Invoke-WithCredentialSwitchMutex {
     param(
-
-
-
-        [string]$SlotName,
-
-
-
-        [switch]$GenerateHandover,
-
-
-
-        [string]$WorkspacePath,
-
-
-
-        [switch]$NonInteractive,
-
-
-
-        [switch]$CloseProcesses = $true
-
-
-
+        [Parameter(Mandatory=$true)][scriptblock]$ScriptBlock,
+        [switch]$IsManual
     )
-
-
-
-    Test-SlotName -Name $SlotName
-
-
-
-    $slotFile = Join-Path $SlotsDir "$SlotName.dpapi"
-
-
-
-    if (-not (Test-Path $slotFile)) {
-
-
-
-        throw "未找到槽位 [$SlotName] 的加密凭据文件：$slotFile"
-
-
-
-    }
-
-
-
-    if ($CloseProcesses -and $WaitParentPid -eq 0 -and (Test-IsRunningInsideAntigravityTerminal)) {
-
-
-
-        Write-Host "[!] 检测到当前脚本运行在 AGY2 内置终端中，正在派生独立系统进程完成关闭、切号与重启..." -ForegroundColor Yellow
-
-
-
-        $scriptPath = $Script:ResolvedScriptPath
-
-
-
-        $detachedArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`" -Action switch -Slot `"$SlotName`" -Force -AutoRestartApp -WaitParentPid $PID"
-
-
-
-        [void](Start-TrulyHiddenDetachedProcess -FilePath "powershell.exe" -Arguments $detachedArgs -WorkingDirectory (Split-Path -Parent $scriptPath))
-
-
-
-        return
-
-
-
-    }
-
-
-
-    if ($GenerateHandover) {
-
-
-
-        New-WorkspaceHandoverFile -WorkspacePath $WorkspacePath | Out-Null
-
-
-
-    }
-
-
-
-    $encryptedBlob = Get-Content -Path $slotFile -Raw -Encoding ASCII
-
-
-
-    $plainJson = [AntigravityCompliantHelper.NativeVaultV4]::UnprotectText($encryptedBlob)
-
-
-
-    $snapshot = $plainJson | ConvertFrom-Json
-
-
-
-    if ($CloseProcesses) {
-
-
-
-        Stop-RunningAntigravityProcesses -NonInteractive:$NonInteractive
-
-
-
-    }
-
-
-
-    $appliedFp = Write-AllStoresForSnapshot -Snapshot $snapshot
-
-
-
-    try {
-
-
-
-        $state = Get-SlotPoolState -SkipAutoMatch
-
-
-
-        $nowStr = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-
-
-
-        $state.currentSlot = $SlotName
-
-
-
-        foreach ($prop in $state.slots.PSObject.Properties) {
-
-
-
-            $s = $prop.Value
-
-
-
-            Ensure-SlotObjectSchema -SlotObj $s
-
-
-
-            if ($s.slotName -eq $SlotName) {
-
-
-
-                Set-SafeProp $s "status" "active"
-
-
-
-                Set-SafeProp $s "cooldownUntil" $null
-
-
-
-                Set-SafeProp $s "cooldownType" "none"
-
-
-
-                Set-SafeProp $s "lastSwitchedAt" $nowStr
-
-
-
-            } elseif ($s.status -eq "active") {
-
-
-
-                Set-SafeProp $s "status" "ready"
-
-
-
+    $mutex = $null
+    $hasLock = $false
+    $timeoutMs = if ($IsManual.IsPresent) { 45000 } else { 5000 }
+    $retries = 3
+    for ($r = 0; $r -lt $retries; $r++) {
+        try {
+            if (-not $mutex) {
+                try {
+                    $mutex = New-Object System.Threading.Mutex($false, "Global\AGY_Credential_Switch_Mutex")
+                } catch [System.UnauthorizedAccessException] {
+                    $mutex = New-Object System.Threading.Mutex($false, "AGY_Credential_Switch_Mutex")
+                }
             }
-
-
-
+            $hasLock = $mutex.WaitOne($timeoutMs)
+            if ($hasLock) { break }
+        } catch [System.Threading.AbandonedMutexException] {
+            $hasLock = $true
+            break
+        } catch {
+            Start-Sleep -Milliseconds 200
         }
-
-
-
-        Save-SlotPoolState -State $state
-
-
-
-    } catch {}
-
-
-
-    $fp = if ($snapshot.PSObject.Properties["tokenFingerprint"] -and $snapshot.tokenFingerprint) { $snapshot.tokenFingerprint } elseif ($appliedFp) { $appliedFp } else { "ok" }
-
-
-
-    Write-Host ("[✓] 已全量切换至槽位 [{0}] (账号: {1}, Token指纹: {2})。" -f $SlotName, $snapshot.detectedEmail, $fp) -ForegroundColor Green
-
-
-
-    return [string]$snapshot.detectedEmail
-
-
-
+    }
+    if (-not $hasLock) {
+        if ($mutex) { try { $mutex.Dispose() } catch {} }
+        if ($IsManual.IsPresent) {
+            throw "获取系统切号互斥锁超时 (Global\AGY_Credential_Switch_Mutex)，可能有其他切号事务正在执行，请稍候重试。"
+        } else {
+            Write-DaemonLog "检测到前台手动切号正在执行中，后台守护自动让步并推迟下一轮检测" "INFO"
+            return $null
+        }
+    }
+    try {
+        return (& $ScriptBlock)
+    } finally {
+        if ($hasLock -and $mutex) {
+            try { $mutex.ReleaseMutex() } catch {}
+        }
+        if ($mutex) {
+            try { $mutex.Dispose() } catch {}
+        }
+    }
 }
 
+function Test-PostSwitchCredentialState {
+    param(
+        [Parameter(Mandatory=$true)][string]$ExpectedSlotName,
+        [Parameter(Mandatory=$true)][string]$ExpectedEmail
+    )
+    # 1. 验证 Windows 凭据管理器
+    try {
+        $currCred = [AntigravityCompliantHelper.NativeVaultV4]::ReadGenericCredential($CredTarget)
+        if ([string]::IsNullOrWhiteSpace($currCred)) {
+            Write-Host "    [!] 切号后验失败：Windows 凭据 ($CredTarget) 为空！" -ForegroundColor Red
+            return $false
+        }
+    } catch {
+        Write-Host ("    [!] 切号后验失败：读取 Windows 凭据异常: {0}" -f $_.Exception.Message) -ForegroundColor Red
+        return $false
+    }
 
+    # 2. 验证 app_storage.json 登录邮箱
+    if (Test-Path $AppStorageJson) {
+        try {
+            $rawJson = [System.IO.File]::ReadAllText($AppStorageJson, [System.Text.Encoding]::UTF8)
+            if ($rawJson.Length -gt 0 -and $rawJson[0] -eq [char]0xFEFF) { $rawJson = $rawJson.Substring(1) }
+            $parsedStorage = $rawJson | ConvertFrom-Json
+            $actualEmail = [string]$parsedStorage."jetski.onboarding.lastLoginUsername"
+            if ([string]::IsNullOrWhiteSpace($actualEmail) -or $actualEmail.Trim().ToLowerInvariant() -ne $ExpectedEmail.Trim().ToLowerInvariant()) {
+                Write-Host ("    [!] 切号后验失败：app_storage.json 登录邮箱不匹配！期望: [{0}], 实际: [{1}]" -f $ExpectedEmail, $actualEmail) -ForegroundColor Red
+                return $false
+            }
+        } catch {
+            Write-Host ("    [!] 切号后验失败：解析 app_storage.json 异常: {0}" -f $_.Exception.Message) -ForegroundColor Red
+            return $false
+        }
+    }
+    return $true
+}
+
+function Take-CredentialWorkingSnapshot {
+    $snap = [ordered]@{
+        Timestamp       = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        CredTarget      = $CredTarget
+        WinCredPayload  = $null
+        AppStorageBytes = $null
+        AccountsBytes   = $null
+        AgyCliBytes     = $null
+        OAuthBytes      = $null
+    }
+    try { $snap.WinCredPayload = [AntigravityCompliantHelper.NativeVaultV4]::ReadGenericCredential($CredTarget) } catch {}
+    if (Test-Path $AppStorageJson) { try { $snap.AppStorageBytes = [System.IO.File]::ReadAllBytes($AppStorageJson) } catch {} }
+    if (Test-Path $AccountsJsonPath) { try { $snap.AccountsBytes = [System.IO.File]::ReadAllBytes($AccountsJsonPath) } catch {} }
+    if (Test-Path $AgyCliTokenPath) { try { $snap.AgyCliBytes = [System.IO.File]::ReadAllBytes($AgyCliTokenPath) } catch {} }
+    if (Test-Path $OAuthCredsPath) { try { $snap.OAuthBytes = [System.IO.File]::ReadAllBytes($OAuthCredsPath) } catch {} }
+    return $snap
+}
+
+function Restore-CredentialWorkingSnapshot {
+    param([Parameter(Mandatory=$true)]$Snapshot)
+    try {
+        if ($Snapshot.WinCredPayload) {
+            [AntigravityCompliantHelper.NativeVaultV4]::WriteGenericCredential($CredTarget, $CredUser, [string]$Snapshot.WinCredPayload)
+        }
+        if ($Snapshot.AppStorageBytes) {
+            [System.IO.File]::WriteAllBytes($AppStorageJson, $Snapshot.AppStorageBytes)
+        }
+        if ($Snapshot.AccountsBytes) {
+            [System.IO.File]::WriteAllBytes($AccountsJsonPath, $Snapshot.AccountsBytes)
+        }
+        if ($Snapshot.AgyCliBytes) {
+            [System.IO.File]::WriteAllBytes($AgyCliTokenPath, $Snapshot.AgyCliBytes)
+        }
+        if ($Snapshot.OAuthBytes) {
+            [System.IO.File]::WriteAllBytes($OAuthCredsPath, $Snapshot.OAuthBytes)
+        }
+        Write-Host "    [✓] 已成功回滚至切号前的完整凭据与配置快照！" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Host ("    [!] 快照回滚执行异常: {0}" -f $_.Exception.Message) -ForegroundColor Red
+        return $false
+    }
+}
+
+function Switch-CredentialSlot {
+    param(
+        [string]$SlotName,
+        [switch]$GenerateHandover,
+        [string]$WorkspacePath,
+        [switch]$NonInteractive,
+        [switch]$CloseProcesses = $true
+    )
+
+    Test-SlotName -Name $SlotName
+    $slotFile = Join-Path $SlotsDir "$SlotName.dpapi"
+    if (-not (Test-Path $slotFile)) {
+        throw "未找到槽位 [$SlotName] 的加密凭据文件：$slotFile"
+    }
+
+    if ($CloseProcesses -and $WaitParentPid -eq 0 -and (Test-IsRunningInsideAntigravityTerminal)) {
+        Write-Host "[!] 检测到当前脚本运行在 AGY2 内置终端中，正在派生独立系统进程完成关闭、切号与重启..." -ForegroundColor Yellow
+        $scriptPath = $Script:ResolvedScriptPath
+        $detachedArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`" -Action switch -Slot `"$SlotName`" -Force -AutoRestartApp -WaitParentPid $PID"
+        [void](Start-TrulyHiddenDetachedProcess -FilePath "powershell.exe" -Arguments $detachedArgs -WorkingDirectory (Split-Path -Parent $scriptPath))
+        return
+    }
+
+    $isManualSwitch = -not $NonInteractive.IsPresent
+    $switchResult = Invoke-WithCredentialSwitchMutex -IsManual:$isManualSwitch {
+        if ($GenerateHandover) {
+            New-WorkspaceHandoverFile -WorkspacePath $WorkspacePath | Out-Null
+        }
+
+        $encryptedBlob = Get-Content -Path $slotFile -Raw -Encoding ASCII
+        $plainJson = [AntigravityCompliantHelper.NativeVaultV4]::UnprotectText($encryptedBlob)
+        $snapshot = $plainJson | ConvertFrom-Json
+
+        if ($CloseProcesses) {
+            Stop-RunningAntigravityProcesses -NonInteractive:$NonInteractive
+        }
+
+        $appliedFp = Write-AllStoresForSnapshot -Snapshot $snapshot
+
+        # 切号事务后验：核验 Windows 凭据与 app_storage.json 登录邮箱一致性
+        $isVerified = Test-PostSwitchCredentialState -ExpectedSlotName $SlotName -ExpectedEmail $snapshot.detectedEmail
+        if (-not $isVerified) {
+            throw "切号事务后验失败：目标槽位 [$SlotName / $($snapshot.detectedEmail)] 的 Windows 凭据或 app_storage.json 配置未能正确就绪！"
+        }
+
+        try {
+            $state = Get-SlotPoolState -SkipAutoMatch
+            $nowStr = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+            $state.currentSlot = $SlotName
+            foreach ($prop in $state.slots.PSObject.Properties) {
+                $s = $prop.Value
+                Ensure-SlotObjectSchema -SlotObj $s
+                if ($s.slotName -eq $SlotName) {
+                    Set-SafeProp $s "status" "active"
+                    Set-SafeProp $s "cooldownUntil" $null
+                    Set-SafeProp $s "cooldownType" "none"
+                    Set-SafeProp $s "lastSwitchedAt" $nowStr
+                } elseif ($s.status -eq "active") {
+                    Set-SafeProp $s "status" "ready"
+                }
+            }
+            Save-SlotPoolState -State $state
+        } catch {}
+
+        $fp = if ($snapshot.PSObject.Properties["tokenFingerprint"] -and $snapshot.tokenFingerprint) { $snapshot.tokenFingerprint } elseif ($appliedFp) { $appliedFp } else { "ok" }
+        Write-Host ("[✓] 已全量切换至槽位 [{0}] (账号: {1}, Token指纹: {2})。" -f $SlotName, $snapshot.detectedEmail, $fp) -ForegroundColor Green
+        return [string]$snapshot.detectedEmail
+    }
+
+    return $switchResult
+}
 
 function Remove-CredentialSlot {
 
@@ -9925,9 +9800,6 @@ function Test-SlotNeedsLiveVerify {
 }
 
 function Switch-ToNextAvailableSlot {
-
-
-
     param(
         [string]$Reason = "检测到限额",
         [switch]$AutoRestartApp = $true,
@@ -9960,231 +9832,54 @@ function Switch-ToNextAvailableSlot {
         return
     }
 
-
+    # 1. 事务级快照提取（用于切号失败时的原子回滚）
+    $workingSnapshot = Take-CredentialWorkingSnapshot
 
     $state = Get-SlotPoolState
-
-
-
     $currentSlotName = [string]$state.currentSlot
-
-
-
     $now = Get-Date
-
-
-
     $cooldownHours = if ($state.cooldownHours) { [double]$state.cooldownHours } else { 5.0 }
-
-
-
     $cooldownType = "hourly"
-
-
-
     $reasonLower = $Reason.ToLowerInvariant()
-
-
-
     if ($IsWeeklyLimit -or ($reasonLower -match 'weekly|week|7-day|周限额|resets?\s+(?:next\s+week|on)')) {
-
-
-
         $cooldownType = "weekly"
-
-
-
         $cooldownHours = 168.0
-
-
-
     }
 
-
-
     $currentFingerprint = ""
-
-
-
     if (-not [string]::IsNullOrWhiteSpace($currentSlotName) -and $state.slots.PSObject.Properties[$currentSlotName]) {
-
-
-
         $currSlotObj = $state.slots.PSObject.Properties[$currentSlotName].Value
-
-
-
         Ensure-SlotObjectSchema -SlotObj $currSlotObj
-
-
-
         $currentFingerprint = [string](Get-SafeProp $currSlotObj "tokenFingerprint" "")
-
-
-
         $lastSw = Get-SafeProp $currSlotObj "lastSwitchedAt"
 
-
-
         if ($lastSw -and $Reason -notmatch '手动') {
-
-
-
             try {
-
-
-
                 $lastActiveTime = [DateTime]::Parse([string]$lastSw)
-
-
-
                 $activeDuration = ($now - $lastActiveTime).TotalMinutes
-
-
-
                 if ($activeDuration -lt 15.0 -and $cooldownType -eq "hourly") {
-
-
-
                     $cooldownType = "weekly"
-
-
-
                     $cooldownHours = 168.0
-
-
-
                     Write-Host ("[!] 触发【周额度熔断器】：槽位 [{0}] 切入使用不足 15 分钟即再次限额，升格为 7 天周冷却！" -f $currentSlotName) -ForegroundColor Magenta
-
-
-
                 }
-
-
-
             } catch {}
-
-
-
         }
-
-
 
         Set-SafeProp $currSlotObj "status" "cooldown"
-
-
-
         Set-SafeProp $currSlotObj "cooldownType" $cooldownType
-
-
-
         Set-SafeProp $currSlotObj "exhaustedAt" ($now.ToString("yyyy-MM-dd HH:mm:ss"))
 
-
-
         $exactThaw = $null
-
-
-
         if (-not [string]::IsNullOrWhiteSpace($ServerResetTime)) {
-
-
-
             try {
-
-
-
                 $dt = [DateTime]::Parse($ServerResetTime).ToLocalTime()
-
-
-
                 if ($dt -gt $now) { $exactThaw = $dt.ToString("yyyy-MM-dd HH:mm:ss") }
-
-
-
             } catch {}
-
-
-
         }
-
-
-
         if (-not $exactThaw) {
-
-
-
-            $rtW = Get-SafeProp $currSlotObj "resetTimeWeekly"
-
-
-
-            $rt5 = Get-SafeProp $currSlotObj "resetTime5h"
-
-
-
-            if ($cooldownType -eq "weekly" -and $rtW) {
-
-
-
-                try {
-
-
-
-                    $dt = [DateTime]::Parse([string]$rtW).ToLocalTime()
-
-
-
-                    if ($dt -gt $now) { $exactThaw = $dt.ToString("yyyy-MM-dd HH:mm:ss") }
-
-
-
-                } catch {}
-
-
-
-            } elseif ($rt5) {
-
-
-
-                try {
-
-
-
-                    $dt = [DateTime]::Parse([string]$rt5).ToLocalTime()
-
-
-
-                    if ($dt -gt $now) { $exactThaw = $dt.ToString("yyyy-MM-dd HH:mm:ss") }
-
-
-
-                } catch {}
-
-
-
-            }
-
-
-
-        }
-
-
-
-        if (-not $exactThaw) {
-
-
-
             $exactThaw = $now.AddHours($cooldownHours).ToString("yyyy-MM-dd HH:mm:ss")
-
-
-
         }
-
-
-
         Set-SafeProp $currSlotObj "cooldownUntil" $exactThaw
-
-
 
         $grp = if ($TargetModelGroup) { $TargetModelGroup } else { (Get-CurrentActiveModelGroup) }
         if ($grp -eq "Argon") {
@@ -10208,152 +9903,48 @@ function Switch-ToNextAvailableSlot {
             }
         }
 
-
-
         $typeLabel = if ($cooldownType -eq "weekly") { "7天周额度限制" } else { "5小时短期速率限制" }
-
-
-
         Write-Host ("[!] 原槽位 [{0}] ({1}) 已进入 [{2}]，精确解冻时间: {3}" -f $currentSlotName, $currSlotObj.email, $typeLabel, $currSlotObj.cooldownUntil) -ForegroundColor Yellow
-
-
-
     }
-
-
 
     $order = @($state.slotOrder)
-
-
-
     if ($order.Count -eq 0) {
-
-
-
         throw "槽位池为空！未检测到任何已保存账号槽位。请先使用 [保存当前账号至槽位.bat] 保存至少 2 个不同账号槽位。"
-
-
-
     }
 
-
-
     $currentIndex = $order.IndexOf($currentSlotName)
-
-
-
     if ($currentIndex -lt 0) { $currentIndex = 0 }
-
-
-
     $nextSlotName = $null
 
-
-
     for ($pass = 1; $pass -le 2; $pass++) {
-
-
-
         for ($i = 1; $i -le $order.Count; $i++) {
-
-
-
             $candidateIndex = ($currentIndex + $i) % $order.Count
-
-
-
             $candidateName = $order[$candidateIndex]
-
-
-
             if ($candidateName -eq $currentSlotName -and $order.Count -gt 1) {
-
-
-
                 continue
-
-
-
             }
-
-
-
             $candidateProp = $state.slots.PSObject.Properties[$candidateName]
-
-
-
             if ($candidateProp) {
-
-
-
                 $candidateObj = $candidateProp.Value
-
-
-
                 Ensure-SlotObjectSchema -SlotObj $candidateObj
-
-
-
                 $cUntil = Get-SafeProp $candidateObj "cooldownUntil"
-
-
-
                 if ($candidateObj.status -eq "cooldown" -and $cUntil) {
-
-
-
                     try {
-
-
-
                         $thawTime = [DateTime]::Parse([string]$cUntil)
-
-
-
                         if ($now -ge $thawTime) {
-
-
-
                             Set-SafeProp $candidateObj "status" "ready"
-
-
-
                             Set-SafeProp $candidateObj "cooldownUntil" $null
-
-
-
                             Set-SafeProp $candidateObj "cooldownType" "none"
-
-
-
                         }
-
-
-
                     } catch {
-
-
-
                         Set-SafeProp $candidateObj "status" "ready"
-
-
-
                     }
-
-
-
                 }
-
-
-
                 $candFp = [string](Get-SafeProp $candidateObj "tokenFingerprint" "")
                 if ($pass -eq 1 -and $currentFingerprint -and $candFp -eq $currentFingerprint -and $currentFingerprint -ne "none") {
                     continue
                 }
-
                 $grp = if ($TargetModelGroup) { $TargetModelGroup } else { (Get-CurrentActiveModelGroup) }
-
-                # 切号前实时核验（配额未知或缓存超 15 分钟）
                 if (Test-SlotNeedsLiveVerify -SlotObj $candidateObj -ModelGroup $grp) {
                     try {
                         $liveQ = Get-SlotRemoteQuotaSummary -SlotName $candidateName
@@ -10363,328 +9954,173 @@ function Switch-ToNextAvailableSlot {
                         }
                     } catch {}
                 }
-
-                # 严格按当前模型组检测额度与可用性（Argon/Claude/Gemini 全量覆盖）
                 if (Test-SlotGroupAvailable -SlotObj $candidateObj -ModelGroup $grp -Now $now) {
                     $nextSlotName = $candidateName
                     break
                 }
-
-
-
             }
-
-
-
         }
-
-
-
         if ($nextSlotName) { break }
-
-
-
     }
 
-
-
+    # 2. 全部账号配额均已耗尽处理（严格同模型组隔离）
     if (-not $nextSlotName) {
-
-
-
         $earliestSlot = $null
-
-
-
         $earliestTime = [DateTime]::MaxValue
-
-
-
         foreach ($prop in $state.slots.PSObject.Properties) {
-
-
-
             $s = $prop.Value
-
-
-
             $cu = Get-SafeProp $s "cooldownUntil"
-
-
-
             if ($cu) {
-
-
-
                 try {
-
-
-
                     $t = [DateTime]::Parse([string]$cu)
-
-
-
                     if ($t -lt $earliestTime) {
-
-
-
                         $earliestTime = $t
-
-
-
                         $earliestSlot = $s
-
-
-
                     }
-
-
-
                 } catch {}
-
-
-
             }
-
-
-
         }
-
-
-
-                Save-SlotPoolState -State $state
+        Save-SlotPoolState -State $state
         $waitMinutes = if ($earliestSlot) { [Math]::Max(0, [int](($earliestTime - $now).TotalMinutes)) } else { 0 }
         $grp = if ($TargetModelGroup) { $TargetModelGroup } else { (Get-CurrentActiveModelGroup) }
 
-        # 严格模型组锁定红线：若当前活跃会话属于 Claude 或 Argon，绝不能跨模型强切为 Gemini API Key！
-        $userKey = [Environment]::GetEnvironmentVariable("GEMINI_API_KEY", "User")
-        $hasKey = (-not [string]::IsNullOrWhiteSpace($env:GEMINI_API_KEY)) -or (-not [string]::IsNullOrWhiteSpace($userKey))
-
-        if ($grp -eq "Gemini" -and $hasKey) {
-            Write-Host "================================================================" -ForegroundColor Red
-            Write-Host "【终极安全阀触发】所有账号的 Gemini 配额均已耗尽！" -ForegroundColor Red
-            Write-Host "[★] 正在无缝激活官方 Gemini API Key 按量计费兜底模式..." -ForegroundColor Green
-            Write-Host "================================================================" -ForegroundColor Red
-            Set-AntigravityCliAuthMode -TargetMode "apikey"
-            Send-DesktopNotification -Title "Antigravity 全部账号冷却 - 已切入 API Key" -Message "所有账号均已耗尽 Gemini 配额，已自动切入官方 Gemini API Key 兜底模式。"
-            return [PSCustomObject]@{
-                Success    = $true
-                FromSlot   = $currentSlotName
-                ToSlot     = "API_KEY_FALLBACK"
-                Email      = "Google AI Studio API Key"
-                SwitchedAt = $now
-            }
+        Write-Host "================================================================" -ForegroundColor Red
+        Write-Host ("【限额报警】当前活跃模型组 [{0}] 的全部可用槽位配额均已耗尽！" -f $grp) -ForegroundColor Red
+        Write-Host "为了严格保护当前会话推演上下文不发生模型降级或漂移，已坚决停止自动切号。" -ForegroundColor Yellow
+        Write-Host "================================================================" -ForegroundColor Red
+        $msg = if ($earliestSlot -and $waitMinutes -gt 0) {
+            "【限额警告】所有 $($order.Count) 个账号槽位在 [$grp] 模型组均已耗尽或冷却！最早解冻槽位为 [$($earliestSlot.slotName)] (预计 $waitMinutes 分钟后解冻)。已严格锁定原模型停止自动切号。"
         } else {
-            Write-Host "================================================================" -ForegroundColor Red
-            Write-Host ("【限额报警】当前活跃模型组 [{0}] 的全部可用槽位配额均已耗尽！" -f $grp) -ForegroundColor Red
-            Write-Host "为了严格保护当前会话推演上下文不发生模型降级或漂移，已坚决停止自动切号。" -ForegroundColor Yellow
-            Write-Host "================================================================" -ForegroundColor Red
-            $msg = if ($earliestSlot -and $waitMinutes -gt 0) {
-                "【限额警告】所有 $($order.Count) 个账号槽位在 [$grp] 模型组均已耗尽或冷却！最早解冻槽位为 [$($earliestSlot.slotName)] (预计 $waitMinutes 分钟后解冻)。已严格锁定原模型停止自动切号。"
-            } else {
-                "【限额警告】所有 $($order.Count) 个账号槽位在 [$grp] 模型组均已耗尽或冷却！已严格锁定原模型并停止自动切号。"
-            }
-            Write-Host $msg -ForegroundColor Red
-            Write-DaemonLog $msg "WARN"
-            Send-DesktopNotification -Title "Antigravity 模型组 [$grp] 配额耗尽" -Message $msg
-
-
-
-            return [PSCustomObject]@{
-
-
-
-                Success      = $false
-
-
-
-                Reason       = $Reason
-
-
-
-                Message      = $msg
-
-
-
-                EarliestThaw = $earliestTime
-
-
-
-                WaitMinutes  = $waitMinutes
-
-
-
-            }
-
-
-
+            "【限额警告】所有 $($order.Count) 个账号槽位在 [$grp] 模型组均已耗尽或冷却！已严格锁定原模型并停止自动切号。"
         }
+        Write-Host $msg -ForegroundColor Red
+        Write-DaemonLog $msg "WARN"
+        Send-DesktopNotification -Title "Antigravity 模型组 [$grp] 配额耗尽" -Message $msg
 
-
-
+        return [PSCustomObject]@{
+            Success      = $false
+            FromSlot     = $currentSlotName
+            ToSlot       = $null
+            Reason       = $Reason
+            Message      = $msg
+            EarliestThaw = $earliestTime
+            WaitMinutes  = $waitMinutes
+        }
     }
 
+    # 3. 级联顺延切换尝试与连续 2 次失败快照回滚
+    $slotToTry = $nextSlotName
+    $consecutiveFailures = 0
+    $maxFailures = 2
+    $switchedSuccess = $false
+    $switchedEmail = ""
+    $triedSlots = @()
 
+    while ($slotToTry -and $consecutiveFailures -lt $maxFailures) {
+        $triedSlots += $slotToTry
+        try {
+            Write-Host ("[▶] 正在切入目标槽位: [{0}]..." -f $slotToTry) -ForegroundColor Cyan
+            Write-DaemonLog ("选定目标可用槽位: [{0}]，正在执行凭据写入与一致性后验..." -f $slotToTry) "SWITCH"
+            $switchedEmail = Switch-CredentialSlot -SlotName $slotToTry -GenerateHandover:$GenerateHandover -WorkspacePath $WorkspacePath -NonInteractive -CloseProcesses:$true
+            $switchedSuccess = $true
+            $nextSlotName = $slotToTry
+            break
+        } catch {
+            $consecutiveFailures++
+            $errMsg = $_.Exception.Message
+            Write-Host ("    [!] 切入槽位 [{0}] 失败: {1}" -f $slotToTry, $errMsg) -ForegroundColor Yellow
+            Write-DaemonLog ("切入槽位 [{0}] 失败: {1} (失败次数: {2}/{3})" -f $slotToTry, $errMsg, $consecutiveFailures, $maxFailures) "WARN"
 
-    Write-Host ("[▶] 正在关闭旧 AGY2 实例并全量切换至槽位: [{0}]..." -f $nextSlotName) -ForegroundColor Cyan
-    Write-DaemonLog ("选定目标可用槽位: [{0}]，正在关闭旧实例并写入凭据..." -f $nextSlotName) "SWITCH"
+            if ($state.slots.PSObject.Properties[$slotToTry]) {
+                Set-SafeProp $state.slots.PSObject.Properties[$slotToTry].Value "status" "error"
+                Set-SafeProp $state.slots.PSObject.Properties[$slotToTry].Value "lastError" $errMsg
+                try { Save-SlotPoolState -State $state } catch {}
+            }
 
+            if ($consecutiveFailures -lt $maxFailures) {
+                Write-Host "    [~] 触发级联顺延容灾，正在寻找下一个可用候选槽位..." -ForegroundColor Yellow
+                $foundNext = $null
+                foreach ($candName in $order) {
+                    if ($triedSlots -notcontains $candName -and $candName -ne $currentSlotName) {
+                        $candProp = $state.slots.PSObject.Properties[$candName]
+                        if ($candProp -and $candProp.Value.status -ne "error") {
+                            $foundNext = $candName
+                            break
+                        }
+                    }
+                }
+                $slotToTry = $foundNext
+                if (-not $slotToTry) {
+                    Write-Host "    [!] 槽位池中已无其他未尝试的可用候选槽位！" -ForegroundColor Yellow
+                    break
+                }
+            }
+        }
+    }
 
+    if (-not $switchedSuccess) {
+        Write-Host "================================================================" -ForegroundColor Red
+        Write-Host "【切号容灾报警】连续切号均失败！正在触发事务级自动快照回滚..." -ForegroundColor Red
+        Write-Host "================================================================" -ForegroundColor Red
+        Write-DaemonLog "连续切号后验失败，触发快照回滚，恢复至原工作账号！" "ERROR"
 
-    $switchedEmail = Switch-CredentialSlot -SlotName $nextSlotName -GenerateHandover:$GenerateHandover -WorkspacePath $WorkspacePath -NonInteractive -CloseProcesses:$true
+        Restore-CredentialWorkingSnapshot -Snapshot $workingSnapshot
+        if ($AutoRestartApp -and (-not $NoRestartApp)) {
+            Restart-AntigravityApp -TargetEmail ([string]$currSlotObj.email) -AutoResume:$false
+        }
+        Send-DesktopNotification -Title "Antigravity 切号异常已回滚" -Message "连续切号后验未通过，已自动回滚恢复原账号配置快照。"
+        return [PSCustomObject]@{
+            Success  = $false
+            FromSlot = $currentSlotName
+            ToSlot   = $null
+            Reason   = "连续切号失败已安全回滚"
+        }
+    }
 
-
-
+    # 4. 成功后更新状态与拉起恢复
     $nextSlotObj = $state.slots.PSObject.Properties[$nextSlotName].Value
-
-
-
     Ensure-SlotObjectSchema -SlotObj $nextSlotObj
-
-
-
     Set-SafeProp $nextSlotObj "status" "active"
-
-
-
     Set-SafeProp $nextSlotObj "cooldownType" "none"
-
-
-
     Set-SafeProp $nextSlotObj "lastSwitchedAt" ($now.ToString("yyyy-MM-dd HH:mm:ss"))
-
-
-
     Set-SafeProp $nextSlotObj "switchCount" ([int](Get-SafeProp $nextSlotObj "switchCount" 0) + 1)
-
-
-
     Set-SafeProp $state "currentSlot" $nextSlotName
 
-
-
     $histList = [System.Collections.Generic.List[object]]::new()
-
-
-
     if ($state.history) {
-
-
-
         foreach ($h in $state.history) { $histList.Add($h) }
-
-
-
     }
-
-
-
     $histList.Add([PSCustomObject]@{
-
-
-
         timestamp = $now.ToString("yyyy-MM-dd HH:mm:ss")
-
-
-
         fromSlot  = $currentSlotName
-
-
-
         toSlot    = $nextSlotName
-
-
-
         reason    = $Reason
-
-
-
         type      = $cooldownType
-
-
-
     })
-
-
-
     if ($histList.Count -gt 50) {
-
-
-
         $histList.RemoveRange(0, $histList.Count - 50)
-
-
-
     }
-
-
-
     Set-SafeProp $state "history" ($histList.ToArray())
-
-
-
     Save-SlotPoolState -State $state
 
-
-
     if (($AutoRestartApp -or $state.autoRestartApp) -and (-not $NoRestartApp)) {
-
-
-
         Start-Sleep -Milliseconds 600
-
-
-
         Write-DaemonLog ("已写入凭据并完成一致性校验，正在重启 Antigravity 并恢复会话 (AutoResume: {0})..." -f $AutoResumeConversation) "INFO"
         Restart-AntigravityApp -TargetEmail $switchedEmail -AutoResume:$AutoResumeConversation
-
-
-
     }
-
-
 
     $notifyMsg = "账号已由 [$currentSlotName] 全量切换至 [$nextSlotName] ($($nextSlotObj.email))，并已切回原会话继续执行。"
-
-
-
     Write-Host ("[✓] " + $notifyMsg) -ForegroundColor Green
     Write-DaemonLog ("<< 账号轮换圆满完成！" + $notifyMsg) "SWITCH"
-
-
-
     Send-DesktopNotification -Title "Antigravity 无人值守自动切号成功" -Message $notifyMsg
 
-
-
     return [PSCustomObject]@{
-
-
-
         Success    = $true
-
-
-
         FromSlot   = $currentSlotName
-
-
-
         ToSlot     = $nextSlotName
-
-
-
         Email      = $nextSlotObj.email
-
-
-
         SwitchedAt = $now
-
-
-
     }
-
-
-
 }
 
 
@@ -12061,19 +11497,30 @@ function Invoke-DaemonMonitorWorkerLoop {
 
             if ($shouldSwitch) {
                 if (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds) {
-                    Write-DaemonLog ("【触发切号阈值】{0}，准备执行账号轮换与会话恢复..." -f $switchReason) "WARN"
+                    # 决策 1：整树感知会话任务运行状态
+                    $hasRunningTask = Test-HasRunningConversations
+                    if (-not $hasRunningTask) {
+                        if (-not $Script:PendingIdleSwitchNoticeSent -or (($now - $Script:LastIdleNoticeTime).TotalMinutes -ge 30)) {
+                            $Script:PendingIdleSwitchNoticeSent = $true
+                            $Script:LastIdleNoticeTime = $now
+                            $idleMsg = '当前账号配额已耗尽 (<=1%)，检测到当前会话处于空闲状态 (IDLE)，已安全推迟切号。将在你下次发送消息或手动按键时生效。'
+                            Write-DaemonLog $idleMsg 'INFO'
+                            Send-DesktopNotification -Title 'Antigravity 配额耗尽 (空闲推迟切号)' -Message $idleMsg
+                        }
+                        $statusLine = "● 配额已尽 (空闲推迟切号) | 当前槽位 [$currSlot]"
+                        $badgeColor = 'Yellow'
+                        continue
+                    }
+
+                    $Script:PendingIdleSwitchNoticeSent = $false
+                    Write-DaemonLog ("【触发切号阈值】{0}，检测到后台任务正在执行中，立即执行账号轮换与会话恢复..." -f $switchReason) 'WARN'
                     $lastSwitchTime = $now
                     [void](Switch-ToNextAvailableSlot -Reason $switchReason -AutoRestartApp:$true -IsWeeklyLimit:$isWeeklyLimit -ServerResetTime $switchResetTime -TargetModelGroup $activeGrp)
                     continue
                 } else {
                     $remainDebounce = [math]::Max(0, [int]($debounceSeconds - ($now - $lastSwitchTime).TotalSeconds))
-                    Write-DaemonLog ("【限额检测】已检测到配额见底 (<=1%)，但正处于切号防抖冷却期中 (剩余 {0} 秒)，暂缓切换" -f $remainDebounce) "WARN"
+                    Write-DaemonLog ("【限额检测】已检测到配额见底 (<=1%)，但正处于切号防抖冷却期中 (剩余 {0} 秒)，暂缓切换" -f $remainDebounce) 'WARN'
                 }
-            }
-            if ($false) {
-                $lastSwitchTime = $now
-                [void](Switch-ToNextAvailableSlot -Reason $switchReason -AutoRestartApp:$true -IsWeeklyLimit:$isWeeklyLimit -ServerResetTime $switchResetTime -TargetModelGroup $activeGrp)
-                continue
             }
         }
 
@@ -12253,10 +11700,22 @@ function Invoke-DaemonMonitorWorkerLoop {
                                 }
                             }
                             if ($isReallyExhausted) {
-                                $lastSwitchTime = $now
-                                $reasonStr = "系统日志捕获限额特征且本地配额已见底 (<=1%): '$matchedText' (来源: $([System.IO.Path]::GetFileName($filePath)))"
-                                Write-DaemonLog $reasonStr "WARN"
-                                [void](Switch-ToNextAvailableSlot -Reason $reasonStr -AutoRestartApp:$true -TargetModelGroup $activeGrp)
+                                $hasRunningTask = Test-HasRunningConversations
+                                if (-not $hasRunningTask) {
+                                    if (-not $Script:PendingIdleSwitchNoticeSent -or (($now - $Script:LastIdleNoticeTime).TotalMinutes -ge 30)) {
+                                        $Script:PendingIdleSwitchNoticeSent = $true
+                                        $Script:LastIdleNoticeTime = $now
+                                        $idleMsg = '日志捕获限额特征且配额见底，检测到当前会话处于空闲状态 (IDLE)，已安全推迟切号。'
+                                        Write-DaemonLog $idleMsg 'INFO'
+                                        Send-DesktopNotification -Title 'Antigravity 限额 (空闲推迟切号)' -Message $idleMsg
+                                    }
+                                } else {
+                                    $Script:PendingIdleSwitchNoticeSent = $false
+                                    $lastSwitchTime = $now
+                                    $reasonStr = "系统日志捕获限额特征且本地配额已见底 (<=1%): '$matchedText' (来源: $([System.IO.Path]::GetFileName($filePath)))"
+                                    Write-DaemonLog $reasonStr 'WARN'
+                                    [void](Switch-ToNextAvailableSlot -Reason $reasonStr -AutoRestartApp:$true -TargetModelGroup $activeGrp)
+                                }
                             } else {
                                 $ignoreMsg = "日志捕获限额特征 [$matchedText] (来源: $([System.IO.Path]::GetFileName($filePath)))，但本地当前模型组 [$activeGrp] 剩余配额充足，已安全忽略后台误报"
                                 Write-Host ("[*] " + $ignoreMsg) -ForegroundColor DarkGray
