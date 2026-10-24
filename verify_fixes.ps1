@@ -397,6 +397,38 @@ Write-Host "`n--- Test 12: Tree-Aware Task Activity Check ---" -ForegroundColor 
 $hasRunning = Test-HasRunningConversations
 Assert-Test "Test-HasRunningConversations returns a boolean" ($hasRunning -is [bool])
 
+# ------------------------------------------------------------------------------
+# Test 13: Floor Calculation & True Claude 5h Retention
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 13: Floor Calculation & True Claude 5h Retention ---" -ForegroundColor Yellow
+$mockJson = @'
+{
+  "response": {
+    "groups": [
+      {
+        "displayName": "Gemini Models",
+        "buckets": [
+          { "bucketId": "gemini-weekly", "window": "weekly", "remainingFraction": 0.018 },
+          { "bucketId": "gemini-5h", "window": "5h", "remainingFraction": 0.7506 }
+        ]
+      },
+      {
+        "displayName": "Claude and GPT models",
+        "buckets": [
+          { "bucketId": "3p-weekly", "window": "weekly", "remainingFraction": 0.0 },
+          { "bucketId": "3p-5h", "window": "5h", "remainingFraction": 1.0, "disabled": true }
+        ]
+      }
+    ]
+  }
+}
+'@
+$parsed = Parse-QuotaSummaryPayload -RawJson $mockJson
+Assert-Test "Gemini Weekly (0.018) floored to 1% (not rounded to 2%)" ($parsed.GeminiWeeklyPct -eq 1)
+Assert-Test "Gemini 5h (0.7506) floored to 75%" ($parsed.Gemini5hPct -eq 75)
+Assert-Test "Claude 5h retained as 100% (not zeroed out)" ($parsed.Claude5hPct -eq 100)
+Assert-Test "Claude Weekly correctly parsed as 0%" ($parsed.ClaudeWeeklyPct -eq 0)
+
 # Clean up test sandbox
 Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
 

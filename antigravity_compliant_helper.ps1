@@ -179,6 +179,8 @@ $Script:LastFileScanTime         = [DateTime]::MinValue
 $Script:CachedActiveModelInfo    = $null
 $Script:ActiveModelInfoCachedAt  = [DateTime]::MinValue
 $Script:LockedActiveModelEnum    = $null
+$Script:PendingIdleSwitchNoticeSent = $false
+$Script:LastIdleNoticeTime          = [DateTime]::MinValue
 
 
 
@@ -8537,7 +8539,7 @@ function Parse-QuotaSummaryPayload {
                 }
 
                 if ($null -eq $rf) { continue }
-                $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round($rf * 100.0)))
+                $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Floor($rf * 100.0)))
                 $rTime = if ($b.PSObject.Properties["resetTime"] -and $b.resetTime) { [string]$b.resetTime } else { $null }
 
                 $is5hBucket = ($win -eq "5h" -or $bId -match '5h' -or $dName -match '(?i)Five Hour|5-Hour|5 Hour')
@@ -8568,13 +8570,9 @@ function Parse-QuotaSummaryPayload {
             }
         }
 
-        # 核心防虚假标记：若某组周限额已归零 (0%) 或 5h 桶被标记为 disabled，5h 必须置为 0% (已耗尽)
-        if ($gemini5hDisabled -or ($null -ne $geminiWeekly -and $geminiWeekly -le 0)) {
-            $gemini5h = 0
-        }
-        if ($claude5hDisabled -or ($null -ne $claudeWeekly -and $claudeWeekly -le 0)) {
-            $claude5h = 0
-        }
+        # 保留真实 5h 与周限额，不人为覆盖 5h 为 0%，确保与官方客户端显示 100% 对齐
+        if ($gemini5hDisabled) { $gemini5hDisabled = $true }
+        if ($claude5hDisabled) { $claude5hDisabled = $true }
     }
 
     # 格式 B: GetUserStatus -> { userStatus: { email, planStatus: { planInfo: { planName } }, cascadeModelConfigData: { clientModelConfigs: [...] } } }
@@ -8613,7 +8611,7 @@ function Parse-QuotaSummaryPayload {
                 $rf = 0.0
             }
             if ($null -eq $rf) { continue }
-            $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round($rf * 100.0)))
+            $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Floor($rf * 100.0)))
             $rt = if ($qi.PSObject.Properties["resetTime"] -and $qi.resetTime) { [string]$qi.resetTime } else { $null }
 
             if ($lbl -match '(?i)argon') {
@@ -8672,7 +8670,7 @@ function Parse-QuotaSummaryPayload {
                 $rf = 0.0
             }
             if ($null -eq $rf) { continue }
-            $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Round($rf * 100.0)))
+            $pct = [Math]::Max(0, [Math]::Min(100, [int][Math]::Floor($rf * 100.0)))
             $rt  = if ($qi.PSObject.Properties["resetTime"] -and $qi.resetTime) { [string]$qi.resetTime } else { $null }
 
             if ($dName -match '(?i)argon' -or $mProp.Name -match '(?i)argon') {
@@ -8716,6 +8714,9 @@ function Parse-QuotaSummaryPayload {
         Is5hExhausted         = (($null -ne $gemini5h -and $gemini5h -le 1))
         IsWeeklyExhausted     = (($null -ne $geminiWeekly -and $geminiWeekly -le 1))
         IsArgonExhausted      = (($null -ne $argonWeekly -and $argonWeekly -le 1))
+        IsClaude5hExhausted   = (($null -ne $claude5h -and $claude5h -le 1))
+        IsClaudeWeeklyExhausted = (($null -ne $claudeWeekly -and $claudeWeekly -le 1))
+        Claude5hDisabled      = $claude5hDisabled
         UpdatedAt             = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     }
 }
@@ -10591,22 +10592,13 @@ function Start-PassiveLogWatcher {
 
 
 
-        try {
-
-
-
-            & $ScriptFile -Action daemon-worker -PollIntervalSec $PollSec
-
-
-
-        } catch {
-
-
-
-            try { [System.IO.File]::AppendAllText($LogPath, "[$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))] Worker crashed: $($_.Exception)`r`n", [System.Text.Encoding]::UTF8) } catch {}
-
-
-
+        while ($true) {
+            try {
+                & $ScriptFile -Action daemon-worker -PollIntervalSec $PollSec
+            } catch {
+                try { [System.IO.File]::AppendAllText($LogPath, "[$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))] Worker crashed: $($_.Exception)`r`n", [System.Text.Encoding]::UTF8) } catch {}
+            }
+            Start-Sleep -Seconds 2
         }
 
 
@@ -10911,7 +10903,27 @@ function Start-PassiveLogWatcher {
 
             try {
 
-
+                if (Test-Path $DaemonHeartbeatPath) {
+                    try {
+                        $hbRaw = [System.IO.File]::ReadAllText($DaemonHeartbeatPath, [System.Text.Encoding]::UTF8)
+                        $hb = $hbRaw | ConvertFrom-Json
+                        if ($hb) {
+                            $isStale = $false
+                            if ($hb.timestamp) {
+                                try {
+                                    $hbDt = [DateTime]::Parse([string]$hb.timestamp)
+                                    if (((Get-Date) - $hbDt).TotalSeconds -gt 15) { $isStale = $true }
+                                } catch {}
+                            }
+                            if ($hb.statusLine) {
+                                $Script:TrayMenuStatus.Text = if ($isStale) { "$($hb.statusLine) (正在同步...)" } else { [string]$hb.statusLine }
+                            }
+                            if ($hb.quotaLine) {
+                                $Script:TrayMenuQuota.Text = [string]$hb.quotaLine
+                            }
+                        }
+                    } catch {}
+                }
 
                 if (Test-Path $ResumeManifestPath) {
 
@@ -11438,7 +11450,26 @@ function Invoke-DaemonMonitorWorkerLoop {
 
 
         $lsQuota = Get-LocalLanguageServerQuota
-        if ($lsQuota -and $currSlot -and $pool.slots.PSObject.Properties[$currSlot]) {
+        if ($lsQuota) {
+            # 自动探测当前实际登录账号是否发生外部变化 (例如用户手动在客户端登录新账号)
+            if ($lsQuota.Email -and $pool.slots) {
+                $matchedSlotName = $null
+                foreach ($sp in $pool.slots.PSObject.Properties) {
+                    if ($sp.Value.email -eq $lsQuota.Email) {
+                        $matchedSlotName = $sp.Name
+                        break
+                    }
+                }
+                if ($matchedSlotName -and $matchedSlotName -ne $currSlot) {
+                    Write-DaemonLog ("检测到 Antigravity 实际登录账号已变更为 [{0}] ({1})，自动同步当前槽位指向" -f $matchedSlotName, $lsQuota.Email) "INFO"
+                    $currSlot = $matchedSlotName
+                    $pool.currentSlot = $currSlot
+                    $currEmail = $lsQuota.Email
+                    try { Save-SlotPoolState -State $pool } catch {}
+                }
+            }
+
+            if ($currSlot -and $pool.slots.PSObject.Properties[$currSlot]) {
             $currSlotObj = $pool.slots.PSObject.Properties[$currSlot].Value
             Apply-QuotaSnapshotToSlotObject -SlotObj $currSlotObj -QuotaSnap $lsQuota -IsCurrentActiveSlot $true
             try { Save-SlotPoolState -State $pool } catch {}
@@ -11447,17 +11478,18 @@ function Invoke-DaemonMonitorWorkerLoop {
             $gw = if ($null -ne $lsQuota.GeminiWeeklyPct) { "$($lsQuota.GeminiWeeklyPct)%" } else { "--" }
             $ar = if ($null -ne $lsQuota.ArgonWeeklyPct)  { "$($lsQuota.ArgonWeeklyPct)%" }  else { "--" }
             $c5 = if ($null -ne $lsQuota.Claude5hPct)     { "$($lsQuota.Claude5hPct)%" }     else { "--" }
+            $cw = if ($null -ne $lsQuota.ClaudeWeeklyPct) { "$($lsQuota.ClaudeWeeklyPct)%" } else { "--" }
 
             $readyCnt = @($pool.slots.PSObject.Properties | Where-Object { $_.Value.status -eq "ready" -or $_.Value.status -eq "active" }).Count
-            $quotaLine = "实时剩余: Gemini 5h:$g5 周:$gw | Argon:$ar | Claude 5h:$c5"
-            $tooltip   = "AGY守护[运行中] 槽位:[$currSlot]`nGemini 5h:$g5 周:$gw | Argon:$ar | 备用:$readyCnt"
+            $quotaLine = "实时剩余: Gemini 5h:$g5 周:$gw | Claude 5h:$c5 周:$cw | Argon:$ar"
+            $tooltip   = "AGY守护[运行中] 槽位:[$currSlot]`nGemini 5h:$g5 周:$gw | Claude 5h:$c5 周:$cw | 备用:$readyCnt"
             if (-not $hasLoggedLsConnect) {
                 $hasLoggedLsConnect = $true
-                Write-DaemonLog ("已建立与本地 LanguageServer 配额连接 (槽位: [{0}], Gemini: 5h={1} 周={2} | Argon={3} | Claude: 5h={4})" -f $currSlot, $g5, $gw, $ar, $c5) "INFO"
+                Write-DaemonLog ("已建立与本地 LanguageServer 配额连接 (槽位: [{0}], Gemini: 5h={1} 周={2} | Claude: 5h={3} 周={4} | Argon={5})" -f $currSlot, $g5, $gw, $c5, $cw, $ar) "INFO"
             }
             if (($now - $lastHeartbeatLogTime).TotalMinutes -ge 10) {
                 $lastHeartbeatLogTime = $now
-                Write-DaemonLog ("【守护心跳正常】当前槽位: [{0}] ({1}) | Gemini 5h:{2} 周:{3} | Argon:{4} | 备用可用槽位:{5}" -f $currSlot, $currEmail, $g5, $gw, $ar, $readyCnt) "INFO"
+                Write-DaemonLog ("【守护心跳正常】当前槽位: [{0}] ({1}) | Gemini 5h:{2} 周:{3} | Claude 5h:{4} 周:{5} | Argon:{6} | 备用可用槽位:{7}" -f $currSlot, $currEmail, $g5, $gw, $c5, $cw, $ar, $readyCnt) "INFO"
             }
 
             if (($null -ne $lsQuota.Gemini5hPct -and $lsQuota.Gemini5hPct -le 20) -or ($null -ne $lsQuota.GeminiWeeklyPct -and $lsQuota.GeminiWeeklyPct -le 10) -or ($null -ne $lsQuota.ArgonWeeklyPct -and $lsQuota.ArgonWeeklyPct -le 10)) {
@@ -11497,23 +11529,8 @@ function Invoke-DaemonMonitorWorkerLoop {
 
             if ($shouldSwitch) {
                 if (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds) {
-                    # 决策 1：整树感知会话任务运行状态
-                    $hasRunningTask = Test-HasRunningConversations
-                    if (-not $hasRunningTask) {
-                        if (-not $Script:PendingIdleSwitchNoticeSent -or (($now - $Script:LastIdleNoticeTime).TotalMinutes -ge 30)) {
-                            $Script:PendingIdleSwitchNoticeSent = $true
-                            $Script:LastIdleNoticeTime = $now
-                            $idleMsg = '当前账号配额已耗尽 (<=1%)，检测到当前会话处于空闲状态 (IDLE)，已安全推迟切号。将在你下次发送消息或手动按键时生效。'
-                            Write-DaemonLog $idleMsg 'INFO'
-                            Send-DesktopNotification -Title 'Antigravity 配额耗尽 (空闲推迟切号)' -Message $idleMsg
-                        }
-                        $statusLine = "● 配额已尽 (空闲推迟切号) | 当前槽位 [$currSlot]"
-                        $badgeColor = 'Yellow'
-                        continue
-                    }
-
                     $Script:PendingIdleSwitchNoticeSent = $false
-                    Write-DaemonLog ("【触发切号阈值】{0}，检测到后台任务正在执行中，立即执行账号轮换与会话恢复..." -f $switchReason) 'WARN'
+                    Write-DaemonLog ("【触发切号阈值】{0}，立即执行账号轮换与会话恢复..." -f $switchReason) 'WARN'
                     $lastSwitchTime = $now
                     [void](Switch-ToNextAvailableSlot -Reason $switchReason -AutoRestartApp:$true -IsWeeklyLimit:$isWeeklyLimit -ServerResetTime $switchResetTime -TargetModelGroup $activeGrp)
                     continue
@@ -11521,6 +11538,7 @@ function Invoke-DaemonMonitorWorkerLoop {
                     $remainDebounce = [math]::Max(0, [int]($debounceSeconds - ($now - $lastSwitchTime).TotalSeconds))
                     Write-DaemonLog ("【限额检测】已检测到配额见底 (<=1%)，但正处于切号防抖冷却期中 (剩余 {0} 秒)，暂缓切换" -f $remainDebounce) 'WARN'
                 }
+            }
             }
         }
 
@@ -11700,21 +11718,13 @@ function Invoke-DaemonMonitorWorkerLoop {
                                 }
                             }
                             if ($isReallyExhausted) {
-                                $hasRunningTask = Test-HasRunningConversations
-                                if (-not $hasRunningTask) {
-                                    if (-not $Script:PendingIdleSwitchNoticeSent -or (($now - $Script:LastIdleNoticeTime).TotalMinutes -ge 30)) {
-                                        $Script:PendingIdleSwitchNoticeSent = $true
-                                        $Script:LastIdleNoticeTime = $now
-                                        $idleMsg = '日志捕获限额特征且配额见底，检测到当前会话处于空闲状态 (IDLE)，已安全推迟切号。'
-                                        Write-DaemonLog $idleMsg 'INFO'
-                                        Send-DesktopNotification -Title 'Antigravity 限额 (空闲推迟切号)' -Message $idleMsg
-                                    }
-                                } else {
+                                if (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds) {
                                     $Script:PendingIdleSwitchNoticeSent = $false
                                     $lastSwitchTime = $now
                                     $reasonStr = "系统日志捕获限额特征且本地配额已见底 (<=1%): '$matchedText' (来源: $([System.IO.Path]::GetFileName($filePath)))"
                                     Write-DaemonLog $reasonStr 'WARN'
                                     [void](Switch-ToNextAvailableSlot -Reason $reasonStr -AutoRestartApp:$true -TargetModelGroup $activeGrp)
+                                    continue
                                 }
                             } else {
                                 $ignoreMsg = "日志捕获限额特征 [$matchedText] (来源: $([System.IO.Path]::GetFileName($filePath)))，但本地当前模型组 [$activeGrp] 剩余配额充足，已安全忽略后台误报"
