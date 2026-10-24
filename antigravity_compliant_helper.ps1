@@ -14847,9 +14847,6 @@ function Start-InteractiveMenu {
         Write-Host "  [A] 开机自启守护切换               (Auto-Start on Boot: " -NoNewline
         Write-Host ($(if (Test-AutoStartEnabled) { "已开启 [ON])" } else { "已关闭 [OFF])" })) -ForegroundColor $(if (Test-AutoStartEnabled) { "Green" } else { "DarkGray" })
         Write-Host "  [D] 删除已保存的加密槽位           (Delete Slot)"
-
-
-
         Write-Host "  [Q] 退出菜单 (不影响已启动的 AGY2 与后台守护)"
 
 
@@ -14998,10 +14995,6 @@ function Start-InteractiveMenu {
                     $s = Read-Host "请输入要重置的槽位名称（输入 all 重置所有槽位）"
                     Reset-SlotCooldown -SlotName $s
                 }
-                "9" {
-                    $s = Read-Host "请输入要重置的槽位名称（输入 all 重置所有槽位）"
-                    Reset-SlotCooldown -SlotName $s
-                }
                 "A" {
                     [void](Toggle-AutoStart)
                 }
@@ -15009,17 +15002,11 @@ function Start-InteractiveMenu {
                     $name = Read-Host "请输入要删除的槽位名称"
                     Remove-CredentialSlot -SlotName $name
                 }
-                "B" {
-                    Invoke-BoostAction
-                }
                 "/BOOST" {
                     Invoke-BoostAction
                 }
                 "BOOST" {
                     Invoke-BoostAction
-                }
-                "G" {
-                    Invoke-GoalAction
                 }
                 "/GOAL" {
                     Invoke-GoalAction
