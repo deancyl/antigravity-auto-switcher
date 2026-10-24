@@ -12143,24 +12143,6 @@ function Start-PassiveLogWatcher {
 
         })
 
-
-
-        $itemBoost = $ctxMenu.Items.Add("⚡ /boost 立即核验并切至最高配额槽位")
-        $itemBoost.Add_Click({
-            try {
-                $bArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$($Script:TrayScriptPath)`" -Action boost"
-                [void](Start-TrulyHiddenDetachedProcess -FilePath "powershell.exe" -Arguments $bArgs -WorkingDirectory $Script:TrayScriptDir)
-            } catch {}
-        })
-
-        $itemGoal = $ctxMenu.Items.Add("🎯 /goal 目标达成与健康度体检")
-        $itemGoal.Add_Click({
-            try {
-                $gArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$($Script:TrayScriptPath)`" -Action goal"
-                Start-Process "powershell.exe" -ArgumentList $gArgs
-            } catch {}
-        })
-
         $itemAutoStart = $ctxMenu.Items.Add("🚀 开机自启守护: " + (if (Test-AutoStartEnabled) { "已开启 [ON]" } else { "已关闭 [OFF]" }))
         $itemAutoStart.Add_Click({
             try {
@@ -14860,20 +14842,11 @@ function Start-InteractiveMenu {
 
 
 
-        Write-Host "  [7] 一键修复/重置受损的 AGY2 配置  (Repair app_storage.json Crash)"
-
-
-
-        Write-Host "  [8] 切换 CLI 认证模式：个人订阅 OAuth <-> 官方 API Key / ADC 兜底"
-
-
-
-        Write-Host "  [9] 重置槽位 5 小时冷却计时器      (Reset Cooldown Timers)"
+        Write-Host "  [7] 一键应急修复/重置受损配置      (Repair app_storage.json Crash)"
+        Write-Host "  [8] 重置槽位冷却计时器             (Reset Cooldown Timers)"
         Write-Host "  [A] 开机自启守护切换               (Auto-Start on Boot: " -NoNewline
         Write-Host ($(if (Test-AutoStartEnabled) { "已开启 [ON])" } else { "已关闭 [OFF])" })) -ForegroundColor $(if (Test-AutoStartEnabled) { "Green" } else { "DarkGray" })
-        Write-Host "  [B] /boost 立即核验并切至最高配额  (Boost Quota & Immediate Jump)"
-        Write-Host "  [G] /goal 目标状态达成与全链路体检 (Goal Health Inspection)"
-        Write-Host "  [D] 删除已保存的加密槽位           (Delete Slot)" 
+        Write-Host "  [D] 删除已保存的加密槽位           (Delete Slot)"
 
 
 
@@ -15022,39 +14995,19 @@ function Start-InteractiveMenu {
 
 
                 "8" {
-
-
-
-                    Write-Host "可选模式：1 = oauth (个人订阅默认) | 2 = apikey (Google AI Studio API Key 兜底) | 3 = adc (Google Cloud ADC)" -ForegroundColor Cyan
-
-
-
-                    $m = Read-Host "请选择模式 [1/2/3]"
-
-
-
-                    if ($m -eq "1") { Set-AntigravityCliAuthMode -TargetMode "oauth" }
-
-
-
-                    elseif ($m -eq "2") { Set-AntigravityCliAuthMode -TargetMode "apikey" }
-
-
-
-                    elseif ($m -eq "3") { Set-AntigravityCliAuthMode -TargetMode "adc" }
-
-
-
+                    $s = Read-Host "请输入要重置的槽位名称（输入 all 重置所有槽位）"
+                    Reset-SlotCooldown -SlotName $s
                 }
-
-
-
-                                "9" {
+                "9" {
                     $s = Read-Host "请输入要重置的槽位名称（输入 all 重置所有槽位）"
                     Reset-SlotCooldown -SlotName $s
                 }
                 "A" {
                     [void](Toggle-AutoStart)
+                }
+                "D" {
+                    $name = Read-Host "请输入要删除的槽位名称"
+                    Remove-CredentialSlot -SlotName $name
                 }
                 "B" {
                     Invoke-BoostAction
@@ -15073,19 +15026,6 @@ function Start-InteractiveMenu {
                 }
                 "GOAL" {
                     Invoke-GoalAction
-                }
-                "D" {
-
-
-
-                    $name = Read-Host "请输入要删除的槽位名称"
-
-
-
-                    Remove-CredentialSlot -SlotName $name
-
-
-
                 }
 
 

@@ -36,7 +36,7 @@
 ## ⚡ 核心功能与演进能力
 
 ### 1. 🎯 `/goal` 目标驱动模式与全链路健康度体检
-- **命令调用**：`pwsh antigravity_compliant_helper.ps1 -Action goal` 或交互式菜单按 **`[G]`**；
+- **命令调用**：`pwsh antigravity_compliant_helper.ps1 -Action goal` 或菜单输入 **`goal` / `/goal`**；
 - **全链路体检输出**：
   1. 当前活跃模型名称、模型组归属及原模型严格锁定状态；
   2. 槽位池账号规模与当前驻留槽位；
@@ -46,7 +46,7 @@
   6. 实时配额看板展示。
 
 ### 2. ⚡ `/boost` 极速提速模式与实时最优跃迁
-- **命令调用**：`pwsh antigravity_compliant_helper.ps1 -Action boost` 或交互式菜单按 **`[B]`**；
+- **命令调用**：`pwsh antigravity_compliant_helper.ps1 -Action boost` 或菜单输入 **`boost` / `/boost`**；
 - **极速跃迁机制**：立即并行拉取槽位池全部账号的云端真实剩余配额，精准识别当前活跃模型组（Gemini / Claude / Argon）配额最高的最佳槽位，若当前槽位配额偏低，则 1 秒内无损切入最优账号并恢复推演。
 
 ### 3. 🔒 严格原模型组锁定 (Strict Model Group Locking)
@@ -93,14 +93,19 @@
 
 | 场景 | 命令行指令 | 交互菜单按键 | 说明 |
 | :--- | :--- | :--- | :--- |
-| **状态查看** | `pwsh antigravity_compliant_helper.ps1 -Action status` | `[1]` | 纯只读查看各账号配额、活跃会话与模型 |
-| **目标体检** | `pwsh antigravity_compliant_helper.ps1 -Action goal` | `[G]` | 全链路健康度体检与可用槽位数核验 |
-| **极速提速** | `pwsh antigravity_compliant_helper.ps1 -Action boost` | `[B]` | 核验云端实时配额并跃迁至最高槽位 |
-| **开机自启** | - | `[A]` | 一键开启/关闭 Windows 开机无感自启 |
-| **保存槽位** | `pwsh antigravity_compliant_helper.ps1 -Action save -Slot <Name>` | `[2]` | 将当前客户端登录态加密快照存入槽位 |
-| **手动切号** | `pwsh antigravity_compliant_helper.ps1 -Action switch -Slot <Name>` | `[3]` | 切换至指定槽位并自动重启续接 |
-| **重置冷却** | `pwsh antigravity_compliant_helper.ps1 -Action reset-cooldown -Slot all` | `[9]` | 重置所有槽位冷却状态与配额基线 |
+| **保存槽位** | `pwsh antigravity_compliant_helper.ps1 -Action save -Slot <Name>` | `[1]` | 将当前客户端登录态加密快照存入槽位 |
+| **手动切号** | `pwsh antigravity_compliant_helper.ps1 -Action switch -Slot <Name>` | `[2]` | 切换至指定槽位并自动重启续接 |
+| **立即轮换** | `pwsh antigravity_compliant_helper.ps1 -Action next-slot` | `[3]` | 立即轮换切入下一个可用槽位 |
+| **看板状态** | `pwsh antigravity_compliant_helper.ps1 -Action status` | `[4]` | 刷新本地全账号实时配额看板状态 |
 | **刷新配额** | `pwsh antigravity_compliant_helper.ps1 -Action refresh-quota` | `[R]` | 强制从云端接口同步各账号最新配额 |
+| **后台守护** | `pwsh antigravity_compliant_helper.ps1 -Action start-daemon` | `[5]` | 开启后台守护与右下角托盘图标 |
+| **停止守护** | `pwsh antigravity_compliant_helper.ps1 -Action stop-daemon` | `[6]` | 停止无人值守后台守护 |
+| **应急修复** | `pwsh antigravity_compliant_helper.ps1 -Action repair-storage` | `[7]` | 一键应急修复/重置受损配置彻底解决闪退 |
+| **重置冷却** | `pwsh antigravity_compliant_helper.ps1 -Action reset-cooldown -Slot all` | `[8]` | 重置槽位冷却计时器与配额基线 |
+| **开机自启** | - | `[A]` | 一键开启/关闭 Windows 开机无感自启 |
+| **删除槽位** | `pwsh antigravity_compliant_helper.ps1 -Action delete -Slot <Name>` | `[D]` | 删除已保存的加密槽位 |
+| **目标体检** | `pwsh antigravity_compliant_helper.ps1 -Action goal` | 快捷指令 `goal` / `/goal` | 全链路健康度体检与可用槽位数核验 |
+| **极速提速** | `pwsh antigravity_compliant_helper.ps1 -Action boost` | 快捷指令 `boost` / `/boost` | 核验云端实时配额并跃迁至最高槽位 |
 
 ---
 
