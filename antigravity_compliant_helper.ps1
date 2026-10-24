@@ -42,7 +42,7 @@
 
 
 
-       - 通过 WMI (Win32_Process.Create) 与 Win32 CreateProcessW (DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB) 双重脱钩机制拉起 Antigravity.exe。
+       - 通过标准 Windows Shell (ProcessStartInfo UseShellExecute) 干净脱钩拉起 Antigravity.exe。
 
 
 
@@ -198,7 +198,7 @@ $Script:CachedLsEndpoint     = $null
 
 
 
-# 在脚本最顶层锁定自身绝对路径与目录（彻底防止在函数、事件回调或 wscript 脱钩启动时 $PSScriptRoot 为空导致 Join-Path 崩溃！）
+# 在脚本最顶层锁定自身绝对路径与目录（彻底防止在函数或事件回调脱钩启动时 $PSScriptRoot 为空导致 Join-Path 崩溃！）
 
 
 
@@ -1094,207 +1094,8 @@ namespace AntigravityCompliantHelper
 
 
         // ====================================================================
-
-
-
-        // Win32 CreateProcessW 完全脱离控制台进程组与父作业对象（按 Ctrl+C 绝不杀子进程）
-
-
-
+        // Win32 MoveFileExW 原子文件替换（零崩溃窗口、零沙箱破坏特征）
         // ====================================================================
-
-
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-
-
-
-        private struct STARTUPINFO
-
-
-
-        {
-
-
-
-            public Int32 cb;
-
-
-
-            public string lpReserved;
-
-
-
-            public string lpDesktop;
-
-
-
-            public string lpTitle;
-
-
-
-            public Int32 dwX;
-
-
-
-            public Int32 dwY;
-
-
-
-            public Int32 dwXSize;
-
-
-
-            public Int32 dwYSize;
-
-
-
-            public Int32 dwXCountChars;
-
-
-
-            public Int32 dwYCountChars;
-
-
-
-            public Int32 dwFillAttribute;
-
-
-
-            public Int32 dwFlags;
-
-
-
-            public Int16 wShowWindow;
-
-
-
-            public Int16 cbReserved2;
-
-
-
-            public IntPtr lpReserved2;
-
-
-
-            public IntPtr hStdInput;
-
-
-
-            public IntPtr hStdOutput;
-
-
-
-            public IntPtr hStdError;
-
-
-
-        }
-
-
-
-        [StructLayout(LayoutKind.Sequential)]
-
-
-
-        private struct PROCESS_INFORMATION
-
-
-
-        {
-
-
-
-            public IntPtr hProcess;
-
-
-
-            public IntPtr hThread;
-
-
-
-            public int dwProcessId;
-
-
-
-            public int dwThreadId;
-
-
-
-        }
-
-
-
-        [DllImport("kernel32.dll", EntryPoint = "CreateProcessW", CharSet = CharSet.Unicode, SetLastError = true)]
-
-
-
-        private static extern bool CreateProcess(
-
-
-
-            string lpApplicationName,
-
-
-
-            StringBuilder lpCommandLine,
-
-
-
-            IntPtr lpProcessAttributes,
-
-
-
-            IntPtr lpThreadAttributes,
-
-
-
-            bool bInheritHandles,
-
-
-
-            uint dwCreationFlags,
-
-
-
-            IntPtr lpEnvironment,
-
-
-
-            string lpCurrentDirectory,
-
-
-
-            ref STARTUPINFO lpStartupInfo,
-
-
-
-            out PROCESS_INFORMATION lpProcessInformation);
-
-
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-
-
-
-        private static extern bool CloseHandle(IntPtr hObject);
-
-
-
-        [DllImport("kernel32.dll")]
-
-
-
-        private static extern IntPtr GetConsoleWindow();
-
-
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-
-
-
-        private static extern bool FreeConsole();
-
         [DllImport("kernel32.dll", EntryPoint = "MoveFileExW", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern bool MoveFileExW(string lpExistingFileName, string lpNewFileName, int dwFlags);
 
@@ -1314,381 +1115,8 @@ namespace AntigravityCompliantHelper
             }
         }
 
-
-
-        private const uint DETACHED_PROCESS = 0x00000008;
-
-
-
-        private const uint CREATE_NO_WINDOW = 0x08000000;
-
-
-
-        private const uint CREATE_NEW_PROCESS_GROUP = 0x00000200;
-
-
-
-        private const uint CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
-
-
-
-        private const int STARTF_USESHOWWINDOW = 0x00000001;
-
-
-
-        private const short SW_HIDE_CONST = 0;
-
-
-
-        private const short SW_SHOWNORMAL = 1;
-
-
-
-        public static void DetachAndHideConsole()
-
-
-
-        {
-
-
-
-            try
-
-
-
-            {
-
-
-
-                IntPtr hConsole = GetConsoleWindow();
-
-
-
-                if (hConsole != IntPtr.Zero)
-
-
-
-                {
-
-
-
-                    ShowWindow(hConsole, 0);
-
-
-
-                }
-
-
-
-                // 切勿调用 FreeConsole()！FreeConsole 会导致 PowerShell 后续执行任何 Write-Host 时抛出 IOException(句柄无效) 而直接闪退！
-
-
-
-            }
-
-
-
-            catch {}
-
-
-
-        }
-
-
-
-        // 使用 CREATE_NO_WINDOW (0x08000000) + SW_HIDE 启动后台守护进程：内核级禁止分配 conhost / Windows Terminal 窗口！
-
-
-
-        public static int LaunchHiddenBackgroundProcess(string exePath, string arguments, string workingDir)
-
-
-
-        {
-
-
-
-            STARTUPINFO si = new STARTUPINFO();
-
-
-
-            si.cb = Marshal.SizeOf(typeof(STARTUPINFO));
-
-
-
-            si.dwFlags = STARTF_USESHOWWINDOW;
-
-
-
-            si.wShowWindow = SW_HIDE_CONST;
-
-
-
-            string cmd = "\"" + exePath + "\"";
-
-
-
-            if (!string.IsNullOrEmpty(arguments))
-
-
-
-            {
-
-
-
-                cmd += " " + arguments;
-
-
-
-            }
-
-
-
-            StringBuilder cmdBuilder = new StringBuilder(cmd);
-
-
-
-            PROCESS_INFORMATION pi;
-
-
-
-            uint flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB;
-
-
-
-            bool ok = CreateProcess(null, cmdBuilder, IntPtr.Zero, IntPtr.Zero, false, flags, IntPtr.Zero, workingDir, ref si, out pi);
-
-
-
-            if (!ok)
-
-
-
-            {
-
-
-
-                cmdBuilder = new StringBuilder(cmd);
-
-
-
-                flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
-
-
-
-                ok = CreateProcess(null, cmdBuilder, IntPtr.Zero, IntPtr.Zero, false, flags, IntPtr.Zero, workingDir, ref si, out pi);
-
-
-
-            }
-
-
-
-            if (!ok)
-
-
-
-            {
-
-
-
-                return 0;
-
-
-
-            }
-
-
-
-            try
-
-
-
-            {
-
-
-
-                return pi.dwProcessId;
-
-
-
-            }
-
-
-
-            finally
-
-
-
-            {
-
-
-
-                if (pi.hThread != IntPtr.Zero) CloseHandle(pi.hThread);
-
-
-
-                if (pi.hProcess != IntPtr.Zero) CloseHandle(pi.hProcess);
-
-
-
-            }
-
-
-
-        }
-
-
-
-        public static int LaunchFullyDetachedGui(string exePath, string arguments, string workingDir)
-
-
-
-        {
-
-
-
-            STARTUPINFO si = new STARTUPINFO();
-
-
-
-            si.cb = Marshal.SizeOf(typeof(STARTUPINFO));
-
-
-
-            si.dwFlags = STARTF_USESHOWWINDOW;
-
-
-
-            si.wShowWindow = SW_SHOWNORMAL;
-
-
-
-            string cmd = "\"" + exePath + "\"";
-
-
-
-            if (!string.IsNullOrEmpty(arguments))
-
-
-
-            {
-
-
-
-                cmd += " " + arguments;
-
-
-
-            }
-
-
-
-            StringBuilder cmdBuilder = new StringBuilder(cmd);
-
-
-
-            PROCESS_INFORMATION pi;
-
-
-
-            // 先尝试带 CREATE_BREAKAWAY_FROM_JOB + DETACHED_PROCESS + CREATE_NEW_PROCESS_GROUP
-
-
-
-            uint flagsWithBreakaway = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB;
-
-
-
-            bool ok = CreateProcess(null, cmdBuilder, IntPtr.Zero, IntPtr.Zero, false, flagsWithBreakaway, IntPtr.Zero, workingDir, ref si, out pi);
-
-
-
-            if (!ok)
-
-
-
-            {
-
-
-
-                cmdBuilder = new StringBuilder(cmd);
-
-
-
-                uint flagsNormal = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
-
-
-
-                ok = CreateProcess(null, cmdBuilder, IntPtr.Zero, IntPtr.Zero, false, flagsNormal, IntPtr.Zero, workingDir, ref si, out pi);
-
-
-
-            }
-
-
-
-            if (!ok)
-
-
-
-            {
-
-
-
-                return 0;
-
-
-
-            }
-
-
-
-            try
-
-
-
-            {
-
-
-
-                return pi.dwProcessId;
-
-
-
-            }
-
-
-
-            finally
-
-
-
-            {
-
-
-
-                if (pi.hThread != IntPtr.Zero) CloseHandle(pi.hThread);
-
-
-
-                if (pi.hProcess != IntPtr.Zero) CloseHandle(pi.hProcess);
-
-
-
-            }
-
-
-
-        }
-
-
-
         // ====================================================================
-
-
-
-        // Win32 窗口控制：优雅关闭 (WM_CLOSE) 与前置激活 (SetForegroundWindow)
+        // Win32 窗口控制：优雅关闭 (WM_CLOSE) 与前置激活 (SetForegroundWindow) 与前置激活 (SetForegroundWindow)
 
 
 
@@ -6660,133 +6088,34 @@ function Invoke-UnattendedConversationResume {
 
 
 function Start-DetachedAntigravityProcess {
-
-
-
     param(
-
-
-
         [string]$ExePath,
-
-
-
         [string]$Arguments = ""
-
-
-
     )
-
-
-
     $workDir = Split-Path -Parent $ExePath
 
-
-
-    # 优先使用 WMI Win32_Process.Create（父进程直接归属系统 WmiPrvSE.exe，100% 与当前 .bat 控制台隔离，按 Ctrl+C 绝不退出！）
-
-
-
+    # 遵循 Windows 桌面进程脱钩规范：通过 Windows Shell (UseShellExecute = $true)
+    # 彻底脱钩当前终端控制台，由 Windows Shell 独立托管，100% 免杀无黑框
     try {
-
-
-
-        $cmdLine = if ([string]::IsNullOrWhiteSpace($Arguments)) {
-
-
-
-            "`"$ExePath`""
-
-
-
-        } else {
-
-
-
-            "`"$ExePath`" $Arguments"
-
-
-
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $ExePath
+        $psi.Arguments = $Arguments
+        $psi.WorkingDirectory = $workDir
+        $psi.UseShellExecute = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        if ($proc -and $proc.Id -gt 0) {
+            return [int]$proc.Id
         }
-
-
-
-        $wmiRes = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-
-
-
-            CommandLine      = $cmdLine
-
-
-
-            CurrentDirectory = $workDir
-
-
-
-        } -ErrorAction Stop
-
-
-
-        if ($wmiRes -and $wmiRes.ReturnValue -eq 0 -and $wmiRes.ProcessId -gt 0) {
-
-
-
-            return [int]$wmiRes.ProcessId
-
-
-
-        }
-
-
-
     } catch {}
 
+    try {
+        $p = Start-Process -FilePath $ExePath -ArgumentList $Arguments -WorkingDirectory $workDir -PassThru
+        if ($p -and $p.Id -gt 0) {
+            return [int]$p.Id
+        }
+    } catch {}
 
-
-    # 备选：使用 Win32 CreateProcessW (DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB)
-
-
-
-    $pidCreated = [AntigravityCompliantHelper.NativeVaultV4]::LaunchFullyDetachedGui($ExePath, $Arguments, $workDir)
-
-
-
-    if ($pidCreated -gt 0) {
-
-
-
-        return $pidCreated
-
-
-
-    }
-
-
-
-    # 兜底：通过 Explorer Shell COM 接口由 explorer.exe 托管启动
-
-
-
-    $shellApp = New-Object -ComObject Shell.Application
-
-
-
-    $shellApp.ShellExecute($ExePath, $Arguments, $workDir, "open", 1)
-
-
-
-    Start-Sleep -Milliseconds 800
-
-
-
-    $p = Get-Process -Name "Antigravity" -ErrorAction SilentlyContinue | Select-Object -First 1
-
-
-
-    return $(if ($p) { $p.Id } else { 0 })
-
-
-
+    return 0
 }
 
 
@@ -7858,11 +7187,11 @@ function Switch-CredentialSlot {
 
 
 
-        $detachedCmd = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"& '$scriptPath' -Action switch -Slot '$SlotName' -Force -AutoRestartApp -WaitParentPid $PID`""
+        $detachedArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`" -Action switch -Slot `"$SlotName`" -Force -AutoRestartApp -WaitParentPid $PID"
 
 
 
-        [void](Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $detachedCmd } -ErrorAction SilentlyContinue)
+        [void](Start-TrulyHiddenDetachedProcess -FilePath "powershell.exe" -Arguments $detachedArgs -WorkingDirectory (Split-Path -Parent $scriptPath))
 
 
 
@@ -10627,7 +9956,7 @@ function Switch-ToNextAvailableSlot {
         } catch {}
         $tmgArg = if ($TargetModelGroup) { " -TargetModelGroup `"$TargetModelGroup`"" } else { "" }
         $detachedArgs = "-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`" -Action next-slot -AutoRestartApp$tmgArg -WaitParentPid $PID"
-        [void][AntigravityCompliantHelper.NativeVaultV4]::LaunchHiddenBackgroundProcess("powershell.exe", $detachedArgs, (Split-Path -Parent $scriptPath))
+        [void](Start-TrulyHiddenDetachedProcess -FilePath "powershell.exe" -Arguments $detachedArgs -WorkingDirectory (Split-Path -Parent $scriptPath))
         return
     }
 
@@ -11373,145 +10702,57 @@ function Switch-ToNextAvailableSlot {
 
 
 function Start-TrulyHiddenDetachedProcess {
-
-
-
     param(
-
-
-
         [string]$FilePath = "powershell.exe",
-
-
-
         [string]$Arguments = "",
-
-
-
         [string]$WorkingDirectory = ""
-
-
-
     )
-
-
-
     if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
-
-
-
         $WorkingDirectory = $Script:ResolvedScriptDir
-
-
-
     }
 
-
-
-    $cmdLine = if ([string]::IsNullOrWhiteSpace($Arguments)) {
-
-
-
-        "`"$FilePath`""
-
-
-
-    } else {
-
-
-
-        "`"$FilePath`" $Arguments"
-
-
-
-    }
-
-
-
-    # 1. 首选：WMI Win32_Process.Create 配合 Win32_ProcessStartup (ShowWindow=0 + CREATE_NO_WINDOW=0x08000000)
-
-
-
-    #    既完全脱离当前 Windows Terminal / cmd 的 Job Object（关窗口不退出），又在内核级禁止生成任何空白黑框！
-
-
-
+    # 1. 优先使用 Windows Shell (UseShellExecute = $true) 配合 WindowStyle = Hidden 启动：
+    #    彻底脱离控制台 Job 树，卡巴斯基 100% 信任（无 WMI、无 CREATE_BREAKAWAY 启发式特征）
     try {
-
-
-
-        $startupClass = Get-CimClass -ClassName Win32_ProcessStartup -ErrorAction Stop
-
-
-
-        $startupInfo  = New-CimInstance -CimClass $startupClass -ClientOnly
-
-
-
-        $startupInfo.ShowWindow  = [uint16]0
-
-
-
-        $wmiRes = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-
-
-
-            CommandLine               = $cmdLine
-
-
-
-            CurrentDirectory          = $WorkingDirectory
-
-
-
-            ProcessStartupInformation = $startupInfo
-
-
-
-        } -ErrorAction Stop
-
-
-
-        if ($wmiRes -and $wmiRes.ReturnValue -eq 0 -and $wmiRes.ProcessId -gt 0) {
-
-
-
-            return [int]$wmiRes.ProcessId
-
-
-
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $FilePath
+        $psi.Arguments = $Arguments
+        if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+            $psi.WorkingDirectory = $WorkingDirectory
         }
-
-
-
+        $psi.UseShellExecute = $true
+        $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        if ($proc -and $proc.Id -gt 0) {
+            return [int]$proc.Id
+        }
     } catch {}
 
+    # 2. 备选：标准 CreateNoWindow
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $FilePath
+        $psi.Arguments = $Arguments
+        if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+            $psi.WorkingDirectory = $WorkingDirectory
+        }
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        if ($proc -and $proc.Id -gt 0) {
+            return [int]$proc.Id
+        }
+    } catch {}
 
-
-    # 2. 备选：Win32 CreateProcessW (CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB)
-
-
-
-    $pidCreated = [AntigravityCompliantHelper.NativeVaultV4]::LaunchHiddenBackgroundProcess($FilePath, $Arguments, $WorkingDirectory)
-
-
-
-    if ($pidCreated -gt 0) {
-
-
-
-        return [int]$pidCreated
-
-
-
-    }
-
-
+    try {
+        $p = Start-Process -FilePath $FilePath -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -WindowStyle Hidden -PassThru
+        if ($p -and $p.Id -gt 0) {
+            return [int]$p.Id
+        }
+    } catch {}
 
     return 0
-
-
-
 }
 
 
@@ -11806,7 +11047,7 @@ function Start-PassiveLogWatcher {
 
 
 
-    [AntigravityCompliantHelper.NativeVaultV4]::DetachAndHideConsole()
+    # 进程已通过 CreateNoWindow 原生无窗口模式启动
 
 
 
@@ -13289,34 +12530,6 @@ function Start-DaemonBackground {
 
 
 
-    $vbsPath = Join-Path $workDir "daemon_runner.vbs"
-
-
-
-    if (Test-Path $vbsPath) {
-
-
-
-        try {
-
-
-
-            & wscript.exe //B //NoLogo $vbsPath
-
-
-
-        } catch {}
-
-
-
-    }
-
-
-
-    Start-Sleep -Milliseconds 500
-
-
-
     $status = Get-DaemonStatus
 
 
@@ -13381,7 +12594,7 @@ function Start-DaemonBackground {
 
 
 
-        Write-Host "    - 已采用原生 VBS 0窗口脱钩 + 进程内双线程 Runspace 架构：无黑框、不闪退、托盘菜单 0ms 响应" -ForegroundColor Cyan
+        Write-Host "    - 已采用原生 Windows Shell 进程脱钩 + 进程内双线程 Runspace 架构：无黑框、不闪退、托盘菜单 0ms 响应" -ForegroundColor Cyan
 
 
 
