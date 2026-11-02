@@ -6861,7 +6861,19 @@ function Write-AllStoresForSnapshot {
     $email = if ($Snapshot.PSObject.Properties["detectedEmail"] -and $Snapshot.detectedEmail -notmatch '未检测|未解析') { [string]$Snapshot.detectedEmail } else { "" }
     $at = if ($Snapshot.PSObject.Properties["accessToken"]) { [string]$Snapshot.accessToken } else { "" }
     $rt = if ($Snapshot.PSObject.Properties["refreshToken"]) { [string]$Snapshot.refreshToken } else { "" }
-    $expSec = if ($Snapshot.PSObject.Properties["expiryTimestamp"] -and $Snapshot.expiryTimestamp) { [long]$Snapshot.expiryTimestamp } else { [long]0 }
+    $expSec = [long]0
+    if ($Snapshot.PSObject.Properties["expiryTimestamp"] -and $Snapshot.expiryTimestamp) {
+        $rawExp = [string]$Snapshot.expiryTimestamp
+        $parsedLong = 0L
+        if ([long]::TryParse($rawExp, [ref]$parsedLong)) {
+            $expSec = $parsedLong
+        } else {
+            $parsedDt = [DateTimeOffset]::MinValue
+            if ([DateTimeOffset]::TryParse($rawExp, [ref]$parsedDt)) {
+                $expSec = $parsedDt.ToUnixTimeSeconds()
+            }
+        }
+    }
     $idt = if ($Snapshot.PSObject.Properties["idToken"]) { [string]$Snapshot.idToken } else { "" }
     $pidVal = if ($Snapshot.PSObject.Properties["projectId"]) { [string]$Snapshot.projectId } else { "" }
 
