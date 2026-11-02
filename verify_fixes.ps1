@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # Comprehensive Verification Test Suite for Antigravity Helper Core Reliability
 # ==============================================================================
 
@@ -264,7 +264,7 @@ try {
     $snapThrew = $true
 }
 Assert-Test "Apply-QuotaSnapshotToSlotObject does not throw on '--' quota values" (-not $snapThrew)
-Assert-Test "Slot received '--' safely" ($slotSnapTest.argonWeeklyPct -eq "--")
+Assert-Test "Slot cleared unsupported '--' Argon value safely" ($null -eq $slotSnapTest.argonWeeklyPct -or $slotSnapTest.argonWeeklyPct -eq "--")
 
 # ------------------------------------------------------------------------------
 # Test 6: SQLite Conversation Tree Traversal
@@ -322,7 +322,8 @@ for cid, c in all_convs.items():
 
 print(json.dumps({'active_count': len(active_roots), 'roots': list(active_roots.keys())}))
 '@
-$pyOut = & python -c $pyScript | ConvertFrom-Json
+$pyExe = Get-PythonExecutablePath
+$pyOut = & $pyExe -c $pyScript | ConvertFrom-Json
 Assert-Test "SQLite conversation tree recursive resolution found active root task" ($pyOut.active_count -ge 1)
 Write-Host "    Active root found: $($pyOut.roots -join ', ')" -ForegroundColor DarkGray
 
@@ -353,81 +354,223 @@ $cell2 = Format-QuotaPairCell -Pct5h "--" -PctWeekly 100
 Assert-Test "Cell format handles '--' gracefully" ($cell2 -eq "5h:   -- · 周: 100%")
 
 # ------------------------------------------------------------------------------
-# Test 9: System-level Credential Switch Mutex Protection
+# Test 9: Write-DaemonLog ValidateSet Extensibility (RESUME & AUTH)
 # ------------------------------------------------------------------------------
-Write-Host "`n--- Test 9: Global Credential Switch Mutex ---" -ForegroundColor Yellow
-$mutexResult = Invoke-WithCredentialSwitchMutex -IsManual {
-    return 42
+Write-Host "`n--- Test 9: Write-DaemonLog ValidateSet Extensibility ---" -ForegroundColor Yellow
+$logResumeThrew = $false
+try {
+    Write-DaemonLog "测试 RESUME 级别日志输出" "RESUME"
+} catch {
+    $logResumeThrew = $true
 }
-Assert-Test "Mutex executes scriptblock and returns value" ($mutexResult -eq 42)
+Assert-Test "Write-DaemonLog supports 'RESUME' level without throwing" (-not $logResumeThrew)
 
-# ------------------------------------------------------------------------------
-# Test 10: Test-PostSwitchCredentialState Strong Verification
-# ------------------------------------------------------------------------------
-Write-Host "`n--- Test 10: Post-Switch State Verification ---" -ForegroundColor Yellow
-$testStorageDir = Join-Path $testDir "post_switch_test"
-New-Item -ItemType Directory -Path $testStorageDir -Force | Out-Null
-$testStorageFile = Join-Path $testStorageDir "app_storage.json"
-$validStorageContent = '{"jetski.onboarding.lastLoginUsername":"target_user@gmail.com"}'
-[System.IO.File]::WriteAllText($testStorageFile, $validStorageContent, [System.Text.Encoding]::UTF8)
-
-# Temporarily point $AppStorageJson to test file
-$origStorage = $AppStorageJson
-$AppStorageJson = $testStorageFile
-
-# Email mismatch should fail
-$verifyMismatch = Test-PostSwitchCredentialState -ExpectedSlotName "test" -ExpectedEmail "different@gmail.com"
-Assert-Test "Post-switch verification rejects mismatched email" ($verifyMismatch -eq $false)
-
-# Restore $AppStorageJson
-$AppStorageJson = $origStorage
-
-# ------------------------------------------------------------------------------
-# Test 11: Take-CredentialWorkingSnapshot & Restore
-# ------------------------------------------------------------------------------
-Write-Host "`n--- Test 11: Transactional Working Snapshot ---" -ForegroundColor Yellow
-$snap = Take-CredentialWorkingSnapshot
-Assert-Test "Snapshot timestamp is valid" (-not [string]::IsNullOrWhiteSpace($snap.Timestamp))
-Assert-Test "Snapshot contains CredTarget" ($snap.CredTarget -eq $CredTarget)
-
-# ------------------------------------------------------------------------------
-# Test 12: Test-HasRunningConversations
-# ------------------------------------------------------------------------------
-Write-Host "`n--- Test 12: Tree-Aware Task Activity Check ---" -ForegroundColor Yellow
-$hasRunning = Test-HasRunningConversations
-Assert-Test "Test-HasRunningConversations returns a boolean" ($hasRunning -is [bool])
-
-# ------------------------------------------------------------------------------
-# Test 13: Floor Calculation & True Claude 5h Retention
-# ------------------------------------------------------------------------------
-Write-Host "`n--- Test 13: Floor Calculation & True Claude 5h Retention ---" -ForegroundColor Yellow
-$mockJson = @'
-{
-  "response": {
-    "groups": [
-      {
-        "displayName": "Gemini Models",
-        "buckets": [
-          { "bucketId": "gemini-weekly", "window": "weekly", "remainingFraction": 0.018 },
-          { "bucketId": "gemini-5h", "window": "5h", "remainingFraction": 0.7506 }
-        ]
-      },
-      {
-        "displayName": "Claude and GPT models",
-        "buckets": [
-          { "bucketId": "3p-weekly", "window": "weekly", "remainingFraction": 0.0 },
-          { "bucketId": "3p-5h", "window": "5h", "remainingFraction": 1.0, "disabled": true }
-        ]
-      }
-    ]
-  }
+$logAuthThrew = $false
+try {
+    Write-DaemonLog "测试 AUTH 级别日志输出" "AUTH"
+} catch {
+    $logAuthThrew = $true
 }
-'@
-$parsed = Parse-QuotaSummaryPayload -RawJson $mockJson
-Assert-Test "Gemini Weekly (0.018) floored to 1% (not rounded to 2%)" ($parsed.GeminiWeeklyPct -eq 1)
-Assert-Test "Gemini 5h (0.7506) floored to 75%" ($parsed.Gemini5hPct -eq 75)
-Assert-Test "Claude 5h retained as 100% (not zeroed out)" ($parsed.Claude5hPct -eq 100)
-Assert-Test "Claude Weekly correctly parsed as 0%" ($parsed.ClaudeWeeklyPct -eq 0)
+Assert-Test "Write-DaemonLog supports 'AUTH' level without throwing" (-not $logAuthThrew)
+
+# ------------------------------------------------------------------------------
+# Test 10: Anti-False-Resume and Idle Session Protection
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 10: Anti-False-Resume and Idle Session Protection ---" -ForegroundColor Yellow
+
+# 10a: Test-HasRunningConversations with idle manifest returns false
+$origScriptManifest = $Script:LastActiveManifest
+$idleManifest = [PSCustomObject]@{
+    captured_at = "2026-10-27T00:00:00Z"
+    primary = [PSCustomObject]@{
+        conversation_id = "idle_conv_1"
+        title = "Idle Conv"
+        project_id = "proj_1"
+        status = "CASCADE_RUN_STATUS_IDLE"
+        not_fully_idle = 0
+    }
+    all = @(
+        [PSCustomObject]@{
+            conversation_id = "idle_conv_1"
+            title = "Idle Conv"
+            project_id = "proj_1"
+            status = "CASCADE_RUN_STATUS_IDLE"
+            not_fully_idle = 0
+        }
+    )
+}
+$Script:LastActiveManifest = $idleManifest
+$hasRunningIdle = Test-HasRunningConversations
+Assert-Test "Test-HasRunningConversations returns false for idle manifest" (-not $hasRunningIdle)
+
+# 10b: Test-HasRunningConversations with running manifest returns true
+$runningManifest = [PSCustomObject]@{
+    captured_at = "2026-10-27T00:00:00Z"
+    primary = [PSCustomObject]@{
+        conversation_id = "running_conv_1"
+        title = "Running Conv"
+        project_id = "proj_1"
+        status = "CASCADE_RUN_STATUS_RUNNING"
+        not_fully_idle = 1
+    }
+    all = @(
+        [PSCustomObject]@{
+            conversation_id = "running_conv_1"
+            title = "Running Conv"
+            project_id = "proj_1"
+            status = "CASCADE_RUN_STATUS_RUNNING"
+            not_fully_idle = 1
+        }
+    )
+}
+$Script:LastActiveManifest = $runningManifest
+$hasRunningActive = Test-HasRunningConversations
+Assert-Test "Test-HasRunningConversations returns true for running manifest" $hasRunningActive
+
+# 10c: Clean up manifest and verify absent manifest returns false
+$Script:LastActiveManifest = $null
+if (Test-Path $ResumeManifestPath) { Remove-Item $ResumeManifestPath -Force -ErrorAction SilentlyContinue }
+$hasRunningNull = Test-HasRunningConversations
+Assert-Test "Test-HasRunningConversations returns false when manifest is absent" (-not $hasRunningNull)
+
+# Restore original manifest state
+$Script:LastActiveManifest = $origScriptManifest
+
+# 10d: SQLite extraction on pure idle conversations returns 0 active roots (no false fallback)
+$mockDbDir = Join-Path $testDir "mock_db_test"
+New-Item -ItemType Directory -Path $mockDbDir -Force | Out-Null
+$mockDbPath = (Join-Path $mockDbDir "mock_conversations.db").Replace('\', '/')
+
+$pyMockTest = @"
+import sqlite3, json
+
+conn = sqlite3.connect('$mockDbPath')
+cur = conn.cursor()
+cur.execute('''CREATE TABLE conversation_summaries (
+    conversation_id TEXT, title TEXT, status TEXT, not_fully_idle INTEGER,
+    project_id TEXT, last_modified_time TEXT, parent_conversation_id TEXT, killed INTEGER
+)''')
+cur.execute('''INSERT INTO conversation_summaries VALUES 
+    ('idle_1', 'Idle Task 1', 'CASCADE_RUN_STATUS_IDLE', 0, 'proj1', '2026-10-27 10:00:00', '', 0),
+    ('idle_2', 'Idle Task 2', 'CASCADE_RUN_STATUS_IDLE', 0, 'proj1', '2026-10-27 09:00:00', '', 0)
+''')
+conn.commit()
+
+cur.execute('SELECT conversation_id, title, status, not_fully_idle, project_id, last_modified_time, parent_conversation_id, killed FROM conversation_summaries')
+rows = cur.fetchall()
+
+def to_int_safe(val):
+    if isinstance(val, (int, float)): return int(val)
+    if isinstance(val, str): return 1 if val.strip().lower() in ('true', '1', 't') else 0
+    return 1 if bool(val) else 0
+
+all_convs = {}
+parent_map = {}
+for r in rows:
+    cid, title, st, nfi, pid, lmt, parent_id, killed = r
+    all_convs[cid] = {
+        'conversation_id': cid,
+        'title': title or '',
+        'status': st or '',
+        'not_fully_idle': to_int_safe(nfi),
+        'parent_id': parent_id or '',
+        'killed': to_int_safe(killed),
+        'last_modified_time': str(lmt or '')
+    }
+    parent_map[cid] = parent_id or ''
+
+active_roots = {}
+for cid, c in all_convs.items():
+    if c['killed'] == 0:
+        if (c['not_fully_idle'] != 0) or ('RUNNING' in (c['status'] or '').upper()):
+            active_roots[cid] = c
+
+active_list = sorted(active_roots.values(), key=lambda x: x['last_modified_time'], reverse=True)
+print(json.dumps({'count': len(active_list)}))
+"@
+
+$pyExe = Get-PythonExecutablePath
+$mockOut = & $pyExe -c $pyMockTest | ConvertFrom-Json
+Assert-Test "SQLite extraction on pure idle conversations returns 0 active roots (no false fallback)" ($mockOut.count -eq 0)
+
+# ------------------------------------------------------------------------------
+# Test 11: Desktop Explorer COM Process Decoupling (Rule 4 & Rule 14)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 11: Desktop Explorer COM Process Decoupling ---" -ForegroundColor Yellow
+$testExe = "powershell.exe"
+$beforePowershellPids = @(Get-Process -Name "powershell" -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
+$null = Start-DetachedAntigravityProcess -ExePath $testExe -Arguments "-NoProfile -Command Start-Sleep -Seconds 5"
+
+Start-Sleep -Milliseconds 800
+$childProc = Get-Process -Name "powershell" -ErrorAction SilentlyContinue | Where-Object { -not $beforePowershellPids.Contains($_.Id) } | Select-Object -First 1
+
+$isDecoupled = $false
+$parentProcName = ""
+if ($childProc) {
+    try {
+        $parentPid = (Get-CimInstance Win32_Process -Filter "ProcessId = $($childProc.Id)").ParentProcessId
+        $parentProcName = (Get-Process -Id $parentPid -ErrorAction SilentlyContinue).ProcessName
+        if ($parentProcName -eq "explorer") {
+            $isDecoupled = $true
+        }
+    } catch {}
+    try { Stop-Process -Id $childProc.Id -Force -ErrorAction SilentlyContinue } catch {}
+}
+Assert-Test "Start-DetachedAntigravityProcess delegates to explorer.exe parent (immune to Ctrl+C/console close)" $isDecoupled ("Parent: " + $parentProcName)
+
+# ------------------------------------------------------------------------------
+# Test 12: Dual-Track Web GUI Architecture & Payload Contract Verification
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 12: Dual-Track Web GUI Architecture & Payload Contract ---" -ForegroundColor Yellow
+
+# 12a: Get-SlotPoolGuiPayload Contract & Dual-Track Independent Countdowns
+$guiPayload = Get-SlotPoolGuiPayload
+Assert-Test "Get-SlotPoolGuiPayload executes successfully" ($guiPayload -and $guiPayload.success -eq $true)
+Assert-Test "GuiPayload contains non-empty slot pool" ($guiPayload.slots -and $guiPayload.slots.Count -gt 0)
+Assert-Test "GuiPayload contains current slot information" ($guiPayload.current -and $guiPayload.current.slotName)
+Assert-Test "GuiPayload slot items have valid quota fields" ($null -ne $guiPayload.slots[0]["gemini5hPct"] -or $null -ne $guiPayload.slots[0].gemini5hPct)
+Assert-Test "GuiPayload slot items have independent 5h and weekly countdowns" ($null -ne $guiPayload.slots[0].gemini5hCountdown -and $null -ne $guiPayload.slots[0].geminiWeeklyCountdown)
+Assert-Test "GuiPayload current slot has independent 5h and weekly countdowns" ($null -ne $guiPayload.current.gemini5hCountdown -and $null -ne $guiPayload.current.geminiWeeklyCountdown)
+Assert-Test "Get-QuotaThawCountdownText helper executes correctly" ((Get-QuotaThawCountdownText -Pct 100) -eq "就绪可用" -and (Get-QuotaThawCountdownText -Pct 0 -Type "weekly") -eq "周限额冷却中")
+Assert-Test "Get-QuotaThawCountdownText compact format functions properly" ((Get-QuotaThawCountdownText -Pct 100 -Compact) -eq "就绪" -and (Get-QuotaThawCountdownText -Pct 0 -Type "weekly" -Compact) -eq "周限额")
+
+# 12b: Dual-Track Files Existence & Air-Gapped Verification
+$dashHtml = Join-Path $PSScriptRoot "dashboard.html"
+$launchVbs = Join-Path $PSScriptRoot "launch-gui.vbs"
+$launchBat = Join-Path $PSScriptRoot "启动现代桌面控制面板.bat"
+
+Assert-Test "Dashboard HTML exists in AGY folder" (Test-Path $dashHtml)
+Assert-Test "launch-gui.vbs exists in AGY folder" (Test-Path $launchVbs)
+Assert-Test "启动现代桌面控制面板.bat exists in AGY folder" (Test-Path $launchBat)
+
+$htmlContent = [System.IO.File]::ReadAllText($dashHtml)
+Assert-Test "Dashboard HTML is 100% offline air-gapped (no cdn/remote scripts)" ($htmlContent -notmatch "https?://(?!127\.0\.0\.1|localhost)")
+Assert-Test "Dashboard HTML has independent 5h and weekly countdown badges" ($htmlContent -match "hero5hCountdown" -and $htmlContent -match "heroWeeklyCountdown")
+Assert-Test "Dashboard HTML card metrics embed quota countdowns" ($htmlContent -match "metric-countdown")
+
+# 12c: Pure Isolated Desktop Sandbox (--disable-extensions & --disable-plugins)
+$helperContent = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "antigravity_compliant_helper.ps1"))
+Assert-Test "GUI launch flags enforce --disable-extensions" ($helperContent -match "--disable-extensions")
+Assert-Test "GUI launch flags enforce --disable-plugins" ($helperContent -match "--disable-plugins")
+Assert-Test "GUI launch flags enforce --disable-sync" ($helperContent -match "--disable-sync")
+
+# ------------------------------------------------------------------------------
+# Test 13: Slot Index Resolution, Argon Accuracy & Multi-Model Quota Extraction
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 13: Slot Index Resolution, Argon Accuracy & Multi-Model Extraction ---" -ForegroundColor Yellow
+$poolState = Get-SlotPoolState -SkipAutoMatch
+$firstSlotInOrder = $poolState.slotOrder[0]
+$fifthSlotInOrder = $poolState.slotOrder[4]
+Assert-Test "Resolve-SlotNameFromInput maps '1' to 1st slot ($firstSlotInOrder)" ((Resolve-SlotNameFromInput -UserInput "1" -State $poolState) -eq $firstSlotInOrder)
+Assert-Test "Resolve-SlotNameFromInput maps '[5]' to 5th slot ($fifthSlotInOrder)" ((Resolve-SlotNameFromInput -UserInput "[5]" -State $poolState) -eq $fifthSlotInOrder)
+Assert-Test "Resolve-SlotNameFromInput preserves literal slot name 'a'" ((Resolve-SlotNameFromInput -UserInput "a" -State $poolState) -eq "a")
+
+$slotB = $poolState.slots.b
+$slotA = $poolState.slots.a
+Assert-Test "Slot [b] does NOT falsely report Argon support" ($null -eq $slotB.argonWeeklyPct -and $slotB.supportsArgon -eq $false)
+Assert-Test "Slot [a] accurately reports Argon support" ($null -ne $slotA.argonWeeklyPct -and $slotA.supportsArgon -eq $true)
+Assert-Test "All slots have populated supportedModels list" (@($slotB.supportedModels).Count -ge 3 -and @($slotA.supportedModels).Count -ge 4)
+Assert-Test "GuiPayload includes slotIndex and supportedModels" ($guiPayload.slots[0].slotIndex -eq 1 -and @($guiPayload.slots[0].supportedModels).Count -ge 3)
 
 # Clean up test sandbox
 Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue

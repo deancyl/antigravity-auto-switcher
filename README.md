@@ -1,6 +1,6 @@
 # Antigravity Auto Switcher (AGY 官方原生合规多账号智能轮换与原会话无损续接助手) 🚀
 
-[![Version](https://img.shields.io/badge/Release-v0.2.1-blue.svg)](https://github.com/deancyl/antigravity-auto-switcher/releases)
+[![Version](https://img.shields.io/badge/Release-v0.3.0-blue.svg)](https://github.com/deancyl/antigravity-auto-switcher/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](https://microsoft.com)
 [![Protocol](https://img.shields.io/badge/Protocol-Zero--CDP%20Native%20Connect--RPC-success.svg)](https://github.com/deancyl/antigravity-auto-switcher)
 [![Compliance](https://img.shields.io/badge/Compliance-100%25%20Official%20Native%20(No%20Proxy)-green.svg)](https://github.com/deancyl/antigravity-auto-switcher)
@@ -71,16 +71,24 @@
 9. **纯只读状态探测**：状态查看完全剔除剪贴板篡改与菜单自动拉起守护的副作用；
 10. **安全密钥掩码与 Python 子进程超时防卡死**：API Key 交互输入支持 `-AsSecureString` 掩码；会话数据库读取子进程配置 5 秒硬超时与自动 Kill 保护。
 
-### 6. 💎 v0.2.1 底层可靠性纵深强化与交互操作台重构 (8 项核心缺陷根治)
-针对外部高标准架构审计与企业级连续无人值守运行诉求，v0.2.1 针对底层 I/O、存储事务、并发判定、时区与控制台交互实施了系统性根治：
-1. **Win32 `MoveFileExW` 操作系统内核级真·原子文件替换**：内联引入 `kernel32.dll!MoveFileExW`（`MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`），废除先 Delete 再 Move 的伪原子方案，彻底免疫进程崩溃、并发争用或断电引起的 0 字节损坏；
-2. **切号存储强一致性校验与全量事务回滚**：切号写入 Windows 凭据、`app_storage.json` 与 CLI 凭据后立即执行双向回读指纹与登录邮箱校验，一旦指纹不一致立即自动全量原子回滚并抛出致命异常，绝不吞错静默失效；
-3. **C# 语法树 JSON 递归下降解析校验与现场隔离备份**：配置修复时改写前无条件生成 `.bak` 备份；采用 C# 语法级递归下降状态机替代脆弱的正则，检测损坏文件完整保留现场为 `.corrupt.<timestamp>.bak`，禁止盲目覆写与暴力擦除；
-4. **SQLite 会话树全链路递归活跃判定 (Cascade Tree Search)**：深度递归遍历整个会话与子任务树，只要任意子孙节点包含 `not_fully_idle != 0` 或 `RUNNING` 状态，即准确标记整棵树活跃（`CASCADE_RUN_STATUS_RUNNING`），彻底杜绝轮询中途误杀；
-5. **Argon 配额优先解冻与类型安全防漂移**：配额评估前优先检测云端 `resetTime`，到期毫秒级自动解冻恢复为 100%；引入 `ConvertTo-SafeInt` 与 `ConvertTo-LocalDateTime`，彻底解决空值、`--` 强转异常与本地/UTC 8 小时时区漂移；
-6. **接力档案模板转义纠正**：修复 `New-WorkspaceHandoverFile` here-string 与反引号转义冲突，消除 `\text` 制表符乱码，确保接力文档完美渲染；
-7. **交互操作台降噪与高频看板重构**：默认隐藏 6 个客户端 PID 列表与内部 RPC 端口（支持 `-ShowDiagnostics` 呼出），顶部呈现 4 项核心状态（守护状态、账号与模型、实时额度、数据新鲜度），表格宽度严格约束在 95 列内杜绝换行折叠，状态明确为 `★ 使用中`、`就绪 (可用)`、`5h限额`、`周限额`、`不支持`，危险重置操作增加显式二次确认；
-8. **PowerShell 5.1 / 7 (Core) 双引擎 53 项自动化回归验证**：配备完整的回归自动化测试套件 `verify_fixes.ps1`，双引擎全量通过。
+### 6. 💎 双轨架构全面演进与现代桌面控制台 (v0.3.0 核心突破)
+针对现代桌面交互、纯净离线隔离、精细化多模型配额与多账号序号切换，v0.3.0 带来重大架构跃迁：
+1. **双轨架构与现代桌面控制台 (Web GUI 独立视窗)**：
+   - 轨 1 (经典高频控制台 TUI 模式) 与 轨 2 (Edge App 纯净无插件独立桌面面板) 完美互通；
+   - 采用纯本地离线沙箱（Air-Gapped，零公网 CDN/外链加载），彻底隔绝公网泄露；
+   - 启动自动挂载 `--disable-extensions --disable-plugins --disable-sync`，实现 **0 插件干扰、秒级极速唤出**。
+2. **槽位序号与名称全双模输入**：
+   - 手动切号 `[2]`、重置冷却 `[8]`、删除槽位 `[D]` 全面支持输入 `#1` ~ `#6` 纯数字序号，告别繁琐英文槽位字母输入，同时向下兼容槽位字母。
+3. **真实多模型家族配额与 Argon 权限穿透识别**：
+   - 深度支持同时并发调用 `retrieveUserQuotaSummary` 与 `fetchAvailableModels`；
+   - 精准区分并呈现每个账号支持的模型家族清单（`Gemini 3.8 Flash`, `Gemini 2.5 Pro`, `Claude 5.5 / 4.6`, `GPT-OSS 120B`, `Gemini 4 Argon`）；
+   - 彻底修复非白名单账号虚假标记含有 Argon 的缺陷，仅在真实支持 Argon 的账号展示专属配额。
+4. **5小时与周配额独立双轨冷却倒计时**：
+   - 全面解耦 Gemini 5h 与 Claude 5h 冷却计时器，杜绝时间戳串扰；
+   - 满额（100%）未消耗时智能抑制 Google 滚动窗口虚假倒计时，准确显示“就绪可用”；
+   - 超时异常 5h 时间戳（>5.5h）自动清洗，实现真·动态解冻。
+5. **84 项全链路自动化回归测试 (84 PASSED, 0 FAILED)**：
+   - 覆盖内核原子写、DPAPI 事务、双模序号解析、离线沙箱隔离、多模型类型校验等核心场景。
 
 ---
 
@@ -88,7 +96,10 @@
 
 ```text
 ├── antigravity_compliant_helper.ps1   # 核心 PowerShell 5.1/7 双引擎合规切换与守护引擎
-├── verify_fixes.ps1                   # 53 项底层可靠性与控制台全量自动化回归测试套件
+├── dashboard.html                     # 纯本地离线双轨现代桌面控制面板 (Air-Gapped Web GUI)
+├── launch-gui.vbs                     # 现代控制面板桌面静默引导器 (0 闪退/防端口未就绪)
+├── 启动现代桌面控制面板.bat             # 一键唤出纯净独立 Edge App 控制台
+├── verify_fixes.ps1                   # 84 项底层可靠性与全链路自动化回归测试套件
 ├── 开启自动切号守护.bat                 # 一键启动后台无窗口守护进程与系统托盘图标
 ├── 停止自动切号守护.bat                 # 一键停止后台守护进程
 ├── 查看自动切号状态与槽位池.bat         # 呼出实时全账号配额看板与交互式控制台
