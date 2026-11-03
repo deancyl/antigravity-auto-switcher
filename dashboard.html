@@ -7,11 +7,11 @@
     <style>
         :root {
             --bg-base: #0a0e17;
-            --bg-card: rgba(18, 25, 42, 0.75);
-            --bg-card-hover: rgba(26, 36, 60, 0.85);
+            --bg-card: rgba(18, 25, 42, 0.78);
+            --bg-card-hover: rgba(26, 36, 60, 0.88);
             --bg-active-card: rgba(16, 185, 129, 0.08);
             --border-card: rgba(255, 255, 255, 0.08);
-            --border-active: rgba(16, 185, 129, 0.35);
+            --border-active: rgba(16, 185, 129, 0.38);
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
@@ -35,72 +35,35 @@
             -webkit-user-select: none;
         }
 
+        /* R2.1 视窗自适应硬锁与紧凑布局 */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
             background-color: var(--bg-base);
             color: var(--text-primary);
-            min-height: 100vh;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
             background-image: 
                 radial-gradient(circle at 15% 15%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
                 radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
         }
 
-        /* 顶部导航 */
+        /* 顶部紧凑导航栏 */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 14px 28px;
-            background: rgba(10, 14, 23, 0.85);
+            padding: 8px 20px;
+            background: rgba(10, 14, 23, 0.88);
             backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border-card);
-            position: sticky;
-            top: 0;
+            flex-shrink: 0;
             z-index: 100;
         }
 
         .brand-box {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        .brand-logo {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #0ea5e9, #10b981);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            font-weight: 800;
-            color: #ffffff;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-            flex-shrink: 0;
-        }
-
-        .brand-title {
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            color: #ffffff;
-            white-space: nowrap;
-        }
-
-        .brand-subtitle {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-top: 1px;
-            white-space: nowrap;
-        }
-
-        .header-actions {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -108,13 +71,50 @@
             flex-shrink: 0;
         }
 
+        .brand-logo {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #0ea5e9, #10b981);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 800;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            flex-shrink: 0;
+        }
+
+        .brand-title {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            color: #ffffff;
+            white-space: nowrap;
+        }
+
+        .brand-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
         .pill-badge {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 11px;
             font-weight: 600;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-card);
@@ -134,46 +134,69 @@
             border-color: rgba(245, 158, 11, 0.3);
         }
 
+        .pill-badge.interactive {
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .pill-badge.interactive:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
         .pulse-dot {
-            width: 7px;
-            height: 7px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             background-color: currentColor;
-            box-shadow: 0 0 8px currentColor;
+            box-shadow: 0 0 6px currentColor;
             animation: pulse-ring 2s infinite ease-in-out;
             flex-shrink: 0;
         }
 
         @keyframes pulse-ring {
             0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.4; transform: scale(0.85); }
+            50% { opacity: 0.35; transform: scale(0.8); }
         }
 
         .btn-icon {
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid var(--border-card);
             color: var(--text-primary);
-            padding: 6px 13px;
-            border-radius: 8px;
+            padding: 5px 11px;
+            border-radius: 7px;
             cursor: pointer;
             font-size: 12px;
             font-weight: 500;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            transition: all 0.2s ease;
+            gap: 5px;
+            transition: all 0.18s ease;
             white-space: nowrap;
             flex-shrink: 0;
         }
 
         .btn-icon:hover {
             background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.22);
             transform: translateY(-1px);
         }
 
         .btn-icon:active {
             transform: translateY(0);
+        }
+
+        .btn-icon.btn-boost {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(239, 68, 68, 0.25));
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+            font-weight: 600;
+        }
+
+        .btn-icon.btn-boost:hover {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(239, 68, 68, 0.4));
+            border-color: #fbbf24;
+            box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
         }
 
         .btn-primary {
@@ -186,35 +209,38 @@
 
         .btn-primary:hover {
             background: linear-gradient(135deg, #0369a1, #047857);
-            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45);
+            box-shadow: 0 3px 12px rgba(2, 132, 199, 0.45);
         }
 
         /* 主体布局 */
         main {
             flex: 1;
-            padding: 20px 28px;
-            max-width: 1360px;
+            min-height: 0;
+            overflow: hidden;
+            padding: 8px 18px;
+            max-width: 1440px;
             width: 100%;
             margin: 0 auto;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 8px;
         }
 
         /* 顶部 Hero 卡片 */
         .hero-banner {
             background: var(--bg-card);
             border: 1px solid var(--border-card);
-            border-radius: 16px;
-            padding: 20px 24px;
+            border-radius: 12px;
+            padding: 10px 18px;
             backdrop-filter: blur(12px);
             display: grid;
             grid-template-columns: 1fr auto;
             align-items: center;
-            gap: 24px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+            gap: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
             position: relative;
             overflow: hidden;
+            flex-shrink: 0;
         }
 
         .hero-banner::before {
@@ -228,13 +254,13 @@
         .hero-info {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 6px;
         }
 
         .hero-slot-tag {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             white-space: nowrap;
         }
 
@@ -242,30 +268,30 @@
             background: linear-gradient(135deg, #10b981, #059669);
             color: #ffffff;
             font-weight: 800;
-            font-size: 15px;
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+            font-size: 14px;
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
             flex-shrink: 0;
         }
 
         .hero-email {
-            font-size: 18px;
+            font-size: 15px;
             font-weight: 700;
             color: #ffffff;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.2px;
         }
 
         .hero-fingerprint {
             font-size: 11px;
             color: var(--text-muted);
             background: rgba(255, 255, 255, 0.05);
-            padding: 2px 8px;
-            border-radius: 6px;
+            padding: 2px 7px;
+            border-radius: 5px;
             border: 1px solid var(--border-card);
             white-space: nowrap;
         }
@@ -273,30 +299,30 @@
         .hero-meta-row {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 14px;
             flex-wrap: wrap;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
         }
 
         .hero-meta-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             white-space: nowrap;
         }
 
         .hero-bars {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            min-width: 320px;
+            gap: 8px;
+            min-width: 300px;
         }
 
         .hero-bar-group {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
 
         .hero-bar-label {
@@ -309,38 +335,40 @@
         }
 
         .progress-track {
-            height: 7px;
+            height: 6px;
             background: rgba(255, 255, 255, 0.06);
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
             position: relative;
         }
 
         .progress-fill {
             height: 100%;
-            border-radius: 4px;
-            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 3px;
+            transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .progress-fill.green { background: linear-gradient(90deg, #10b981, #34d399); }
         .progress-fill.yellow { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
         .progress-fill.red { background: linear-gradient(90deg, #ef4444, #f87171); }
+        .progress-fill.neutral { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
 
         /* 全池宏观水位大盘 (Pool Runway Strip) */
         .runway-strip {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 14px;
+            gap: 8px;
+            flex-shrink: 0;
         }
 
         .runway-card {
             background: rgba(18, 25, 42, 0.6);
             border: 1px solid var(--border-card);
-            border-radius: 12px;
-            padding: 12px 16px;
+            border-radius: 10px;
+            padding: 8px 12px;
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 10px;
             backdrop-filter: blur(8px);
             transition: all 0.2s ease;
         }
@@ -351,13 +379,13 @@
         }
 
         .runway-icon-box {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 14px;
             flex-shrink: 0;
         }
 
@@ -369,13 +397,13 @@
         .runway-body {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 1px;
             overflow: hidden;
             white-space: nowrap;
         }
 
         .runway-title {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -383,17 +411,17 @@
         }
 
         .runway-val {
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 700;
             color: #ffffff;
             display: flex;
             align-items: baseline;
-            gap: 5px;
+            gap: 4px;
             white-space: nowrap;
         }
 
         .runway-sub {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-secondary);
             font-weight: normal;
         }
@@ -404,52 +432,56 @@
             align-items: center;
             justify-content: space-between;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 8px;
+            flex-shrink: 0;
         }
 
         .section-heading {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
             color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 0.6px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             white-space: nowrap;
         }
 
         .toolbar-btns {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }
 
         .view-controls {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             white-space: nowrap;
             flex-shrink: 0;
         }
 
+        /* 模型视角切换器 */
+        .perspective-chip-group,
         .filter-chip-group {
             display: flex;
             align-items: center;
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border-card);
-            border-radius: 8px;
+            border-radius: 7px;
             padding: 2px;
             gap: 2px;
         }
 
+        .perspective-btn,
         .filter-btn {
             background: transparent;
             border: none;
             color: var(--text-muted);
-            padding: 4px 10px;
-            border-radius: 6px;
+            padding: 3px 8px;
+            border-radius: 5px;
             font-size: 11px;
             font-weight: 600;
             cursor: pointer;
@@ -457,48 +489,84 @@
             white-space: nowrap;
         }
 
+        .perspective-btn:hover,
         .filter-btn:hover {
             color: var(--text-primary);
         }
 
+        .perspective-btn.active,
         .filter-btn.active {
             background: rgba(255, 255, 255, 0.12);
             color: #ffffff;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
         }
 
+        /* R2.1 卡片网格独立滚动容器 */
+        .slot-grid-container {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 4px;
+        }
+
+        .slot-grid-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .slot-grid-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 3px;
+        }
+
+        .slot-grid-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
         /* 槽位池卡片网格 */
         .slot-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-            gap: 18px;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 12px;
+            padding-bottom: 6px;
+        }
+
+        /* 紧凑模式 */
+        .slot-grid.compact-mode {
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 8px;
         }
 
         .slot-card {
             background: var(--bg-card);
             border: 1px solid var(--border-card);
-            border-radius: 14px;
-            padding: 16px 18px;
+            border-radius: 12px;
+            padding: 12px 14px;
             backdrop-filter: blur(8px);
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            transition: all 0.25s ease;
+            gap: 10px;
+            transition: all 0.2s ease;
             position: relative;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .slot-grid.compact-mode .slot-card {
+            padding: 8px 10px;
+            gap: 6px;
         }
 
         .slot-card:hover {
             background: var(--bg-card-hover);
             border-color: rgba(255, 255, 255, 0.16);
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
         }
 
         .slot-card.active-slot {
             background: var(--bg-active-card);
             border-color: var(--border-active);
-            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.18);
+            box-shadow: 0 4px 18px rgba(16, 185, 129, 0.18);
         }
 
         .slot-card.is-skipped {
@@ -517,19 +585,19 @@
         .slot-title-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 7px;
             overflow: hidden;
             white-space: nowrap;
         }
 
         .slot-letter-badge {
-            min-width: 44px;
-            padding: 0 8px;
-            height: 26px;
-            border-radius: 6px;
+            min-width: 40px;
+            padding: 0 6px;
+            height: 24px;
+            border-radius: 5px;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.12);
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             color: #fff;
             display: flex;
@@ -546,10 +614,10 @@
         }
 
         .slot-email-text {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-primary);
-            max-width: 175px;
+            max-width: 170px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -564,19 +632,19 @@
         .slot-header-tags {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             white-space: nowrap;
             flex-shrink: 0;
         }
 
         .status-chip {
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 11px;
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-size: 10px;
             font-weight: 700;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
             white-space: nowrap;
             flex-shrink: 0;
         }
@@ -598,12 +666,17 @@
 
         .model-pill {
             font-size: 10px;
-            padding: 1px 6px;
+            padding: 1px 5px;
             border-radius: 4px;
             background: rgba(255, 255, 255, 0.05);
             color: var(--text-secondary);
             border: 1px solid rgba(255, 255, 255, 0.08);
             white-space: nowrap;
+        }
+
+        .slot-grid.compact-mode .model-pill {
+            font-size: 9px;
+            padding: 1px 4px;
         }
 
         .model-pill.special {
@@ -617,17 +690,22 @@
         .slot-metrics {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
             background: rgba(0, 0, 0, 0.2);
-            padding: 10px 12px;
+            padding: 8px 10px;
             border-radius: 8px;
             border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .slot-grid.compact-mode .slot-metrics {
+            padding: 5px 8px;
+            gap: 5px;
         }
 
         .metric-row {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
 
         .metric-label-row {
@@ -649,9 +727,10 @@
         .metric-val {
             font-weight: 700;
             color: #ffffff;
-            font-size: 12px;
+            font-size: 11px;
         }
 
+        /* R2.3 / R2.4 配额状态语义区分样式 */
         .metric-countdown {
             font-size: 10px;
             font-weight: 600;
@@ -664,27 +743,32 @@
             white-space: nowrap;
         }
 
+        /* 剩余额度 > 20%: 显示中性冷灰/青色正常刷新提示 */
         .metric-countdown.ready {
-            color: #34d399;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: #38bdf8;
+            background: rgba(14, 165, 233, 0.1);
+            border: 1px solid rgba(14, 165, 233, 0.25);
         }
 
-        .metric-countdown.cooldown {
+        /* 剩余额度 <= 20%: 显示黄色预警 */
+        .metric-countdown.warning {
             color: #fbbf24;
-            background: rgba(245, 158, 11, 0.12);
-            border: 1px solid rgba(245, 158, 11, 0.3);
+            background: rgba(245, 158, 11, 0.14);
+            border: 1px solid rgba(245, 158, 11, 0.35);
         }
 
+        /* 剩余额度 <= 1%: 显示红色限额冷却 */
+        .metric-countdown.cooldown,
         .metric-countdown.exhausted {
             color: #f87171;
-            background: rgba(239, 68, 68, 0.12);
-            border: 1px solid rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.14);
+            border: 1px solid rgba(239, 68, 68, 0.35);
         }
 
         .metric-countdown.muted {
             color: var(--text-muted);
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         /* 折叠抽屉：其他模型配额 */
@@ -708,11 +792,11 @@
         .other-models-drawer {
             display: none;
             flex-direction: column;
-            gap: 8px;
-            margin-top: 6px;
-            padding-top: 6px;
+            gap: 6px;
+            margin-top: 4px;
+            padding-top: 4px;
             border-top: 1px solid rgba(255, 255, 255, 0.05);
-            animation: fadeIn 0.2s ease-in-out;
+            animation: fadeIn 0.18s ease-in-out;
         }
 
         .other-models-drawer.open {
@@ -724,29 +808,58 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* 卡片底部操作与状态 */
+        /* R2.2 卡片底部操作与元数据 */
         .slot-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-top: 4px;
+            padding-top: 2px;
             white-space: nowrap;
             gap: 8px;
         }
 
-        .slot-countdown {
-            font-size: 11px;
-            color: var(--text-secondary);
+        .slot-footer-meta {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 5px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            overflow: hidden;
             white-space: nowrap;
+        }
+
+        .meta-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 10px;
+        }
+
+        .meta-tag.plan {
+            color: #38bdf8;
+            background: rgba(14, 165, 233, 0.1);
+            border-color: rgba(14, 165, 233, 0.2);
+            font-weight: 600;
+        }
+
+        .meta-tag.time {
+            color: var(--text-secondary);
+        }
+
+        .meta-tag.count {
+            color: #a78bfa;
+            background: rgba(168, 85, 247, 0.08);
+            border-color: rgba(168, 85, 247, 0.2);
         }
 
         .card-actions-group {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             white-space: nowrap;
         }
 
@@ -754,13 +867,13 @@
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid var(--border-card);
             color: var(--text-secondary);
-            padding: 4px 8px;
-            border-radius: 6px;
+            padding: 3px 7px;
+            border-radius: 5px;
             font-size: 11px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 3px;
+            gap: 2px;
             transition: all 0.15s ease;
             white-space: nowrap;
         }
@@ -777,18 +890,24 @@
             border-color: rgba(239, 68, 68, 0.3);
         }
 
+        .btn-mini.btn-danger-mini:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
         .btn-switch-primary {
             background: linear-gradient(135deg, #0ea5e9, #0284c7);
             color: #fff;
             border: none;
-            padding: 5px 12px;
-            border-radius: 6px;
+            padding: 4px 10px;
+            border-radius: 5px;
             font-size: 11px;
             font-weight: 600;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
             transition: all 0.15s ease;
             white-space: nowrap;
             box-shadow: 0 2px 6px rgba(14, 165, 233, 0.25);
@@ -822,14 +941,14 @@
         .audit-panel {
             background: var(--bg-card);
             border: 1px solid var(--border-card);
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
             backdrop-filter: blur(8px);
-            margin-top: 10px;
+            flex-shrink: 0;
         }
 
         .audit-header {
-            padding: 12px 18px;
+            padding: 8px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -846,27 +965,27 @@
         .audit-title-box {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             white-space: nowrap;
             overflow: hidden;
         }
 
         .audit-summary-pill {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            max-width: 600px;
+            max-width: 550px;
         }
 
         .audit-timeline-content {
             display: none;
             flex-direction: column;
-            gap: 8px;
-            padding: 14px 18px;
+            gap: 6px;
+            padding: 10px 14px;
             border-top: 1px solid var(--border-card);
-            max-height: 240px;
+            max-height: 160px;
             overflow-y: auto;
             background: rgba(0, 0, 0, 0.15);
         }
@@ -879,13 +998,13 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 12px;
-            padding: 6px 10px;
-            border-radius: 6px;
+            font-size: 11px;
+            padding: 5px 8px;
+            border-radius: 5px;
             background: rgba(255, 255, 255, 0.02);
             border: 1px solid rgba(255, 255, 255, 0.03);
             white-space: nowrap;
-            gap: 12px;
+            gap: 10px;
         }
 
         .timeline-item:hover {
@@ -895,13 +1014,13 @@
         .timeline-left {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             white-space: nowrap;
         }
 
         .timeline-time {
             color: var(--text-muted);
-            font-size: 11px;
+            font-size: 10px;
             font-variant-numeric: tabular-nums;
         }
 
@@ -910,15 +1029,15 @@
             color: #38bdf8;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
         }
 
         .timeline-reason {
             color: var(--text-secondary);
-            font-size: 11px;
+            font-size: 10.5px;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 500px;
+            max-width: 450px;
         }
 
         /* 底部说明与时间戳 */
@@ -926,25 +1045,26 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 28px;
+            padding: 8px 20px;
             border-top: 1px solid var(--border-card);
-            background: rgba(10, 14, 23, 0.85);
-            font-size: 12px;
+            background: rgba(10, 14, 23, 0.88);
+            font-size: 11px;
             color: var(--text-muted);
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .dual-track-note {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             white-space: nowrap;
         }
 
         .track-tag {
             background: rgba(255, 255, 255, 0.08);
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 1px 5px;
+            border-radius: 3px;
             font-size: 10px;
             font-weight: 700;
             color: var(--text-secondary);
@@ -953,24 +1073,24 @@
         /* Toast 提示 */
         #toast {
             position: fixed;
-            bottom: 28px;
-            right: 28px;
+            bottom: 24px;
+            right: 24px;
             background: rgba(18, 25, 42, 0.95);
             border: 1px solid var(--accent-green);
             color: #ffffff;
-            padding: 10px 18px;
+            padding: 8px 16px;
             border-radius: 8px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 500;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 7px;
             z-index: 1000;
             opacity: 0;
-            transform: translateY(12px);
+            transform: translateY(10px);
             pointer-events: none;
-            transition: all 0.25s ease;
+            transition: all 0.22s ease;
         }
 
         #toast.show {
@@ -978,47 +1098,82 @@
             transform: translateY(0);
         }
 
-        /* 模态框 */
+        /* R3.5 暗色毛玻璃模态弹窗体系 */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(6px);
+            background: rgba(0, 0, 0, 0.72);
+            backdrop-filter: blur(12px);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 500;
+            animation: modalFadeIn 0.18s ease-out;
         }
 
         .modal-overlay.open {
             display: flex;
         }
 
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
         .modal-card {
-            background: #111827;
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(17, 24, 39, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 14px;
-            padding: 24px;
-            width: 380px;
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+            padding: 22px;
+            width: 420px;
+            max-width: 90vw;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
+            animation: cardScaleUp 0.18s ease-out;
+        }
+
+        @keyframes cardScaleUp {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
         }
 
         .modal-title {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 700;
             color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-message {
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .modal-details {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            max-height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
 
         .modal-input {
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 8px;
-            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 7px;
+            padding: 8px 12px;
             color: #ffffff;
-            font-size: 13px;
+            font-size: 12.5px;
             outline: none;
         }
 
@@ -1029,20 +1184,107 @@
         .modal-actions {
             display: flex;
             justify-content: flex-end;
-            gap: 10px;
+            gap: 8px;
             margin-top: 4px;
+        }
+
+        .btn-modal-cancel {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-card);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 7px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-modal-cancel:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        .btn-modal-confirm {
+            background: linear-gradient(135deg, #0284c7, #059669);
+            border: none;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+            transition: all 0.15s ease;
+        }
+
+        .btn-modal-confirm:hover {
+            background: linear-gradient(135deg, #0369a1, #047857);
+            box-shadow: 0 3px 12px rgba(2, 132, 199, 0.45);
+        }
+
+        .btn-modal-confirm.danger {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
+        }
+
+        .btn-modal-confirm.danger:hover {
+            background: linear-gradient(135deg, #b91c1c, #991b1b);
+        }
+
+        .btn-modal-confirm:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 运维与体检弹窗专属样式 */
+        .ops-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 6px 0;
+        }
+
+        .ops-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .ops-card-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .ops-card-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.35;
         }
 
         @media (max-width: 900px) {
             .hero-banner { grid-template-columns: 1fr; }
             .runway-strip { grid-template-columns: repeat(2, 1fr); }
             .slot-grid { grid-template-columns: 1fr; }
+            .slot-grid.compact-mode { grid-template-columns: 1fr; }
+            .ops-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-    <!-- 顶部导航 -->
+    <!-- 顶部紧凑导航 -->
     <header>
         <div class="brand-box">
             <div class="brand-logo">A</div>
@@ -1053,21 +1295,38 @@
         </div>
 
         <div class="header-actions">
+            <!-- 锁定模型胶囊 -->
             <div class="pill-badge" id="modelBadge">
-                <span style="font-size: 14px;">🎯</span>
+                <span style="font-size: 13px;">🎯</span>
                 <span id="lockedModelText">锁定模型检测中...</span>
             </div>
-            <div class="pill-badge green" id="daemonBadge">
+
+            <!-- 守护进程状态徽章 (点击可唤出运维操作) -->
+            <div class="pill-badge green interactive" id="daemonBadge" onclick="openOpsModal()" title="点击管理守护进程与开机自启">
                 <span class="pulse-dot"></span>
                 <span id="daemonText">守护运行中</span>
             </div>
+
+            <!-- ⚡ 极速切号 (/boost) -->
+            <button class="btn-icon btn-boost" id="btnBoost" onclick="triggerBoost()" title="并发测速并瞬间切入当前模型最高配额槽位">
+                ⚡ 极速切号
+            </button>
+
+            <!-- ⚙️ 运维与体检 -->
+            <button class="btn-icon" onclick="openOpsModal()" title="全链路健康体检、开机自启与存储修复">
+                ⚙️ 运维体检
+            </button>
+
+            <!-- 📟 经典终端 -->
             <button class="btn-icon" onclick="openTuiTerminal()">
                 📟 经典终端
             </button>
+
+            <!-- 🔄 刷新配额 -->
             <button class="btn-icon btn-primary" id="btnRefresh" onclick="fetchStatus(true)">
                 <span id="refreshIcon">🔄</span>
-                <span>刷新配额</span>
-                <span id="refreshCountdownBadge" style="font-size: 10px; opacity: 0.8; margin-left: 2px;">(8s)</span>
+                <span>刷新</span>
+                <span id="refreshCountdownBadge" style="font-size: 10px; opacity: 0.8; margin-left: 1px;">(8s)</span>
             </button>
         </div>
     </header>
@@ -1087,13 +1346,14 @@
                         <span>● 当前状态:</span>
                         <span style="color: #34d399; font-weight: 600;" id="heroStatusText">★ 使用中</span>
                     </div>
+                    <!-- R2.4 消除重复 ⏱️ 图标，使用统一 metric-countdown 类名 -->
                     <div class="hero-meta-item">
                         <span>⏱️ 5小时冷却:</span>
-                        <span id="hero5hCountdown" class="countdown-badge ready">⏱️ 就绪可用</span>
+                        <span id="hero5hCountdown" class="metric-countdown ready">就绪可用</span>
                     </div>
                     <div class="hero-meta-item">
-                        <span>⏱️ 周重置倒计:</span>
-                        <span id="heroWeeklyCountdown" class="countdown-badge ready">⏱️ 就绪可用</span>
+                        <span>📅 周重置倒计:</span>
+                        <span id="heroWeeklyCountdown" class="metric-countdown ready">就绪可用</span>
                     </div>
                     <div class="hero-meta-item">
                         <span>☁️ 配额新鲜度:</span>
@@ -1102,10 +1362,11 @@
                 </div>
             </div>
 
+            <!-- R3.2 动态模型组配额绑定 -->
             <div class="hero-bars">
                 <div class="hero-bar-group">
                     <div class="hero-bar-label">
-                        <span>当前模型 5小时配额</span>
+                        <span id="hero5hLabel">当前模型 5小时配额</span>
                         <span id="hero5hPct" style="font-weight: 700; color: #fff;">--%</span>
                     </div>
                     <div class="progress-track">
@@ -1114,7 +1375,7 @@
                 </div>
                 <div class="hero-bar-group">
                     <div class="hero-bar-label">
-                        <span>当前模型 周配额余量</span>
+                        <span id="heroWeeklyLabel">当前模型 周配额余量</span>
                         <span id="heroWeeklyPct" style="font-weight: 700; color: #fff;">--%</span>
                     </div>
                     <div class="progress-track">
@@ -1156,30 +1417,47 @@
             </div>
         </section>
 
-        <!-- 快捷操作区 + 排序/筛选视图控制 -->
+        <!-- 快捷操作区 + 模型组视角切换 + 视图控制 -->
         <div class="quick-toolbar">
             <div class="section-heading">
-                <span>全账号槽位池 (Slot Pool)</span>
+                <span>槽位池 (Slot Pool)</span>
             </div>
             <div class="toolbar-btns">
                 <button class="btn-icon" onclick="triggerNextSlot()">
-                    ⚡ 轮换至下一账号
+                    ⚡ 轮换下一号
                 </button>
                 <button class="btn-icon" onclick="triggerResume()">
-                    💬 恢复当前原会话
+                    💬 恢复原会话
                 </button>
                 <button class="btn-icon" onclick="openSaveModal()">
-                    ➕ 备份当前账号至槽位
+                    ➕ 备份当前
                 </button>
                 <button class="btn-icon" onclick="triggerResetCooldown()">
-                    ⏱️ 重置槽位冷却
+                    ⏱️ 重置全池冷却
                 </button>
             </div>
             <div class="view-controls">
-                <button class="btn-icon" id="btnSortToggle" onclick="toggleSortMode()">
-                    <span id="sortIcon">🔤</span>
-                    <span id="sortText">默认槽位排序</span>
+                <!-- R3.3 模型组视角切换器 -->
+                <div class="perspective-chip-group" title="切换卡片展示的核心模型视角">
+                    <button class="perspective-btn active" data-perspective="follow" onclick="setPerspective('follow', this)">🎯 跟随活跃</button>
+                    <button class="perspective-btn" data-perspective="Gemini" onclick="setPerspective('Gemini', this)">Gemini</button>
+                    <button class="perspective-btn" data-perspective="Claude" onclick="setPerspective('Claude', this)">Claude</button>
+                    <button class="perspective-btn" data-perspective="Argon" onclick="setPerspective('Argon', this)">Argon</button>
+                </div>
+
+                <!-- R2.1 紧凑视图 / 标准视图切换 -->
+                <button class="btn-icon" id="btnViewMode" onclick="toggleViewMode()" title="切换紧凑视图与标准视图">
+                    <span id="viewModeIcon">📐</span>
+                    <span id="viewModeText">紧凑视图</span>
                 </button>
+
+                <!-- R2.5 三态排序切换 (字母 a-z / 配额降序 / 状态优先) -->
+                <button class="btn-icon" id="btnSortToggle" onclick="toggleSortMode()" title="点击切换排序逻辑 (活跃槽位始终置顶)">
+                    <span id="sortIcon">🔤</span>
+                    <span id="sortText">字母槽位</span>
+                </button>
+
+                <!-- 状态筛选 -->
                 <div class="filter-chip-group">
                     <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
                     <button class="filter-btn" onclick="setFilter('ready', this)">就绪</button>
@@ -1188,20 +1466,22 @@
             </div>
         </div>
 
-        <!-- 槽位卡片网格 -->
-        <section class="slot-grid" id="slotsContainer">
-            <!-- 动态注入 slot-card -->
-        </section>
+        <!-- R2.1 卡片网格独立平滑滚动容器 -->
+        <div class="slot-grid-container">
+            <section class="slot-grid" id="slotsContainer">
+                <!-- 动态注入 slot-card -->
+            </section>
+        </div>
 
         <!-- 底部折叠抽屉：切号审计与运行动态 (Activity Timeline) -->
         <section class="audit-panel">
             <div class="audit-header" onclick="toggleTimeline()">
                 <div class="audit-title-box">
-                    <span style="font-size: 14px;">📌</span>
-                    <span style="font-weight: 700; font-size: 13px; color: #fff;">切号审计与运行动态</span>
+                    <span style="font-size: 13px;">📌</span>
+                    <span style="font-weight: 700; font-size: 12px; color: #fff;">切号审计与运行动态</span>
                     <span class="audit-summary-pill" id="auditSummaryPill">正在读取审计日志...</span>
                 </div>
-                <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 3px;">
                     <span id="timelineToggleText">展开时间轴 ▾</span>
                 </div>
             </div>
@@ -1223,30 +1503,135 @@
     <!-- Toast 弹窗 -->
     <div id="toast">已成功执行操作</div>
 
-    <!-- 备份槽位模态框 -->
+    <!-- R3.5 暗色毛玻璃统一通用确认模态框 (替代原生 confirm) -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal-card">
+            <div class="modal-title" id="confirmModalTitle">
+                <span>⚠️ 操作确认</span>
+            </div>
+            <div class="modal-message" id="confirmModalMsg">
+                请确认是否执行该操作。
+            </div>
+            <div class="modal-details" id="confirmModalDetails" style="display: none;"></div>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" id="btnConfirmCancel" onclick="closeConfirmModal(false)">取消</button>
+                <button class="btn-modal-confirm" id="btnConfirmOk">
+                    <span id="confirmSpinner" style="display: none;">⏳ </span>
+                    <span id="confirmBtnText">确认执行</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 备份当前槽位模态框 -->
     <div class="modal-overlay" id="saveModal">
         <div class="modal-card">
-            <div class="modal-title">备份当前 AGY2 登录账号至槽位</div>
-            <p style="font-size: 13px; color: var(--text-secondary);">
-                请输入槽位名称（例如 a, b, c，若留空将自动分配字母代号）：
+            <div class="modal-title">
+                <span>➕ 备份当前登录账号至槽位</span>
+            </div>
+            <p class="modal-message">
+                请输入目标槽位字母代号（如 a, b, c，若留空将自动分配下一个空闲字母）：
             </p>
             <input type="text" class="modal-input" id="slotInput" placeholder="槽位字母 (如 i)" maxlength="8">
             <div class="modal-actions">
-                <button class="btn-icon" onclick="closeSaveModal()">取消</button>
-                <button class="btn-icon btn-primary" onclick="confirmSaveSlot()">立即加密保存</button>
+                <button class="btn-modal-cancel" onclick="closeSaveModal()">取消</button>
+                <button class="btn-modal-confirm" onclick="confirmSaveSlot()">立即加密备份</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- R4 运维与全链路健康体检弹窗 -->
+    <div class="modal-overlay" id="opsModal">
+        <div class="modal-card" style="width: 520px;">
+            <div class="modal-title">
+                <span>⚙️ 运维中心与全链路体检</span>
+            </div>
+            <div class="modal-message">
+                管理后台托管守护进程、Windows 开机自启、执行全盘健康体检或重置存储。
+            </div>
+
+            <div class="ops-grid">
+                <!-- 守护进程控制 -->
+                <div class="ops-card">
+                    <div class="ops-card-title">
+                        <span>🛡️ 守护进程状态</span>
+                    </div>
+                    <div class="ops-card-desc" id="opsDaemonStatusText">
+                        检测中...
+                    </div>
+                    <div style="display: flex; gap: 6px; margin-top: 4px;">
+                        <button class="btn-mini" onclick="triggerDaemonAction('restart')">🔄 平滑重启</button>
+                        <button class="btn-mini" id="btnDaemonToggle" onclick="triggerDaemonAction('toggle')">⏹️ 停止守护</button>
+                    </div>
+                </div>
+
+                <!-- 开机自启控制 -->
+                <div class="ops-card">
+                    <div class="ops-card-title">
+                        <span>🚀 Windows 开机自启</span>
+                    </div>
+                    <div class="ops-card-desc" id="opsAutostartText">
+                        读取自启状态中...
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <button class="btn-mini" id="btnToggleAutostart" onclick="triggerToggleAutostart()">⚡ 切换开机自启</button>
+                    </div>
+                </div>
+
+                <!-- 全链路体检 /goal -->
+                <div class="ops-card">
+                    <div class="ops-card-title">
+                        <span>🩺 全链路健康度体检</span>
+                    </div>
+                    <div class="ops-card-desc">
+                        深度核验槽位就绪率、DPAPI 凭据加解密与 CDP 状态。
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <button class="btn-mini" onclick="triggerGoalCheck()">🔍 开始健康体检</button>
+                    </div>
+                </div>
+
+                <!-- 存储应急修复 repair-storage -->
+                <div class="ops-card">
+                    <div class="ops-card-title">
+                        <span>🛠️ 存储应急净化修复</span>
+                    </div>
+                    <div class="ops-card-desc">
+                        修复损坏或非法的 app_storage.json 并创建时间戳备份。
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <button class="btn-mini btn-danger-mini" onclick="triggerRepairStorage()">⚠️ 净化修复</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 体检输出区 -->
+            <div class="modal-details" id="opsOutputBox" style="display: none;"></div>
+
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeOpsModal()">关闭</button>
             </div>
         </div>
     </div>
 
     <script>
+        // 全局核心状态机
+        const UIState = {
+            expandedDrawers: new Set(), // 存储展开抽屉的 slotName (R3.1 Anti-Flicker)
+            refreshingSlots: new Set(), // 存储正在单卡刷新的 slotName
+            isCompactView: false,       // 紧凑模式开关 (R2.1)
+            currentPerspective: 'follow', // 'follow' | 'Gemini' | 'Claude' | 'Argon' (R3.3)
+            currentSortMode: 'letter',  // 'letter' (a-z) | 'quota' (配额降序) | 'status' (可用优先) (R2.5)
+            currentFilter: 'all',       // 'all' | 'ready' | 'cooldown'
+            timelineOpen: false
+        };
+
         let pollTimer = null;
         let countdownSeconds = 8;
         let isFetching = false;
         let globalData = null;
-        let isSortByQuota = false;
-        let currentFilter = 'all'; // 'all' | 'ready' | 'cooldown'
-        let timelineOpen = false;
 
+        // 通用 Toast 提示
         function showToast(msg) {
             const toast = document.getElementById("toast");
             toast.textContent = msg;
@@ -1254,6 +1639,7 @@
             setTimeout(() => toast.classList.remove("show"), 2800);
         }
 
+        // 剪贴板复制
         function copyEmail(email, event) {
             if (event) event.stopPropagation();
             if (!email) return;
@@ -1264,64 +1650,155 @@
             });
         }
 
+        // R2.2 格式化最近切号时间
+        function formatRecentSwitchTime(timeStr) {
+            if (!timeStr || timeStr === "null" || timeStr === "undefined") {
+                return "暂无记录";
+            }
+            try {
+                const d = new Date(timeStr);
+                if (isNaN(d.getTime())) return timeStr;
+                const now = new Date();
+                const isToday = d.getFullYear() === now.getFullYear() &&
+                                d.getMonth() === now.getMonth() &&
+                                d.getDate() === now.getDate();
+                const pad = (n) => n.toString().padStart(2, '0');
+                if (isToday) {
+                    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                }
+                return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            } catch (e) {
+                return timeStr;
+            }
+        }
+
+        // R2.3 语义区分进度条颜色: >20% green, <=20% yellow, <=1% red
         function getPctColorClass(pct) {
             if (pct <= 1) return "red";
-            if (pct <= 40) return "yellow";
+            if (pct <= 20) return "yellow";
             return "green";
         }
 
-        function formatMetricCountdownHtml(cdStr) {
+        // R2.3 配额状态语义区分函数 (双因子决策状态机)
+        // 剩余额度 > 20%: 显示中性冷灰/青色正常刷新提示 (class="metric-countdown ready")
+        // 剩余额度 <= 20%: 显示黄色预警 (class="metric-countdown warning")
+        // 剩余额度 <= 1%: 显示红色限额冷却 (class="metric-countdown cooldown")
+        // 杜绝正常滚动窗口被误标为冷却预警！
+        function formatMetricCountdownHtml(cdStr, pct) {
             if (!cdStr || cdStr === '就绪' || cdStr === '就绪可用') {
                 return `<span class="metric-countdown ready">⏱️ 就绪</span>`;
             }
             if (cdStr === '不支持') {
                 return `<span class="metric-countdown muted">不支持</span>`;
             }
-            if (cdStr.includes('限额') || cdStr.includes('耗尽')) {
-                return `<span class="metric-countdown exhausted">⏱️ ${cdStr}</span>`;
+            const numPct = typeof pct === 'number' ? pct : 100;
+            
+            // 1. 红色限额冷却
+            if (numPct <= 1 || cdStr.includes('限额') || cdStr.includes('耗尽')) {
+                return `<span class="metric-countdown cooldown" title="${cdStr}">🛑 ${cdStr}</span>`;
             }
-            return `<span class="metric-countdown cooldown" title="${cdStr}">⏱️ ${cdStr}</span>`;
+            // 2. 黄色预警
+            if (numPct <= 20) {
+                return `<span class="metric-countdown warning" title="${cdStr}">⚠️ ${cdStr}</span>`;
+            }
+            // 3. 中性冷灰/青色正常重置提示 (正常滚动窗口)
+            return `<span class="metric-countdown ready" title="${cdStr}">⏱️ ${cdStr}</span>`;
         }
 
-        function toggleSortMode() {
-            isSortByQuota = !isSortByQuota;
-            const sortText = document.getElementById("sortText");
-            const sortIcon = document.getElementById("sortIcon");
-            if (isSortByQuota) {
-                sortText.textContent = "配额余量降序";
-                sortIcon.textContent = "⚡";
-                showToast("已切换为：按当前锁定模型配额余量从高到低排序");
+        // R2.1 紧凑视图 / 标准视图切换
+        function toggleViewMode() {
+            UIState.isCompactView = !UIState.isCompactView;
+            const grid = document.getElementById("slotsContainer");
+            const icon = document.getElementById("viewModeIcon");
+            const text = document.getElementById("viewModeText");
+            if (UIState.isCompactView) {
+                grid.classList.add("compact-mode");
+                icon.textContent = "📖";
+                text.textContent = "标准视图";
+                showToast("已切换为：紧凑视图 (卡片面积缩减，一屏展现更多槽位)");
             } else {
-                sortText.textContent = "默认槽位排序";
-                sortIcon.textContent = "🔤";
-                showToast("已恢复为：按字母槽位默认序号排序");
+                grid.classList.remove("compact-mode");
+                icon.textContent = "📐";
+                text.textContent = "紧凑视图";
+                showToast("已恢复为：标准视图");
             }
+        }
+
+        // R2.5 活跃槽位置顶与三态排序切换 (字母 a-z -> 配额降序 -> 可用优先)
+        function toggleSortMode() {
+            const modes = ['letter', 'quota', 'status'];
+            const nextIdx = (modes.indexOf(UIState.currentSortMode) + 1) % modes.length;
+            UIState.currentSortMode = modes[nextIdx];
+            updateSortUI();
             if (globalData) renderSlots(globalData);
         }
 
+        function updateSortUI() {
+            const sortText = document.getElementById("sortText");
+            const sortIcon = document.getElementById("sortIcon");
+            if (UIState.currentSortMode === 'quota') {
+                sortIcon.textContent = "⚡";
+                sortText.textContent = "配额降序";
+                showToast("已切换为：按配额余量从高到低排序 (活跃槽位置顶)");
+            } else if (UIState.currentSortMode === 'status') {
+                sortIcon.textContent = "🟢";
+                sortText.textContent = "状态优先";
+                showToast("已切换为：按可用状态优先排序 (活跃槽位置顶)");
+            } else {
+                sortIcon.textContent = "🔤";
+                sortText.textContent = "字母槽位";
+                showToast("已恢复为：按字母槽位 a-z 排序 (活跃槽位置顶)");
+            }
+        }
+
+        // R3.3 模型组视角切换
+        function setPerspective(pName, elem) {
+            UIState.currentPerspective = pName;
+            document.querySelectorAll(".perspective-btn").forEach(b => b.classList.remove("active"));
+            if (elem) elem.classList.add("active");
+            showToast(`已切换卡片主配额视角: ${pName === 'follow' ? '跟随当前会话' : pName}`);
+            if (globalData) renderSlots(globalData);
+        }
+
+        // 状态筛选
         function setFilter(filterType, elem) {
-            currentFilter = filterType;
+            UIState.currentFilter = filterType;
             document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
             if (elem) elem.classList.add("active");
             if (globalData) renderSlots(globalData);
         }
 
-        function toggleCardDrawer(elem, event) {
+        // R3.1 抽屉折叠展开 Hook (保活于 UIState.expandedDrawers)
+        function toggleCardDrawer(slotName, elem, event) {
             if (event) event.stopPropagation();
-            const card = elem.closest(".slot-card");
-            if (!card) return;
-            const drawer = card.querySelector(".other-models-drawer");
-            if (drawer) {
-                const isOpen = drawer.classList.toggle("open");
-                elem.querySelector("span").textContent = isOpen ? "▴ 收起其他模型配额" : elem.dataset.originalLabel;
+            const isOpen = UIState.expandedDrawers.has(slotName);
+            if (isOpen) {
+                UIState.expandedDrawers.delete(slotName);
+            } else {
+                UIState.expandedDrawers.add(slotName);
+            }
+            const card = document.querySelector(`.slot-card[data-slot="${slotName}"]`);
+            if (card) {
+                const drawer = card.querySelector(".other-models-drawer");
+                const toggle = card.querySelector(".other-models-toggle span");
+                if (drawer && toggle) {
+                    if (UIState.expandedDrawers.has(slotName)) {
+                        drawer.classList.add("open");
+                        toggle.textContent = "▴ 收起其他模型配额";
+                    } else {
+                        drawer.classList.remove("open");
+                        toggle.textContent = toggle.dataset.origLabel || "▾ 查看其他模型配额";
+                    }
+                }
             }
         }
 
+        // 审计时间轴折叠
         function toggleTimeline() {
-            timelineOpen = !timelineOpen;
+            UIState.timelineOpen = !UIState.timelineOpen;
             const content = document.getElementById("timelineContent");
             const toggleText = document.getElementById("timelineToggleText");
-            if (timelineOpen) {
+            if (UIState.timelineOpen) {
                 content.classList.add("open");
                 toggleText.textContent = "收起时间轴 ▴";
             } else {
@@ -1330,12 +1807,79 @@
             }
         }
 
+        // R3.5 暗色毛玻璃统一通用确认模态框
+        let modalConfirmCallback = null;
+
+        function showConfirmModal({ title, message, details = "", confirmText = "确认执行", isDanger = false, onConfirm }) {
+            const overlay = document.getElementById("confirmModal");
+            const titleElem = document.getElementById("confirmModalTitle");
+            const msgElem = document.getElementById("confirmModalMsg");
+            const detailsElem = document.getElementById("confirmModalDetails");
+            const btnOk = document.getElementById("btnConfirmOk");
+            const btnText = document.getElementById("confirmBtnText");
+            const spinner = document.getElementById("confirmSpinner");
+
+            titleElem.innerHTML = `<span>${title || "操作确认"}</span>`;
+            msgElem.textContent = message || "请确认是否继续。";
+
+            if (details) {
+                detailsElem.textContent = details;
+                detailsElem.style.display = "block";
+            } else {
+                detailsElem.style.display = "none";
+            }
+
+            btnText.textContent = confirmText;
+            btnOk.className = "btn-modal-confirm" + (isDanger ? " danger" : "");
+            btnOk.disabled = false;
+            spinner.style.display = "none";
+
+            modalConfirmCallback = onConfirm;
+            overlay.classList.add("open");
+
+            btnOk.onclick = async () => {
+                btnOk.disabled = true;
+                spinner.style.display = "inline";
+                btnText.textContent = "处理中...";
+                try {
+                    if (modalConfirmCallback) {
+                        await modalConfirmCallback();
+                    }
+                } catch (e) {
+                    showToast("操作出错: " + e.message);
+                } finally {
+                    closeConfirmModal(true);
+                }
+            };
+        }
+
+        function closeConfirmModal(isOk = false) {
+            const overlay = document.getElementById("confirmModal");
+            overlay.classList.remove("open");
+            modalConfirmCallback = null;
+        }
+
+        // 点击背景遮罩关闭
+        document.getElementById("confirmModal").addEventListener("click", (e) => {
+            if (e.target.id === "confirmModal") closeConfirmModal(false);
+        });
+
+        // 按 Esc 键关闭模态弹窗
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                closeConfirmModal(false);
+                closeSaveModal();
+                closeOpsModal();
+            }
+        });
+
+        // 数据拉取与渲染
         async function fetchStatus(isManual = false) {
             if (isFetching) return;
             isFetching = true;
             const btnRefresh = document.getElementById("btnRefresh");
             const refreshIcon = document.getElementById("refreshIcon");
-            if (isManual) {
+            if (isManual && refreshIcon) {
                 refreshIcon.classList.add("rotating");
             }
 
@@ -1351,18 +1895,18 @@
             } finally {
                 isFetching = false;
                 countdownSeconds = 8;
-                if (isManual) {
+                if (isManual && refreshIcon) {
                     setTimeout(() => refreshIcon.classList.remove("rotating"), 500);
                 }
             }
         }
 
+        // R3.1 单卡刷新生命周期接管 (Anti-Flicker)
         async function refreshSingleSlot(slotName, btnElem, event) {
             if (event) event.stopPropagation();
             if (!slotName) return;
-            if (btnElem) {
-                btnElem.classList.add("rotating");
-            }
+            UIState.refreshingSlots.add(slotName);
+            if (btnElem) btnElem.classList.add("rotating");
             showToast(`正在单独同步槽位 [${slotName}] 的云端配额...`);
             try {
                 const resp = await fetch("/api/action/refresh-slot", {
@@ -1380,12 +1924,14 @@
             } catch (e) {
                 showToast("网络请求失败: " + e.message);
             } finally {
+                UIState.refreshingSlots.delete(slotName);
                 if (btnElem) {
-                    setTimeout(() => btnElem.classList.remove("rotating"), 600);
+                    setTimeout(() => btnElem.classList.remove("rotating"), 500);
                 }
             }
         }
 
+        // 免切/跳过切换
         async function toggleSkipSlot(slotName, event) {
             if (event) event.stopPropagation();
             if (!slotName) return;
@@ -1403,6 +1949,7 @@
             }
         }
 
+        // R3.2 / R2.4 Hero 区域渲染与动态模型组绑定
         function renderDashboard(data) {
             if (!data || !data.success) return;
 
@@ -1410,94 +1957,191 @@
             const dBadge = document.getElementById("daemonBadge");
             const dText = document.getElementById("daemonText");
             if (data.daemon && data.daemon.isRunning) {
-                dBadge.className = "pill-badge green";
+                dBadge.className = "pill-badge green interactive";
                 dText.textContent = `守护运行中 (PID: ${data.daemon.pid})`;
             } else {
-                dBadge.className = "pill-badge yellow";
-                dText.textContent = "守护未运行";
+                dBadge.className = "pill-badge yellow interactive";
+                dText.textContent = "守护未运行 (点击管理)";
             }
 
-            document.getElementById("lockedModelText").textContent = data.current.activeModelLabel || data.current.activeModelGroup;
+            document.getElementById("lockedModelText").textContent = data.current.activeModelLabel || data.current.activeModelGroup || "Gemini 3.8 Flash";
 
             // 2. Hero 当前账号
             document.getElementById("heroSlotBadge").textContent = data.current.slotName || "-";
             document.getElementById("heroEmail").textContent = data.current.email || "未检测到登录";
             document.getElementById("heroFp").textContent = "指纹: " + (data.current.tokenFingerprint || "--");
             document.getElementById("heroSyncTime").textContent = data.current.lastQuotaSyncAt ? `${data.current.lastQuotaSyncAt} 已同步` : "实时";
-            document.getElementById("footerTimestamp").textContent = "更新时间: " + data.timestamp;
-
-            const cd5 = data.current.gemini5hCountdown;
-            const cdWk = data.current.geminiWeeklyCountdown;
-            const h5Elem = document.getElementById("hero5hCountdown");
-            const hwElem = document.getElementById("heroWeeklyCountdown");
-            if (h5Elem) {
-                h5Elem.textContent = cd5 ? `⏱️ ${cd5}` : "⏱️ 就绪可用";
-                h5Elem.className = "countdown-badge " + (cd5 && (cd5.includes("后重置") || cd5.includes("限额")) ? "cooldown" : "ready");
-            }
-            if (hwElem) {
-                hwElem.textContent = cdWk ? `⏱️ ${cdWk}` : "⏱️ 就绪可用";
-                hwElem.className = "countdown-badge " + (cdWk && (cdWk.includes("后重置") || cdWk.includes("限额")) ? "cooldown" : "ready");
-            }
+            document.getElementById("footerTimestamp").textContent = "更新时间: " + (data.timestamp || "--:--:--");
 
             const curSlot = (data.slots || []).find(s => s.slotName === data.current.slotName);
-            if (curSlot) {
-                const g5 = Math.max(0, curSlot.gemini5hPct);
-                const gw = Math.max(0, curSlot.geminiWeeklyPct);
-                document.getElementById("hero5hPct").textContent = g5 + "%";
-                document.getElementById("heroWeeklyPct").textContent = gw + "%";
+            const activeGrp = data.current.activeModelGroup || "Gemini";
 
-                const b5 = document.getElementById("hero5hBar");
-                b5.style.width = g5 + "%";
-                b5.className = "progress-fill " + getPctColorClass(g5);
+            // 动态感知模型组配额与倒计时
+            const h5Elem = document.getElementById("hero5hCountdown");
+            const hwElem = document.getElementById("heroWeeklyCountdown");
+            const h5Label = document.getElementById("hero5hLabel");
+            const hwLabel = document.getElementById("heroWeeklyLabel");
+            const h5PctElem = document.getElementById("hero5hPct");
+            const hwPctElem = document.getElementById("heroWeeklyPct");
+            const h5Bar = document.getElementById("hero5hBar");
+            const hwBar = document.getElementById("heroWeeklyBar");
 
-                const bw = document.getElementById("heroWeeklyBar");
-                bw.style.width = gw + "%";
-                bw.className = "progress-fill " + getPctColorClass(gw);
+            if (activeGrp === "Claude") {
+                h5Label.textContent = "Claude 5小时配额 (核心)";
+                hwLabel.textContent = "Claude 周配额余量";
+                const c5 = curSlot && curSlot.claude5hPct >= 0 ? curSlot.claude5hPct : 0;
+                const cw = curSlot && curSlot.claudeWeeklyPct >= 0 ? curSlot.claudeWeeklyPct : 0;
+                h5PctElem.textContent = c5 + "%";
+                hwPctElem.textContent = cw + "%";
+                h5Bar.style.width = c5 + "%";
+                h5Bar.className = "progress-fill " + getPctColorClass(c5);
+                hwBar.style.width = cw + "%";
+                hwBar.className = "progress-fill " + getPctColorClass(cw);
+
+                const cd5 = curSlot ? curSlot.claude5hCountdown : "就绪可用";
+                const cdW = curSlot ? curSlot.claudeWeeklyCountdown : "就绪可用";
+                if (h5Elem) {
+                    h5Elem.textContent = cd5 ? cd5.replace(/^⏱️\s*/, "") : "就绪可用";
+                    h5Elem.className = "metric-countdown " + (c5 <= 1 || (cd5 && cd5.includes("限额")) ? "cooldown" : c5 <= 20 ? "warning" : "ready");
+                }
+                if (hwElem) {
+                    hwElem.textContent = cdW ? cdW.replace(/^⏱️\s*/, "") : "就绪可用";
+                    hwElem.className = "metric-countdown " + (cw <= 1 || (cdW && cdW.includes("限额")) ? "cooldown" : cw <= 20 ? "warning" : "ready");
+                }
+            } else if (activeGrp === "Argon") {
+                // Argon 无 5 小时限制时明确提示无 5h 限制
+                h5Label.textContent = "Argon 5小时配额 (无限制)";
+                hwLabel.textContent = "Argon 周配额余量 (核心)";
+                h5PctElem.textContent = "无 5h 限制";
+                h5Bar.style.width = "100%";
+                h5Bar.className = "progress-fill neutral";
+
+                const ar = curSlot && curSlot.argonWeeklyPct >= 0 ? curSlot.argonWeeklyPct : 0;
+                hwPctElem.textContent = ar >= 0 ? ar + "%" : "不支持";
+                hwBar.style.width = Math.max(0, ar) + "%";
+                hwBar.className = "progress-fill " + getPctColorClass(ar);
+
+                if (h5Elem) {
+                    h5Elem.textContent = "无需 5h 冷却";
+                    h5Elem.className = "metric-countdown ready";
+                }
+                const cdW = curSlot ? curSlot.argonWeeklyCountdown : "就绪可用";
+                if (hwElem) {
+                    hwElem.textContent = cdW ? cdW.replace(/^⏱️\s*/, "") : "就绪可用";
+                    hwElem.className = "metric-countdown " + (ar <= 1 || (cdW && cdW.includes("限额")) ? "cooldown" : ar <= 20 ? "warning" : "ready");
+                }
+            } else {
+                // Gemini (默认)
+                h5Label.textContent = "Gemini 5小时配额 (核心)";
+                hwLabel.textContent = "Gemini 周配额余量";
+                const g5 = curSlot ? Math.max(0, curSlot.gemini5hPct) : 0;
+                const gw = curSlot ? Math.max(0, curSlot.geminiWeeklyPct) : 0;
+                h5PctElem.textContent = g5 + "%";
+                hwPctElem.textContent = gw + "%";
+                h5Bar.style.width = g5 + "%";
+                h5Bar.className = "progress-fill " + getPctColorClass(g5);
+                hwBar.style.width = gw + "%";
+                hwBar.className = "progress-fill " + getPctColorClass(gw);
+
+                const cd5 = (curSlot && curSlot.gemini5hCountdown) || data.current.gemini5hCountdown || "就绪可用";
+                const cdW = (curSlot && curSlot.geminiWeeklyCountdown) || data.current.geminiWeeklyCountdown || "就绪可用";
+                if (h5Elem) {
+                    h5Elem.textContent = cd5 ? cd5.replace(/^⏱️\s*/, "") : "就绪可用";
+                    h5Elem.className = "metric-countdown " + (g5 <= 1 || cd5.includes("限额") || cd5.includes("耗尽") ? "cooldown" : g5 <= 20 ? "warning" : "ready");
+                }
+                if (hwElem) {
+                    hwElem.textContent = cdW ? cdW.replace(/^⏱️\s*/, "") : "就绪可用";
+                    hwElem.className = "metric-countdown " + (gw <= 1 || cdW.includes("限额") || cdW.includes("耗尽") ? "cooldown" : gw <= 20 ? "warning" : "ready");
+                }
             }
 
             // 3. 全池宏观水位大盘 (Pool Runway Strip)
             if (data.runway) {
                 document.getElementById("runwayReadyVal").innerHTML = `${data.runway.readyCount} / ${data.runway.totalCount} <span class="runway-sub">待命中</span>`;
-                document.getElementById("runwayModelTitle").textContent = `${data.runway.activeModelGroup} 全池均值`;
+                document.getElementById("runwayModelTitle").textContent = `${data.runway.activeModelGroup || "当前模型"} 全池均值`;
                 document.getElementById("runwayAvgVal").innerHTML = `${data.runway.activeModelAvgPct}% <span class="runway-sub">平均水位</span>`;
                 document.getElementById("runwayCooldownVal").innerHTML = `${data.runway.cooldownCount} <span class="runway-sub">槽位限额冷却</span>`;
             }
 
-            // 4. 渲染槽位池卡片
+            // 4. 渲染槽位池卡片 (Anti-Flicker 保活渲染)
             renderSlots(data);
 
             // 5. 渲染切号审计时间轴
             renderAuditTimeline(data);
         }
 
+        // 获取槽位针对目标模型组的配额余量 (用于排序)
+        function getSlotSortQuota(s, perspective) {
+            if (perspective === "Claude") {
+                return s.claude5hPct >= 0 ? s.claude5hPct : -1;
+            } else if (perspective === "Argon") {
+                return s.argonWeeklyPct >= 0 ? s.argonWeeklyPct : -1;
+            } else {
+                return s.gemini5hPct >= 0 ? s.gemini5hPct : -1;
+            }
+        }
+
+        // 槽位可用状态权重 (用于可用状态优先排序)
+        function getSlotStatusWeight(s) {
+            if (s.isActive) return 0;
+            if (s.statusKey === 'ready' || s.status === '就绪') return 1;
+            if (s.statusKey === 'exhausted-5h') return 2;
+            if (s.statusKey === 'exhausted-weekly') return 3;
+            if (s.statusKey === 'unsupported') return 4;
+            if (s.isSkipped) return 5;
+            return 2;
+        }
+
+        // R3.1 轮询状态保活 (Anti-Flicker) 渲染器
+        // 严禁全量清空 container.innerHTML = ""，通过保持已展开抽屉与卡片节点平滑更新
         function renderSlots(data) {
             const container = document.getElementById("slotsContainer");
-            container.innerHTML = "";
-
             let slots = (data.slots || []).slice();
             const activeGrp = (data.current && data.current.activeModelGroup) || "Gemini";
+            const effectivePerspective = UIState.currentPerspective === 'follow' ? activeGrp : UIState.currentPerspective;
 
-            // 过滤
-            if (currentFilter === 'ready') {
-                slots = slots.filter(s => s.statusKey === 'ready' || s.statusKey === 'active');
-            } else if (currentFilter === 'cooldown') {
-                slots = slots.filter(s => s.statusKey.includes('exhausted') || s.status === 'cooldown');
+            // 1. 过滤
+            if (UIState.currentFilter === 'ready') {
+                slots = slots.filter(s => s.statusKey === 'ready' || s.statusKey === 'active' || s.isActive);
+            } else if (UIState.currentFilter === 'cooldown') {
+                slots = slots.filter(s => (s.statusKey && s.statusKey.includes('exhausted')) || s.status === 'cooldown');
             }
 
-            // 排序
-            if (isSortByQuota) {
-                slots.sort((a, b) => {
-                    const getSortVal = (s) => {
-                        if (activeGrp === "Claude") return s.claude5hPct >= 0 ? s.claude5hPct : -1;
-                        if (activeGrp === "Argon") return s.argonWeeklyPct >= 0 ? s.argonWeeklyPct : -1;
-                        return s.gemini5hPct >= 0 ? s.gemini5hPct : -1;
-                    };
-                    return getSortVal(b) - getSortVal(a);
-                });
-            }
+            // 2. R2.5 活跃槽位置顶与排序
+            slots.sort((a, b) => {
+                // 活跃槽位强制置顶 (Rank 0)
+                if (a.isActive && !b.isActive) return -1;
+                if (!a.isActive && b.isActive) return 1;
 
+                if (UIState.currentSortMode === 'quota') {
+                    return getSlotSortQuota(b, effectivePerspective) - getSlotSortQuota(a, effectivePerspective);
+                } else if (UIState.currentSortMode === 'status') {
+                    return getSlotStatusWeight(a) - getSlotStatusWeight(b);
+                } else {
+                    return (a.slotName || "").localeCompare(b.slotName || "");
+                }
+            });
+
+            // 记录当前存在的目标 slotName 集合
+            const targetSlotNames = new Set(slots.map(s => s.slotName));
+
+            // 清理已不再存在的卡片 DOM 节点
+            Array.from(container.children).forEach(child => {
+                const sName = child.getAttribute("data-slot");
+                if (sName && !targetSlotNames.has(sName)) {
+                    container.removeChild(child);
+                }
+            });
+
+            // 逐个更新或创建卡片
             slots.forEach(s => {
-                const card = document.createElement("div");
+                let card = container.querySelector(`.slot-card[data-slot="${s.slotName}"]`);
+                const isNew = !card;
+                if (isNew) {
+                    card = document.createElement("div");
+                    card.setAttribute("data-slot", s.slotName);
+                }
+
                 let cardClass = "slot-card";
                 if (s.isActive) cardClass += " active-slot";
                 if (s.isSkipped) cardClass += " is-skipped";
@@ -1516,7 +2160,7 @@
                 const ar = s.argonWeeklyPct;
                 const idxLabel = s.slotIndex ? `#${s.slotIndex} · ${s.slotName}` : s.slotName;
 
-                // 模型标签
+                // 模型胶囊标签
                 const modelsList = Array.isArray(s.supportedModels) && s.supportedModels.length > 0
                     ? s.supportedModels
                     : ["Gemini 3.8 Flash", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B"];
@@ -1525,19 +2169,19 @@
                     return `<span class="model-pill ${isSpecial ? 'special' : ''}">${m}</span>`;
                 }).join("");
 
-                // 主次分明配额构建
+                // 根据当前视角构建主次配额与倒计时胶囊 (R3.3 补齐多模型倒计时)
                 let primaryMetricsHtml = "";
                 let otherMetricsHtml = "";
                 let otherCount = 0;
 
-                if (activeGrp === "Claude") {
+                if (effectivePerspective === "Claude") {
                     primaryMetricsHtml = `
                         <div class="metric-row">
                             <div class="metric-label-row">
                                 <span style="font-weight:600;color:#fff;">🎯 Claude 5小时配额 (核心)</span>
                                 <span class="metric-val-group">
                                     <span class="metric-val">${Math.max(0, c5)}%</span>
-                                    ${formatMetricCountdownHtml(s.claude5hCountdown)}
+                                    ${formatMetricCountdownHtml(s.claude5hCountdown, Math.max(0, c5))}
                                 </span>
                             </div>
                             <div class="progress-track">
@@ -1549,7 +2193,7 @@
                                 <span>Claude 周配额</span>
                                 <span class="metric-val-group">
                                     <span class="metric-val">${Math.max(0, cw)}%</span>
-                                    ${formatMetricCountdownHtml(s.claudeWeeklyCountdown)}
+                                    ${formatMetricCountdownHtml(s.claudeWeeklyCountdown, Math.max(0, cw))}
                                 </span>
                             </div>
                             <div class="progress-track">
@@ -1560,26 +2204,47 @@
                         <div class="metric-row">
                             <div class="metric-label-row">
                                 <span>Gemini 5小时</span>
-                                <span class="metric-val">${g5}%</span>
+                                <span class="metric-val-group">
+                                    <span class="metric-val">${g5}%</span>
+                                    ${formatMetricCountdownHtml(s.gemini5hCountdown, g5)}
+                                </span>
                             </div>
                             <div class="progress-track"><div class="progress-fill ${getPctColorClass(g5)}" style="width:${g5}%"></div></div>
                         </div>
                         <div class="metric-row">
                             <div class="metric-label-row">
                                 <span>Gemini 周配额</span>
-                                <span class="metric-val">${gw}%</span>
+                                <span class="metric-val-group">
+                                    <span class="metric-val">${gw}%</span>
+                                    ${formatMetricCountdownHtml(s.geminiWeeklyCountdown, gw)}
+                                </span>
                             </div>
                             <div class="progress-track"><div class="progress-fill ${getPctColorClass(gw)}" style="width:${gw}%"></div></div>
                         </div>`;
-                    otherCount = 2;
-                } else if (activeGrp === "Argon") {
+                    if (ar >= 0) {
+                        otherMetricsHtml += `
+                            <div class="metric-row">
+                                <div class="metric-label-row">
+                                    <span>Argon 周配额</span>
+                                    <span class="metric-val-group">
+                                        <span class="metric-val">${ar}%</span>
+                                        ${formatMetricCountdownHtml(s.argonWeeklyCountdown, ar)}
+                                    </span>
+                                </div>
+                                <div class="progress-track"><div class="progress-fill ${getPctColorClass(ar)}" style="width:${ar}%"></div></div>
+                            </div>`;
+                        otherCount = 3;
+                    } else {
+                        otherCount = 2;
+                    }
+                } else if (effectivePerspective === "Argon") {
                     primaryMetricsHtml = `
                         <div class="metric-row">
                             <div class="metric-label-row">
                                 <span style="font-weight:600;color:#fff;">🎯 Argon 周配额 (核心)</span>
                                 <span class="metric-val-group">
                                     <span class="metric-val">${ar >= 0 ? ar + '%' : '不支持'}</span>
-                                    ${formatMetricCountdownHtml(s.argonWeeklyCountdown)}
+                                    ${formatMetricCountdownHtml(s.argonWeeklyCountdown, ar)}
                                 </span>
                             </div>
                             <div class="progress-track">
@@ -1590,27 +2255,48 @@
                         <div class="metric-row">
                             <div class="metric-label-row">
                                 <span>Gemini 5小时</span>
-                                <span class="metric-val">${g5}%</span>
+                                <span class="metric-val-group">
+                                    <span class="metric-val">${g5}%</span>
+                                    ${formatMetricCountdownHtml(s.gemini5hCountdown, g5)}
+                                </span>
                             </div>
                             <div class="progress-track"><div class="progress-fill ${getPctColorClass(g5)}" style="width:${g5}%"></div></div>
                         </div>
                         <div class="metric-row">
                             <div class="metric-label-row">
                                 <span>Gemini 周配额</span>
-                                <span class="metric-val">${gw}%</span>
+                                <span class="metric-val-group">
+                                    <span class="metric-val">${gw}%</span>
+                                    ${formatMetricCountdownHtml(s.geminiWeeklyCountdown, gw)}
+                                </span>
                             </div>
                             <div class="progress-track"><div class="progress-fill ${getPctColorClass(gw)}" style="width:${gw}%"></div></div>
                         </div>`;
-                    otherCount = 2;
+                    if (c5 >= 0) {
+                        otherMetricsHtml += `
+                            <div class="metric-row">
+                                <div class="metric-label-row">
+                                    <span>Claude 5小时</span>
+                                    <span class="metric-val-group">
+                                        <span class="metric-val">${c5}%</span>
+                                        ${formatMetricCountdownHtml(s.claude5hCountdown, c5)}
+                                    </span>
+                                </div>
+                                <div class="progress-track"><div class="progress-fill ${getPctColorClass(c5)}" style="width:${c5}%"></div></div>
+                            </div>`;
+                        otherCount = 3;
+                    } else {
+                        otherCount = 2;
+                    }
                 } else {
-                    // Default Gemini
+                    // Gemini (默认)
                     primaryMetricsHtml = `
                         <div class="metric-row">
                             <div class="metric-label-row">
                                 <span style="font-weight:600;color:#fff;">🎯 Gemini 5小时 (核心)</span>
                                 <span class="metric-val-group">
                                     <span class="metric-val">${g5}%</span>
-                                    ${formatMetricCountdownHtml(s.gemini5hCountdown)}
+                                    ${formatMetricCountdownHtml(s.gemini5hCountdown, g5)}
                                 </span>
                             </div>
                             <div class="progress-track">
@@ -1622,7 +2308,7 @@
                                 <span>Gemini 周配额</span>
                                 <span class="metric-val-group">
                                     <span class="metric-val">${gw}%</span>
-                                    ${formatMetricCountdownHtml(s.geminiWeeklyCountdown)}
+                                    ${formatMetricCountdownHtml(s.geminiWeeklyCountdown, gw)}
                                 </span>
                             </div>
                             <div class="progress-track">
@@ -1636,14 +2322,20 @@
                                 <div class="metric-row">
                                     <div class="metric-label-row">
                                         <span>Claude / GPT 5小时</span>
-                                        <span class="metric-val">${Math.max(0, c5)}%</span>
+                                        <span class="metric-val-group">
+                                            <span class="metric-val">${Math.max(0, c5)}%</span>
+                                            ${formatMetricCountdownHtml(s.claude5hCountdown, Math.max(0, c5))}
+                                        </span>
                                     </div>
                                     <div class="progress-track"><div class="progress-fill ${getPctColorClass(Math.max(0, c5))}" style="width:${Math.max(0, c5)}%"></div></div>
                                 </div>
                                 <div class="metric-row">
                                     <div class="metric-label-row">
                                         <span>Claude / GPT 周配额</span>
-                                        <span class="metric-val">${Math.max(0, cw)}%</span>
+                                        <span class="metric-val-group">
+                                            <span class="metric-val">${Math.max(0, cw)}%</span>
+                                            ${formatMetricCountdownHtml(s.claudeWeeklyCountdown, Math.max(0, cw))}
+                                        </span>
                                     </div>
                                     <div class="progress-track"><div class="progress-fill ${getPctColorClass(Math.max(0, cw))}" style="width:${Math.max(0, cw)}%"></div></div>
                                 </div>`;
@@ -1654,7 +2346,10 @@
                                 <div class="metric-row">
                                     <div class="metric-label-row">
                                         <span>Argon 周配额</span>
-                                        <span class="metric-val">${ar}%</span>
+                                        <span class="metric-val-group">
+                                            <span class="metric-val">${ar}%</span>
+                                            ${formatMetricCountdownHtml(s.argonWeeklyCountdown, ar)}
+                                        </span>
                                     </div>
                                     <div class="progress-track"><div class="progress-fill ${getPctColorClass(ar)}" style="width:${ar}%"></div></div>
                                 </div>`;
@@ -1663,14 +2358,25 @@
                     }
                 }
 
+                // 抽屉展开状态恢复 (R3.1)
+                const isDrawerOpen = UIState.expandedDrawers.has(s.slotName);
+                const drawerToggleLabel = isDrawerOpen ? "▴ 收起其他模型配额" : `▾ 查看其他模型配额 (${otherCount}项)`;
                 const drawerHtml = otherCount > 0 ? `
-                    <div class="other-models-toggle" data-original-label="▾ 查看其他模型配额 (${otherCount}项)" onclick="toggleCardDrawer(this, event)">
-                        <span>▾ 查看其他模型配额 (${otherCount}项)</span>
+                    <div class="other-models-toggle" onclick="toggleCardDrawer('${s.slotName}', this, event)">
+                        <span data-orig-label="▾ 查看其他模型配额 (${otherCount}项)">${drawerToggleLabel}</span>
                     </div>
-                    <div class="other-models-drawer">
+                    <div class="other-models-drawer ${isDrawerOpen ? 'open' : ''}">
                         ${otherMetricsHtml}
                     </div>
                 ` : "";
+
+                // R3.1 单卡刷新旋转状态恢复
+                const isCardRefreshing = UIState.refreshingSlots.has(s.slotName);
+
+                // R2.2 彻底消除底部倒计时冗余，释放空间展示套餐类型、最近切换时间与累计切换次数
+                const switchCountDisplay = (s.switchCount !== undefined && s.switchCount !== null) ? s.switchCount : 0;
+                const planNameDisplay = s.planName || "标准套餐";
+                const lastSwitchDisplay = formatRecentSwitchTime(s.lastSwitchedAt);
 
                 card.innerHTML = `
                     <div class="slot-card-header">
@@ -1694,19 +2400,27 @@
                     </div>
 
                     <div class="slot-footer">
-                        <div class="slot-countdown">
-                            <span>⏱️ ${s.countdown || "就绪"}</span>
-                            <span style="color: var(--text-muted); margin-left: 4px;">(${s.switchCount}次)</span>
+                        <div class="slot-footer-meta">
+                            <span class="meta-tag plan" title="套餐类型">${planNameDisplay}</span>
+                            <span class="meta-tag time" title="最近切换时间">🕒 ${lastSwitchDisplay}</span>
+                            <span class="meta-tag count" title="累计切换次数">🔀 ${switchCountDisplay}次</span>
                         </div>
+
                         <div class="card-actions-group">
                             <button class="btn-mini" title="复制账号邮箱" onclick="copyEmail('${s.email}', event)">
                                 📋
                             </button>
-                            <button class="btn-mini" title="单卡精准测试云端配额" onclick="refreshSingleSlot('${s.slotName}', this, event)">
+                            <button class="btn-mini ${isCardRefreshing ? 'rotating' : ''}" title="单卡精准测试云端配额" onclick="refreshSingleSlot('${s.slotName}', this, event)">
                                 🔄
+                            </button>
+                            <button class="btn-mini" title="重置该槽位冷却状态" onclick="triggerResetSingleCooldown('${s.slotName}', event)">
+                                ⏱️
                             </button>
                             <button class="btn-mini ${s.isSkipped ? 'skip-active' : ''}" title="${s.isSkipped ? '恢复自动切号' : '设置免切/跳过'}" onclick="toggleSkipSlot('${s.slotName}', event)">
                                 ${s.isSkipped ? '✔️ 恢复' : '🚫 免切'}
+                            </button>
+                            <button class="btn-mini btn-danger-mini" title="删除该槽位" onclick="triggerDeleteSlot('${s.slotName}', event)">
+                                🗑️
                             </button>
                             ${s.isActive ? `
                                 <button class="btn-switch-primary" disabled>
@@ -1721,10 +2435,12 @@
                     </div>
                 `;
 
+                // 平滑维护节点顺序
                 container.appendChild(card);
             });
         }
 
+        // 渲染切号审计时间轴
         function renderAuditTimeline(data) {
             const summaryPill = document.getElementById("auditSummaryPill");
             const timelineContent = document.getElementById("timelineContent");
@@ -1732,12 +2448,11 @@
 
             if (history.length === 0) {
                 summaryPill.textContent = "暂无最近切号事件记录";
-                timelineContent.innerHTML = `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:12px;">暂无历史切换流水</div>`;
+                timelineContent.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px;">暂无历史切换流水</div>`;
                 return;
             }
 
             const latest = history[0];
-            const latestFrom = latest.fromSlot ? `[${latest.fromSlot}]` : '';
             const latestTo = latest.toSlot ? `[${latest.toSlot}]` : '';
             summaryPill.textContent = `最新: ${latest.timestamp} 切入 ${latestTo} (原因: ${latest.reason || '自动切号'})`;
 
@@ -1757,60 +2472,141 @@
             }).join("");
         }
 
-        // 操作调用
-        async function triggerSwitchSlot(slotName) {
-            if (!confirm(`确定要切换至槽位 [${slotName}] 吗？\n切换后将自动更新凭据并无缝唤出 Antigravity 2.0。`)) return;
-            showToast(`正在切换至槽位 [${slotName}]...`);
-            try {
-                const resp = await fetch("/api/action/switch", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ slot: slotName })
-                });
-                const res = await resp.json();
-                showToast(res.message);
-                fetchStatus(false);
-            } catch (err) {
-                showToast("切换请求失败: " + err.message);
-            }
+        // R3.5 / R4 动作派发体系 (暗色毛玻璃弹窗替代原生 confirm，防连点保护)
+
+        // 1. 切号操作
+        function triggerSwitchSlot(slotName) {
+            showConfirmModal({
+                title: "⚡ 账号切换确认",
+                message: `确定要切换至槽位 [${slotName}] 吗？`,
+                details: "系统将自动完成凭据安全写入、应用进程重载并原位恢复会话上下文。",
+                confirmText: "立即切换",
+                onConfirm: async () => {
+                    showToast(`正在切换至槽位 [${slotName}]...`);
+                    const resp = await fetch("/api/action/switch", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ slot: slotName })
+                    });
+                    const res = await resp.json();
+                    showToast(res.message || "切换指令已派发！");
+                    fetchStatus(false);
+                }
+            });
         }
 
+        // 2. 轮换下一号
         async function triggerNextSlot() {
             showToast("正在轮换至下一个可用账号...");
             try {
                 const resp = await fetch("/api/action/next", { method: "POST" });
                 const res = await resp.json();
-                showToast(res.message);
+                showToast(res.message || "已轮换至下一账号");
                 fetchStatus(false);
             } catch (err) {
                 showToast("轮换请求失败: " + err.message);
             }
         }
 
+        // 3. 恢复会话
         async function triggerResume() {
             showToast("正在触发断点会话恢复与原会话点开...");
             try {
                 const resp = await fetch("/api/action/resume", { method: "POST" });
                 const res = await resp.json();
-                showToast(res.message);
+                showToast(res.message || "已触发会话恢复");
             } catch (err) {
                 showToast("恢复请求失败: " + err.message);
             }
         }
 
-        async function triggerResetCooldown() {
-            if (!confirm("确定要立即重置所有槽位的 5小时与周限额冷却吗？")) return;
-            showToast("正在重置全部槽位冷却...");
+        // 4. 重置全池冷却
+        function triggerResetCooldown() {
+            showConfirmModal({
+                title: "⏱️ 重置全池冷却状态",
+                message: "确定要立即解除全池所有槽位的 5小时与周限额冷却标记吗？",
+                details: "解除后系统将在下一轮轮换时重新探测所有槽位的云端配额。",
+                confirmText: "重置全部",
+                onConfirm: async () => {
+                    showToast("正在重置全部槽位冷却...");
+                    const resp = await fetch("/api/action/reset-cooldown", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({})
+                    });
+                    const res = await resp.json();
+                    showToast(res.message || "全池冷却已重置！");
+                    fetchStatus(true);
+                }
+            });
+        }
+
+        // 5. R4 重置单槽冷却
+        function triggerResetSingleCooldown(slotName, event) {
+            if (event) event.stopPropagation();
+            showConfirmModal({
+                title: "⏱️ 重置单槽冷却",
+                message: `确定要立即清除槽位 [${slotName}] 的冷却锁定吗？`,
+                confirmText: "确认重置",
+                onConfirm: async () => {
+                    showToast(`正在重置槽位 [${slotName}] 冷却...`);
+                    const resp = await fetch("/api/action/reset-cooldown", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ slot: slotName })
+                    });
+                    const res = await resp.json();
+                    showToast(res.message || `槽位 [${slotName}] 冷却已重置！`);
+                    fetchStatus(true);
+                }
+            });
+        }
+
+        // 6. R4 删除失效槽位
+        function triggerDeleteSlot(slotName, event) {
+            if (event) event.stopPropagation();
+            showConfirmModal({
+                title: "🗑️ 删除槽位确认",
+                message: `确定要永久删除槽位 [${slotName}] 及其关联的本地凭据吗？`,
+                details: "注意：此操作不可逆！删除后该槽位将从槽位池中彻底移除。",
+                confirmText: "确认删除",
+                isDanger: true,
+                onConfirm: async () => {
+                    showToast(`正在删除槽位 [${slotName}]...`);
+                    const resp = await fetch("/api/action/remove-slot", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ slot: slotName })
+                    });
+                    const res = await resp.json();
+                    showToast(res.message || `槽位 [${slotName}] 已删除`);
+                    fetchStatus(true);
+                }
+            });
+        }
+
+        // 7. R4 极速切号 (/boost)
+        async function triggerBoost() {
+            showToast("🚀 正在发起极速测速并择优跃迁...");
+            const btn = document.getElementById("btnBoost");
+            if (btn) btn.disabled = true;
             try {
-                const resp = await fetch("/api/action/reset-cooldown", { method: "POST" });
+                const resp = await fetch("/api/action/boost", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({})
+                });
                 const res = await resp.json();
-                showToast(res.message);
-                fetchStatus(true);
-            } catch (err) {
-                showToast("重置失败: " + err.message);
+                showToast(res.message || "极速跃迁完成！");
+                fetchStatus(false);
+            } catch (e) {
+                showToast("极速跃迁失败: " + e.message);
+            } finally {
+                if (btn) btn.disabled = false;
             }
         }
 
+        // 8. 呼出经典控制台终端
         async function openTuiTerminal() {
             showToast("正在呼出经典控制台终端...");
             try {
@@ -1818,6 +2614,7 @@
             } catch (e) {}
         }
 
+        // 9. 备份当前登录账号
         function openSaveModal() {
             document.getElementById("saveModal").classList.add("open");
             document.getElementById("slotInput").value = "";
@@ -1839,21 +2636,126 @@
                     body: JSON.stringify({ slot: slotName })
                 });
                 const res = await resp.json();
-                showToast(res.message);
+                showToast(res.message || "凭据已安全保存！");
                 fetchStatus(false);
             } catch (err) {
                 showToast("保存失败: " + err.message);
             }
         }
 
-        // 倒计时与轮询驱动
+        // 10. R4 运维中心控制 (守护启停/开机自启/体检/存储修复)
+        function openOpsModal() {
+            const overlay = document.getElementById("opsModal");
+            overlay.classList.add("open");
+            document.getElementById("opsOutputBox").style.display = "none";
+            updateOpsModalData();
+        }
+
+        function closeOpsModal() {
+            document.getElementById("opsModal").classList.remove("open");
+        }
+
+        function updateOpsModalData() {
+            if (globalData && globalData.daemon) {
+                const isRun = globalData.daemon.isRunning;
+                document.getElementById("opsDaemonStatusText").textContent = isRun ? `运行中 (PID: ${globalData.daemon.pid})` : "已停止";
+                document.getElementById("btnDaemonToggle").textContent = isRun ? "⏹️ 停止守护" : "▶️ 启动守护";
+                document.getElementById("opsAutostartText").textContent = globalData.daemon.autoStart ? "已开启 (开机静默启动)" : "未开启";
+                document.getElementById("btnToggleAutostart").textContent = globalData.daemon.autoStart ? "❌ 关闭自启" : "✔️ 开启自启";
+            }
+        }
+
+        async function triggerDaemonAction(act) {
+            showToast(`正在${act === 'restart' ? '重启' : '切换'}守护进程...`);
+            try {
+                const resp = await fetch("/api/action/daemon", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: act })
+                });
+                const res = await resp.json();
+                showToast(res.message || "守护进程指令已执行");
+                fetchStatus(false);
+                setTimeout(updateOpsModalData, 600);
+            } catch (e) {
+                showToast("守护操作失败: " + e.message);
+            }
+        }
+
+        async function triggerToggleAutostart() {
+            showToast("正在切换 Windows 开机自启状态...");
+            try {
+                const resp = await fetch("/api/action/autostart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "toggle" })
+                });
+                const res = await resp.json();
+                showToast(res.message || "开机自启已更新");
+                fetchStatus(false);
+                setTimeout(updateOpsModalData, 600);
+            } catch (e) {
+                showToast("自启设置失败: " + e.message);
+            }
+        }
+
+        async function triggerGoalCheck() {
+            const box = document.getElementById("opsOutputBox");
+            box.style.display = "block";
+            box.textContent = "🔍 正在执行全链路健康度体检 (/goal)...";
+            try {
+                const resp = await fetch("/api/action/goal", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({})
+                });
+                const res = await resp.json();
+                box.textContent = JSON.stringify(res.data || res, null, 2);
+                showToast("体检完成！");
+            } catch (e) {
+                box.textContent = "体检请求失败: " + e.message;
+            }
+        }
+
+        function triggerRepairStorage() {
+            showConfirmModal({
+                title: "🛠️ 应急净化修复存储",
+                message: "确定要执行 app_storage.json 安全净化重置吗？",
+                details: "该操作将备份现有存储并清除坏死/非法的 JSON 节点，用于排查登录秒退或凭据损坏。",
+                confirmText: "执行修复",
+                isDanger: true,
+                onConfirm: async () => {
+                    showToast("正在执行存储应急净化...");
+                    const resp = await fetch("/api/action/repair-storage", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({})
+                    });
+                    const res = await resp.json();
+                    showToast(res.message || "存储净化完成！");
+                    fetchStatus(false);
+                }
+            });
+        }
+
+        // R3.4 页面可见性定时器防抖与轮询驱动
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
         function startPolling() {
+            stopPolling(); // 强制前置幂等清理旧定时器，防止叠加倍速轮询
+            countdownSeconds = 8;
             fetchStatus(false);
             pollTimer = setInterval(() => {
                 countdownSeconds--;
                 const badge = document.getElementById("refreshCountdownBadge");
                 if (badge) badge.textContent = `(${countdownSeconds}s)`;
                 if (countdownSeconds <= 0) {
+                    countdownSeconds = 8;
                     fetchStatus(false);
                 }
             }, 1000);
@@ -1861,7 +2763,7 @@
 
         document.addEventListener("visibilitychange", () => {
             if (document.hidden) {
-                clearInterval(pollTimer);
+                stopPolling();
             } else {
                 startPolling();
             }

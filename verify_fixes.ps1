@@ -499,10 +499,10 @@ Assert-Test "SQLite extraction on pure idle conversations returns 0 active roots
 Write-Host "`n--- Test 11: Desktop Explorer COM Process Decoupling ---" -ForegroundColor Yellow
 $testExe = "powershell.exe"
 $beforePowershellPids = @(Get-Process -Name "powershell" -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
-$null = Start-DetachedAntigravityProcess -ExePath $testExe -Arguments "-NoProfile -Command Start-Sleep -Seconds 5"
+$launchedPid = Start-DetachedAntigravityProcess -ExePath $testExe -Arguments "-NoProfile -Command Start-Sleep -Seconds 5"
 
 Start-Sleep -Milliseconds 800
-$childProc = Get-Process -Name "powershell" -ErrorAction SilentlyContinue | Where-Object { -not $beforePowershellPids.Contains($_.Id) } | Select-Object -First 1
+$childProc = if ($launchedPid -and $launchedPid -gt 0) { Get-Process -Id $launchedPid -ErrorAction SilentlyContinue } else { Get-Process -Name "powershell" -ErrorAction SilentlyContinue | Where-Object { -not $beforePowershellPids.Contains($_.Id) } | Select-Object -First 1 }
 
 $isDecoupled = $false
 $parentProcName = ""
@@ -574,6 +574,269 @@ Assert-Test "GuiPayload includes slotIndex and supportedModels" ($guiPayload.slo
 
 # Clean up test sandbox
 Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
+
+# ------------------------------------------------------------------------------
+# Test 14: Timezone Double-Offset Immunity & Upper Bounds (Tier 2)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 14: Timezone Double-Offset Immunity & Upper Bounds (Tier 2) ---" -ForegroundColor Yellow
+
+$nowTz = Get-Date
+
+# 14a: Naive local string (Must NOT add timezone offset again, e.g. +8h)
+$naiveLocalStr = $nowTz.AddHours(2).ToString("yyyy-MM-dd HH:mm:ss")
+$parsedLocal = ConvertTo-LocalDateTime $naiveLocalStr
+$spanLocal = $parsedLocal - $nowTz
+Assert-Test "Naive local string retains exact +2h difference" ([Math]::Abs($spanLocal.TotalHours - 2.0) -lt 0.05)
+
+# 14b: UTC ISO string with 'Z'
+$utcStr = $nowTz.ToUniversalTime().AddHours(3).ToString("yyyy-MM-ddTHH:mm:ssZ")
+$parsedUtc = ConvertTo-LocalDateTime $utcStr
+$spanUtc = $parsedUtc - $nowTz
+Assert-Test "UTC ISO string with 'Z' correctly converted to local +3h difference" ([Math]::Abs($spanUtc.TotalHours - 3.0) -lt 0.05)
+
+# 14c: 5h countdown upper bounds verification (absolute limit <= 5 hours)
+$slot5hTestReset = $nowTz.AddHours(4).ToString("yyyy-MM-dd HH:mm:ss")
+$cd5hText = Get-QuotaThawCountdownText -ResetTimeStr $slot5hTestReset -Pct 0 -Type "5h" -Now $nowTz
+Assert-Test "5h countdown text does not exceed 5 hours (no timezone double-offset)" ($cd5hText -notmatch "(?:[5-9]|[1-9]\d+)h\d{2,}m后重置")
+Assert-Test "5h countdown matches expected 03h/04h window" ($cd5hText -match "0[34]h\d{2}m后重置")
+
+# 14d: Weekly countdown upper bounds verification (absolute limit <= 7 days)
+$slotWkTestReset = $nowTz.AddDays(5).ToString("yyyy-MM-dd HH:mm:ss")
+$cdWkText = Get-QuotaThawCountdownText -ResetTimeStr $slotWkTestReset -Pct 0 -Type "weekly" -Now $nowTz
+Assert-Test "Weekly countdown text does not exceed 7 days" ($cdWkText -notmatch "([8-9]|\d{2,})d")
+Assert-Test "Weekly countdown matches expected ~5d window" ($cdWkText -match "5d\s+\d{2}h后重置")
+
+# ------------------------------------------------------------------------------
+# Test 15: Switch Account Audit & switchCount Increment (Tier 1)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 15: Switch Account Audit & switchCount Increment (Tier 1) ---" -ForegroundColor Yellow
+
+$poolStateBefore = Get-SlotPoolState -SkipAutoMatch
+$targetSwitchSlot = $poolStateBefore.slotOrder[0]
+$prevSwitchCount = ConvertTo-SafeInt $poolStateBefore.slots.$targetSwitchSlot.switchCount -Default 0
+$prevHistoryCount = if ($poolStateBefore.history) { @($poolStateBefore.history).Count } else { 0 }
+
+# Execute switch without killing processes
+$switchedEmail = $null
+try {
+    $switchedEmail = Switch-CredentialSlot -SlotName $targetSwitchSlot -WorkspacePath $PSScriptRoot -NonInteractive -CloseProcesses:$false
+} catch {
+    Write-Host "    Switch execution notice: $($_.Exception.Message)" -ForegroundColor DarkGray
+}
+
+$poolStateAfter = Get-SlotPoolState -SkipAutoMatch
+$newSwitchCount = ConvertTo-SafeInt $poolStateAfter.slots.$targetSwitchSlot.switchCount -Default 0
+$newHistory = if ($poolStateAfter.history) { @($poolStateAfter.history) } else { @() }
+
+Assert-Test "Switch-CredentialSlot increments target slot switchCount strictly by 1" ($newSwitchCount -eq ($prevSwitchCount + 1))
+Assert-Test "state.history records new entry after switch" ($newHistory.Count -eq [Math]::Min(50, $prevHistoryCount + 1))
+
+if ($newHistory.Count -gt 0) {
+    $lastAudit = $newHistory[-1]
+    Assert-Test "Audit history entry has valid timestamp" ([DateTime]::TryParse($lastAudit.timestamp, [ref](Get-Date)))
+    Assert-Test "Audit history entry toSlot matches target slot" ($lastAudit.toSlot -eq $targetSwitchSlot)
+    Assert-Test "Audit history entry has non-empty reason" (-not [string]::IsNullOrWhiteSpace($lastAudit.reason))
+} else {
+    Assert-Test "Audit history entry has valid timestamp" $false "state.history is empty"
+    Assert-Test "Audit history entry toSlot matches target slot" $false "state.history is empty"
+    Assert-Test "Audit history entry has non-empty reason" $false "state.history is empty"
+}
+
+# ------------------------------------------------------------------------------
+# Test 16: Read-Only Zero Disk Write & Dirty-Flag Mechanism (Tier 2)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 16: Read-Only Zero Disk Write & Dirty-Flag Mechanism (Tier 2) ---" -ForegroundColor Yellow
+
+$stateFilePath = $PoolStatePath
+if (-not (Test-Path $stateFilePath)) {
+    $null = Get-SlotPoolState -SkipAutoMatch
+}
+
+# 16a: Record initial timestamp ticks and SHA256 hash
+$beforeItem = Get-Item $stateFilePath
+$beforeWriteTime = $beforeItem.LastWriteTimeUtc.Ticks
+$beforeHash = (Get-FileHash -Path $stateFilePath -Algorithm SHA256).Hash
+
+# Sleep slightly to allow any potential file timestamp update to be measurable
+Start-Sleep -Milliseconds 100
+
+# 16b: Perform 10 consecutive read-only queries
+for ($rIdx = 0; $rIdx -lt 10; $rIdx++) {
+    $null = Get-SlotPoolState -SkipAutoMatch
+    $null = Get-SlotPoolGuiPayload
+}
+
+# 16c: Verify LastWriteTimeUtc and SHA256 hash remain strictly identical
+$afterItem = Get-Item $stateFilePath
+$afterWriteTime = $afterItem.LastWriteTimeUtc.Ticks
+$afterHash = (Get-FileHash -Path $stateFilePath -Algorithm SHA256).Hash
+
+Assert-Test "Read-only queries do NOT modify pool_state.json LastWriteTimeUtc (Dirty-Flag)" ($beforeWriteTime -eq $afterWriteTime)
+Assert-Test "Read-only queries do NOT alter pool_state.json SHA256 hash" ($beforeHash -eq $afterHash)
+
+# ------------------------------------------------------------------------------
+# Test 17: DPAPI Credential Atomic Write & Security (Tier 1)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 17: DPAPI Credential Atomic Write & Security (Tier 1) ---" -ForegroundColor Yellow
+
+$testAtomicDir = Join-Path $PSScriptRoot "test_dpapi_sandbox"
+if (Test-Path $testAtomicDir) { Remove-Item $testAtomicDir -Recurse -Force }
+New-Item -ItemType Directory -Path $testAtomicDir -Force | Out-Null
+
+$atomicTarget = Join-Path $testAtomicDir "credential.dpapi"
+$initialSecret = "INITIAL_SECRET_DATA_12345"
+$updatedSecret = "UPDATED_SECRET_DATA_67890"
+
+# Protect data using DPAPI
+$encryptedInitial = [AntigravityCompliantHelper.NativeVaultV4]::ProtectText($initialSecret)
+$encryptedUpdated = [AntigravityCompliantHelper.NativeVaultV4]::ProtectText($updatedSecret)
+
+# 17a: Initial atomic write
+Write-AtomicAscii -Path $atomicTarget -Content $encryptedInitial
+$readInitial = [System.IO.File]::ReadAllText($atomicTarget, [System.Text.Encoding]::ASCII)
+Assert-Test "Write-AtomicAscii writes valid DPAPI content" ($readInitial -eq $encryptedInitial)
+
+# 17b: Overwrite atomically using Win32 MoveFileAtomic
+Write-AtomicAscii -Path $atomicTarget -Content $encryptedUpdated
+$readUpdated = [System.IO.File]::ReadAllText($atomicTarget, [System.Text.Encoding]::ASCII)
+Assert-Test "Write-AtomicAscii cleanly overwrites target with MoveFileAtomic" ($readUpdated -eq $encryptedUpdated)
+
+# 17c: Verify DPAPI decrypts to original plaintext
+$decrypted = [AntigravityCompliantHelper.NativeVaultV4]::UnprotectText($readUpdated)
+Assert-Test "Decrypted payload matches updated plaintext secret" ($decrypted -eq $updatedSecret)
+
+# 17d: No leftover .tmp files
+$leftoverTmp = @(Get-ChildItem -Path $testAtomicDir -Filter "*.tmp")
+Assert-Test "No leftover temporary files remain in directory after atomic write" ($leftoverTmp.Count -eq 0)
+
+# Clean up sandbox
+Remove-Item $testAtomicDir -Recurse -Force -ErrorAction SilentlyContinue
+
+# ------------------------------------------------------------------------------
+# Test 18: CORS Origin Security Convergence (Tier 2)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 18: CORS Origin Security Convergence (Tier 2) ---" -ForegroundColor Yellow
+
+$helperFilePath = Join-Path $PSScriptRoot "antigravity_compliant_helper.ps1"
+$helperCode = [System.IO.File]::ReadAllText($helperFilePath, [System.Text.Encoding]::UTF8)
+
+# 18a: Source code must not expose wildcard CORS header
+$hasWildcardCors = $helperCode -match 'Access-Control-Allow-Origin",\s*"\*"'
+Assert-Test "Start-SlotPoolHttpServer source code has NO wildcard '*' CORS header" (-not $hasWildcardCors)
+
+# 18b: Dynamic HTTP server Origin verification
+$corsTestPort = 4096
+$corsServerJob = $null
+try {
+    $corsServerJob = Start-Job -ScriptBlock {
+        param($p, $scriptP)
+        . $scriptP -Action load-only
+        Start-SlotPoolHttpServer -Port $p
+    } -ArgumentList $corsTestPort, $helperFilePath
+
+    Start-Sleep -Seconds 2
+
+    # Legitimate Origin (http://127.0.0.1:4088)
+    $legitReq = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$corsTestPort/api/status")
+    $legitReq.Headers.Add("Origin", "http://127.0.0.1:4088")
+    $legitReq.Timeout = 5000
+    $legitCors = ""
+    try {
+        $legitResp = $legitReq.GetResponse()
+        $legitCors = $legitResp.Headers["Access-Control-Allow-Origin"]
+        $legitResp.Close()
+    } catch {}
+    Assert-Test "Legitimate Origin 127.0.0.1:4088 receives expected CORS header" ($legitCors -eq "http://127.0.0.1:4088")
+
+    # Malicious Origin (http://evil.com)
+    $evilReq = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$corsTestPort/api/status")
+    $evilReq.Headers.Add("Origin", "http://evil.com")
+    $evilReq.Timeout = 5000
+    $evilCors = ""
+    $evilBlocked = $false
+    try {
+        $evilResp = $evilReq.GetResponse()
+        $evilCors = $evilResp.Headers["Access-Control-Allow-Origin"]
+        $evilResp.Close()
+    } catch [System.Net.WebException] {
+        if ($_.Exception -and $_.Exception.Response) {
+            $webResp = $_.Exception.Response -as [System.Net.HttpWebResponse]
+            if ($webResp -and [int]$webResp.StatusCode -eq 403) {
+                $evilBlocked = $true
+            }
+        }
+    } catch {}
+    Assert-Test "Malicious Origin (evil.com) is blocked with 403 or denied matching CORS header" ($evilBlocked -or ($evilCors -ne "*" -and $evilCors -ne "http://evil.com"))
+} finally {
+    if ($corsServerJob) {
+        Stop-Job $corsServerJob -ErrorAction SilentlyContinue
+        Remove-Job $corsServerJob -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# ------------------------------------------------------------------------------
+# Test 19: PowerShell 5.1 & 7+ Dual Compatibility & UTF-8 BOM (Tier 1)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 19: PowerShell 5.1 & 7+ Dual Compatibility & UTF-8 BOM (Tier 1) ---" -ForegroundColor Yellow
+
+$scriptBytes = [System.IO.File]::ReadAllBytes($helperFilePath)
+
+# 19a: UTF-8 BOM verification (0xEF, 0xBB, 0xBF)
+$hasBomHeader = ($scriptBytes.Length -ge 3 -and $scriptBytes[0] -eq 0xEF -and $scriptBytes[1] -eq 0xBB -and $scriptBytes[2] -eq 0xBF)
+Assert-Test "antigravity_compliant_helper.ps1 strictly possesses UTF-8 BOM header (0xEF, 0xBB, 0xBF)" $hasBomHeader
+
+# 19b: PowerShell AST parser reports 0 syntax errors
+$astTokens = $null
+$astErrors = $null
+$scriptAst = [System.Management.Automation.Language.Parser]::ParseFile($helperFilePath, [ref]$astTokens, [ref]$astErrors)
+Assert-Test "PowerShell AST parser reports exactly 0 syntax errors" ($astErrors.Count -eq 0)
+
+# 19c: No unquoted PS7-exclusive operators (??, &&) in PowerShell AST tokens
+$ps7Tokens = @($astTokens | Where-Object { $_.Text -in @('??', '&&') -and $_.Kind -ne [System.Management.Automation.Language.TokenKind]::StringLiteral })
+$hasPs7NullCoalesce = ($ps7Tokens | Where-Object { $_.Text -eq '??' })
+$hasPs7PipelineAnd = ($ps7Tokens | Where-Object { $_.Text -eq '&&' })
+Assert-Test "No unquoted PS7 null-coalescing '??' in helper code" ($null -eq $hasPs7NullCoalesce)
+Assert-Test "No unquoted PS7 pipeline chaining '&&' in helper code" ($null -eq $hasPs7PipelineAnd)
+
+# ------------------------------------------------------------------------------
+# Test 20: WebUI GuiPayload Schema Contract & 16 API Endpoints (Tier 1 & 4)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 20: WebUI GuiPayload Schema Contract & 16 API Endpoints (Tier 1 & 4) ---" -ForegroundColor Yellow
+
+# 20a: GuiPayload Schema completeness
+$guiPayloadV2 = Get-SlotPoolGuiPayload
+Assert-Test "GuiPayload contains 'runway' object" ($null -ne $guiPayloadV2["runway"])
+Assert-Test "GuiPayload contains 'current' object" ($null -ne $guiPayloadV2["current"])
+Assert-Test "GuiPayload contains 'slots' array" ($null -ne $guiPayloadV2["slots"])
+Assert-Test "GuiPayload contains 'daemon' object" ($null -ne $guiPayloadV2["daemon"])
+$hasTaskState = ($null -ne $guiPayloadV2 -and ($guiPayloadV2.Contains("taskState") -or $null -ne $guiPayloadV2["taskState"]))
+Assert-Test "GuiPayload contains 'taskState' field (async progress tracking)" $hasTaskState
+
+# 20b: All 16 API endpoints verified in HTTP server router
+$requiredEndpoints = @(
+    @{ Path = "/"; Method = "GET"; Desc = "WebUI Root HTML" },
+    @{ Path = "/api/status"; Method = "GET"; Desc = "Aggregated Status API" },
+    @{ Path = "/api/action/switch"; Method = "POST"; Desc = "Switch Slot API" },
+    @{ Path = "/api/action/next"; Method = "POST"; Desc = "Next Slot API" },
+    @{ Path = "/api/action/resume"; Method = "POST"; Desc = "Resume Session API" },
+    @{ Path = "/api/action/reset-cooldown"; Method = "POST"; Desc = "Reset Cooldown API" },
+    @{ Path = "/api/action/refresh-slot"; Method = "POST"; Desc = "Refresh Slot Quota API" },
+    @{ Path = "/api/action/toggle-skip"; Method = "POST"; Desc = "Toggle Skip API" },
+    @{ Path = "/api/action/save-current"; Method = "POST"; Desc = "Save Current Slot API" },
+    @{ Path = "/api/action/open-tui"; Method = "POST"; Desc = "Open Console TUI API" },
+    @{ Path = "/api/action/boost"; Method = "POST"; Desc = "R4 Boost Action API" },
+    @{ Path = "/api/action/remove-slot"; Method = "POST"; Desc = "R4 Remove Slot API" },
+    @{ Path = "/api/action/daemon"; Method = "POST"; Desc = "R4 Daemon Control API" },
+    @{ Path = "/api/action/autostart"; Method = "POST"; Desc = "R4 Autostart Toggle API" },
+    @{ Path = "/api/action/goal"; Method = "POST"; Desc = "R4 Goal Healthcheck API" },
+    @{ Path = "/api/action/repair-storage"; Method = "POST"; Desc = "R4 Storage Repair API" }
+)
+
+$serverFuncDef = (Get-Command Start-SlotPoolHttpServer).Definition
+foreach ($ep in $requiredEndpoints) {
+    $hasRoute = $serverFuncDef -match [regex]::Escape($ep.Path)
+    Assert-Test "HTTP Server handles endpoint $($ep.Method) $($ep.Path) ($($ep.Desc))" $hasRoute
+}
 
 Write-Host "`n=======================================================" -ForegroundColor Cyan
 Write-Host "Test Results: $passCount PASSED, $failCount FAILED" -ForegroundColor $(if ($failCount -eq 0) { "Green" } else { "Red" })
