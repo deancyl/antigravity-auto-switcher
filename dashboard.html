@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -53,8 +53,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 28px;
-            background: rgba(10, 14, 23, 0.8);
+            padding: 14px 28px;
+            background: rgba(10, 14, 23, 0.85);
             backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border-card);
             position: sticky;
@@ -66,6 +66,8 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .brand-logo {
@@ -80,6 +82,7 @@
             font-weight: 800;
             color: #ffffff;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            flex-shrink: 0;
         }
 
         .brand-title {
@@ -87,18 +90,22 @@
             font-weight: 700;
             letter-spacing: 0.5px;
             color: #ffffff;
+            white-space: nowrap;
         }
 
         .brand-subtitle {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
             margin-top: 1px;
+            white-space: nowrap;
         }
 
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .pill-badge {
@@ -111,6 +118,8 @@
             font-weight: 600;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-card);
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .pill-badge.green {
@@ -132,6 +141,7 @@
             background-color: currentColor;
             box-shadow: 0 0 8px currentColor;
             animation: pulse-ring 2s infinite ease-in-out;
+            flex-shrink: 0;
         }
 
         @keyframes pulse-ring {
@@ -143,20 +153,27 @@
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid var(--border-card);
             color: var(--text-primary);
-            padding: 7px 14px;
+            padding: 6px 13px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
-            display: flex;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-flex;
             align-items: center;
             gap: 6px;
             transition: all 0.2s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .btn-icon:hover {
             background: rgba(255, 255, 255, 0.12);
             border-color: rgba(255, 255, 255, 0.2);
             transform: translateY(-1px);
+        }
+
+        .btn-icon:active {
+            transform: translateY(0);
         }
 
         .btn-primary {
@@ -175,13 +192,13 @@
         /* 主体布局 */
         main {
             flex: 1;
-            padding: 24px 28px;
-            max-width: 1280px;
+            padding: 20px 28px;
+            max-width: 1360px;
             width: 100%;
             margin: 0 auto;
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 20px;
         }
 
         /* 顶部 Hero 卡片 */
@@ -194,7 +211,7 @@
             display: grid;
             grid-template-columns: 1fr auto;
             align-items: center;
-            gap: 20px;
+            gap: 24px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
             position: relative;
             overflow: hidden;
@@ -211,13 +228,14 @@
         .hero-info {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
 
         .hero-slot-tag {
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            white-space: nowrap;
         }
 
         .slot-badge-large {
@@ -232,28 +250,32 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+            flex-shrink: 0;
         }
 
         .hero-email {
-            font-size: 19px;
+            font-size: 18px;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: 0.3px;
         }
 
         .hero-fingerprint {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
             background: rgba(255, 255, 255, 0.05);
             padding: 2px 8px;
             border-radius: 6px;
+            border: 1px solid var(--border-card);
+            white-space: nowrap;
         }
 
         .hero-meta-row {
             display: flex;
             align-items: center;
             gap: 16px;
-            font-size: 13px;
+            flex-wrap: wrap;
+            font-size: 12px;
             color: var(--text-secondary);
         }
 
@@ -261,36 +283,34 @@
             display: flex;
             align-items: center;
             gap: 6px;
-        }
-
-        .hero-meta-item strong {
-            color: var(--text-primary);
+            white-space: nowrap;
         }
 
         .hero-bars {
             display: flex;
-            align-items: center;
-            gap: 24px;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 320px;
         }
 
         .hero-bar-group {
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            min-width: 140px;
+            gap: 4px;
         }
 
         .hero-bar-label {
             display: flex;
             justify-content: space-between;
-            font-size: 12px;
-            font-weight: 600;
+            align-items: center;
+            font-size: 11px;
             color: var(--text-secondary);
+            white-space: nowrap;
         }
 
         .progress-track {
-            height: 8px;
-            background: rgba(255, 255, 255, 0.08);
+            height: 7px;
+            background: rgba(255, 255, 255, 0.06);
             border-radius: 4px;
             overflow: hidden;
             position: relative;
@@ -299,14 +319,86 @@
         .progress-fill {
             height: 100%;
             border-radius: 4px;
-            transition: width 0.5s ease-out;
+            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .progress-fill.green { background: linear-gradient(90deg, #10b981, #34d399); }
         .progress-fill.yellow { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
         .progress-fill.red { background: linear-gradient(90deg, #ef4444, #f87171); }
 
-        /* 快捷动作按钮栏 */
+        /* 全池宏观水位大盘 (Pool Runway Strip) */
+        .runway-strip {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+        }
+
+        .runway-card {
+            background: rgba(18, 25, 42, 0.6);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s ease;
+        }
+
+        .runway-card:hover {
+            border-color: rgba(255, 255, 255, 0.16);
+            background: rgba(26, 36, 60, 0.7);
+        }
+
+        .runway-icon-box {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .runway-icon-box.green { background: var(--accent-green-bg); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .runway-icon-box.cyan { background: var(--accent-cyan-bg); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
+        .runway-icon-box.yellow { background: var(--accent-yellow-bg); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .runway-icon-box.purple { background: var(--accent-purple-bg); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+        .runway-body {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .runway-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .runway-val {
+            font-size: 15px;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: baseline;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .runway-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: normal;
+        }
+
+        /* 快捷动作栏 + 视图控制 */
         .quick-toolbar {
             display: flex;
             align-items: center;
@@ -316,7 +408,7 @@
         }
 
         .section-heading {
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 700;
             color: var(--text-secondary);
             text-transform: uppercase;
@@ -324,18 +416,61 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            white-space: nowrap;
         }
 
         .toolbar-btns {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .view-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .filter-chip-group {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-card);
+            border-radius: 8px;
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .filter-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
         }
 
         /* 槽位池卡片网格 */
         .slot-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 18px;
         }
 
@@ -343,11 +478,11 @@
             background: var(--bg-card);
             border: 1px solid var(--border-card);
             border-radius: 14px;
-            padding: 18px 20px;
+            padding: 16px 18px;
             backdrop-filter: blur(8px);
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
             transition: all 0.25s ease;
             position: relative;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
@@ -366,30 +501,42 @@
             box-shadow: 0 4px 20px rgba(16, 185, 129, 0.18);
         }
 
+        .slot-card.is-skipped {
+            opacity: 0.65;
+            border-style: dashed;
+        }
+
         .slot-card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            white-space: nowrap;
+            gap: 8px;
         }
 
         .slot-title-group {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            overflow: hidden;
+            white-space: nowrap;
         }
 
         .slot-letter-badge {
-            width: 28px;
-            height: 28px;
+            min-width: 44px;
+            padding: 0 8px;
+            height: 26px;
             border-radius: 6px;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.12);
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 700;
             color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .slot-card.active-slot .slot-letter-badge {
@@ -399,23 +546,39 @@
         }
 
         .slot-email-text {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--text-primary);
-            max-width: 200px;
+            max-width: 175px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            cursor: pointer;
+        }
+
+        .slot-email-text:hover {
+            color: #38bdf8;
+            text-decoration: underline;
+        }
+
+        .slot-header-tags {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .status-chip {
-            padding: 3px 9px;
-            border-radius: 12px;
+            padding: 3px 8px;
+            border-radius: 10px;
             font-size: 11px;
             font-weight: 700;
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .status-chip.active { background: var(--accent-green-bg); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
@@ -423,16 +586,42 @@
         .status-chip.exhausted-5h { background: var(--accent-yellow-bg); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
         .status-chip.exhausted-weekly { background: var(--accent-purple-bg); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
         .status-chip.unsupported { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); }
+        .status-chip.skipped { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
 
-        /* 卡片内配额指标 */
+        /* 模型胶囊标签 */
+        .slot-models-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: -2px;
+        }
+
+        .model-pill {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            white-space: nowrap;
+        }
+
+        .model-pill.special {
+            background: rgba(16, 185, 129, 0.14);
+            color: #34d399;
+            border-color: rgba(16, 185, 129, 0.3);
+            font-weight: 600;
+        }
+
+        /* 主次分明配额区域 */
         .slot-metrics {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             background: rgba(0, 0, 0, 0.2);
-            padding: 10px 14px;
+            padding: 10px 12px;
             border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .metric-row {
@@ -447,34 +636,32 @@
             align-items: center;
             font-size: 11px;
             color: var(--text-secondary);
-        }
-
-        .countdown-badge {
-            font-size: 11px;
-            font-weight: 500;
-            color: var(--text-muted);
-            background: rgba(255, 255, 255, 0.05);
-            padding: 2px 7px;
-            border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            white-space: nowrap;
         }
 
         .metric-val-group {
             display: flex;
             align-items: center;
             gap: 6px;
+            white-space: nowrap;
+        }
+
+        .metric-val {
+            font-weight: 700;
+            color: #ffffff;
+            font-size: 12px;
         }
 
         .metric-countdown {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
-            padding: 2px 7px;
+            padding: 1px 6px;
             border-radius: 4px;
             letter-spacing: 0.2px;
             display: inline-flex;
             align-items: center;
-            gap: 3px;
-            transition: all 0.2s ease;
+            gap: 2px;
+            white-space: nowrap;
         }
 
         .metric-countdown.ready {
@@ -498,163 +685,364 @@
         .metric-countdown.muted {
             color: var(--text-muted);
             background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        .countdown-badge.cooldown {
-            color: #fbbf24;
-            background: rgba(245, 158, 11, 0.15);
-            border-color: rgba(245, 158, 11, 0.35);
+        /* 折叠抽屉：其他模型配额 */
+        .other-models-toggle {
+            font-size: 11px;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding-top: 4px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.06);
+            transition: color 0.2s ease;
+            white-space: nowrap;
         }
 
-        .countdown-badge.ready {
-            color: #34d399;
-            background: rgba(16, 185, 129, 0.12);
-            border-color: rgba(16, 185, 129, 0.3);
+        .other-models-toggle:hover {
+            color: var(--accent-cyan);
         }
 
-        .metric-val {
-            font-weight: 700;
-            color: var(--text-primary);
+        .other-models-drawer {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            animation: fadeIn 0.2s ease-in-out;
         }
 
+        .other-models-drawer.open {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 卡片底部操作与状态 */
         .slot-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding-top: 4px;
+            white-space: nowrap;
+            gap: 8px;
         }
 
         .slot-countdown {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .card-actions-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btn-mini {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-card);
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn-mini:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text-primary);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-mini.skip-active {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-switch-primary {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+            color: #fff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(14, 165, 233, 0.25);
+        }
+
+        .btn-switch-primary:hover {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            box-shadow: 0 3px 10px rgba(14, 165, 233, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-switch-primary:disabled {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-muted);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 旋转动画（单卡刷新） */
+        .rotating {
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* 底部折叠抽屉：切号审计与运行动态 (Activity Timeline) */
+        .audit-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+            margin-top: 10px;
+        }
+
+        .audit-header {
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .audit-header:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .audit-title-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .audit-summary-pill {
             font-size: 12px;
             color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 600px;
+        }
+
+        .audit-timeline-content {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            padding: 14px 18px;
+            border-top: 1px solid var(--border-card);
+            max-height: 240px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        .audit-timeline-content.open {
+            display: flex;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            white-space: nowrap;
+            gap: 12px;
+        }
+
+        .timeline-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .timeline-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+        }
+
+        .timeline-time {
+            color: var(--text-muted);
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .timeline-transfer {
+            font-weight: 700;
+            color: #38bdf8;
             display: flex;
             align-items: center;
             gap: 4px;
         }
 
-        .btn-switch {
-            padding: 6px 14px;
-            font-size: 12px;
-            font-weight: 600;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            border: 1px solid var(--border-card);
-            background: rgba(255, 255, 255, 0.06);
-            color: var(--text-primary);
+        .timeline-reason {
+            color: var(--text-secondary);
+            font-size: 11px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 500px;
         }
 
-        .btn-switch:hover {
-            background: var(--accent-green);
-            color: #ffffff;
-            border-color: var(--accent-green);
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-        }
-
-        .btn-switch.current {
-            background: transparent;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: var(--accent-green);
-            cursor: default;
-        }
-
-        /* 底部信息栏与双轨互通提示 */
+        /* 底部说明与时间戳 */
         footer {
-            margin-top: auto;
-            padding: 16px 28px;
-            background: rgba(10, 14, 23, 0.9);
-            border-top: 1px solid var(--border-card);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding: 16px 28px;
+            border-top: 1px solid var(--border-card);
+            background: rgba(10, 14, 23, 0.85);
             font-size: 12px;
             color: var(--text-muted);
+            white-space: nowrap;
         }
 
         .dual-track-note {
             display: flex;
             align-items: center;
             gap: 8px;
-            color: var(--text-secondary);
+            white-space: nowrap;
         }
 
         .track-tag {
-            padding: 2px 6px;
             background: rgba(255, 255, 255, 0.08);
+            padding: 2px 6px;
             border-radius: 4px;
-            font-weight: 600;
-            color: var(--accent-cyan);
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-secondary);
         }
 
-        /* Toast 提示浮窗 */
+        /* Toast 提示 */
         #toast {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: #1e293b;
+            bottom: 28px;
+            right: 28px;
+            background: rgba(18, 25, 42, 0.95);
+            border: 1px solid var(--accent-green);
             color: #ffffff;
-            padding: 12px 20px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 18px;
+            border-radius: 8px;
             font-size: 13px;
-            font-weight: 600;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            display: none;
-            z-index: 1000;
+            font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            display: flex;
             align-items: center;
             gap: 8px;
-            transition: all 0.3s ease;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(12px);
+            pointer-events: none;
+            transition: all 0.25s ease;
         }
 
-        #toast.show { display: flex; animation: slideUp 0.3s ease forwards; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        #toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
 
         /* 模态框 */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(6px);
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 999;
+            z-index: 500;
         }
 
-        .modal-overlay.show { display: flex; }
+        .modal-overlay.open {
+            display: flex;
+        }
 
         .modal-card {
-            background: #131b2e;
-            border: 1px solid var(--border-card);
+            background: #111827;
+            border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 14px;
             padding: 24px;
-            width: 420px;
-            max-width: 90vw;
+            width: 380px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
             display: flex;
             flex-direction: column;
-            gap: 16px;
-            box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+            gap: 14px;
         }
 
-        .modal-title { font-size: 16px; font-weight: 700; color: #fff; }
+        .modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
         .modal-input {
-            width: 100%;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border-card);
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 8px;
             padding: 10px 12px;
-            color: #fff;
-            font-size: 14px;
+            color: #ffffff;
+            font-size: 13px;
             outline: none;
         }
-        .modal-input:focus { border-color: var(--accent-cyan); }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+        .modal-input:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        @media (max-width: 900px) {
+            .hero-banner { grid-template-columns: 1fr; }
+            .runway-strip { grid-template-columns: repeat(2, 1fr); }
+            .slot-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
 
-    <!-- 顶部状态栏 -->
+    <!-- 顶部导航 -->
     <header>
         <div class="brand-box">
             <div class="brand-logo">A</div>
@@ -663,78 +1051,119 @@
                 <div class="brand-subtitle">5小时 / 周配额全自动切号与原会话恢复</div>
             </div>
         </div>
+
         <div class="header-actions">
-            <div id="daemonBadge" class="pill-badge green">
-                <span class="pulse-dot"></span>
-                <span id="daemonText">守护运行中 (PID: --)</span>
-            </div>
             <div class="pill-badge" id="modelBadge">
-                <span>锁定: <strong id="lockedModelText">Gemini 3.8 Flash</strong></span>
+                <span style="font-size: 14px;">🎯</span>
+                <span id="lockedModelText">锁定模型检测中...</span>
             </div>
-            <button class="btn-icon" onclick="openTerminalTui()" title="一键呼出原有黑框交互菜单">
+            <div class="pill-badge green" id="daemonBadge">
+                <span class="pulse-dot"></span>
+                <span id="daemonText">守护运行中</span>
+            </div>
+            <button class="btn-icon" onclick="openTuiTerminal()">
                 📟 经典终端
             </button>
-            <button class="btn-icon btn-primary" id="refreshBtn" onclick="manualRefresh()" title="强制云端全量刷新">
-                🔄 刷新配额
+            <button class="btn-icon btn-primary" id="btnRefresh" onclick="fetchStatus(true)">
+                <span id="refreshIcon">🔄</span>
+                <span>刷新配额</span>
+                <span id="refreshCountdownBadge" style="font-size: 10px; opacity: 0.8; margin-left: 2px;">(8s)</span>
             </button>
         </div>
     </header>
 
-    <!-- 主体区域 -->
+    <!-- 主体内容 -->
     <main>
-        <!-- 当前使用账号 Hero Banner -->
+        <!-- 顶部 Hero 卡片 (当前使用账号) -->
         <section class="hero-banner">
             <div class="hero-info">
                 <div class="hero-slot-tag">
-                    <div class="slot-badge-large" id="heroSlotBadge">d</div>
-                    <span class="hero-email" id="heroEmail">loading...</span>
-                    <span class="hero-fingerprint" id="heroFp">fp: --</span>
+                    <div class="slot-badge-large" id="heroSlotBadge">-</div>
+                    <div class="hero-email" id="heroEmail">正在读取当前账号...</div>
+                    <div class="hero-fingerprint" id="heroFp">指纹: --</div>
                 </div>
                 <div class="hero-meta-row">
                     <div class="hero-meta-item">
-                        <span>当前状态:</span>
-                        <strong id="heroCountdown" style="color: var(--accent-green);">就绪可用</strong>
+                        <span>● 当前状态:</span>
+                        <span style="color: #34d399; font-weight: 600;" id="heroStatusText">★ 使用中</span>
                     </div>
                     <div class="hero-meta-item">
-                        <span>数据新鲜度:</span>
-                        <strong id="heroSyncTime">云端已同步</strong>
+                        <span>⏱️ 5小时冷却:</span>
+                        <span id="hero5hCountdown" class="countdown-badge ready">⏱️ 就绪可用</span>
                     </div>
                     <div class="hero-meta-item">
-                        <span>自动轮询:</span>
-                        <strong id="pollCountdown">8s</strong>
+                        <span>⏱️ 周重置倒计:</span>
+                        <span id="heroWeeklyCountdown" class="countdown-badge ready">⏱️ 就绪可用</span>
+                    </div>
+                    <div class="hero-meta-item">
+                        <span>☁️ 配额新鲜度:</span>
+                        <span id="heroSyncTime" style="color: var(--text-muted);">实时</span>
                     </div>
                 </div>
             </div>
+
             <div class="hero-bars">
                 <div class="hero-bar-group">
                     <div class="hero-bar-label">
-                        <span>5小时额度: <strong id="hero5hPct">--%</strong></span>
-                        <span id="hero5hCountdown" class="countdown-badge">⏱️ --</span>
+                        <span>当前模型 5小时配额</span>
+                        <span id="hero5hPct" style="font-weight: 700; color: #fff;">--%</span>
                     </div>
                     <div class="progress-track">
-                        <div id="hero5hBar" class="progress-fill green" style="width: 0%;"></div>
+                        <div class="progress-fill green" id="hero5hBar" style="width: 0%"></div>
                     </div>
                 </div>
                 <div class="hero-bar-group">
                     <div class="hero-bar-label">
-                        <span>周额度: <strong id="heroWeeklyPct">--%</strong></span>
-                        <span id="heroWeeklyCountdown" class="countdown-badge">⏱️ --</span>
+                        <span>当前模型 周配额余量</span>
+                        <span id="heroWeeklyPct" style="font-weight: 700; color: #fff;">--%</span>
                     </div>
                     <div class="progress-track">
-                        <div id="heroWeeklyBar" class="progress-fill green" style="width: 0%;"></div>
+                        <div class="progress-fill green" id="heroWeeklyBar" style="width: 0%"></div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- 快捷操作区 -->
+        <!-- 全池宏观水位大盘 (Pool Runway Strip) -->
+        <section class="runway-strip">
+            <div class="runway-card">
+                <div class="runway-icon-box green">🟢</div>
+                <div class="runway-body">
+                    <div class="runway-title">全池就绪槽位</div>
+                    <div class="runway-val" id="runwayReadyVal">-- / -- <span class="runway-sub">待命中</span></div>
+                </div>
+            </div>
+            <div class="runway-card">
+                <div class="runway-icon-box cyan">💧</div>
+                <div class="runway-body">
+                    <div class="runway-title" id="runwayModelTitle">当前模型全池均值</div>
+                    <div class="runway-val" id="runwayAvgVal">--% <span class="runway-sub">平均水位</span></div>
+                </div>
+            </div>
+            <div class="runway-card">
+                <div class="runway-icon-box yellow">⏱️</div>
+                <div class="runway-body">
+                    <div class="runway-title">冷却中槽位</div>
+                    <div class="runway-val" id="runwayCooldownVal">-- <span class="runway-sub">限额冷却中</span></div>
+                </div>
+            </div>
+            <div class="runway-card">
+                <div class="runway-icon-box purple">🛡️</div>
+                <div class="runway-body">
+                    <div class="runway-title">守护与续接机制</div>
+                    <div class="runway-val">Zero-CDP <span class="runway-sub">原生协议续接</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 快捷操作区 + 排序/筛选视图控制 -->
         <div class="quick-toolbar">
             <div class="section-heading">
                 <span>全账号槽位池 (Slot Pool)</span>
             </div>
             <div class="toolbar-btns">
                 <button class="btn-icon" onclick="triggerNextSlot()">
-                    ⚡ 轮换至下一可用账号
+                    ⚡ 轮换至下一账号
                 </button>
                 <button class="btn-icon" onclick="triggerResume()">
                     💬 恢复当前原会话
@@ -746,11 +1175,39 @@
                     ⏱️ 重置槽位冷却
                 </button>
             </div>
+            <div class="view-controls">
+                <button class="btn-icon" id="btnSortToggle" onclick="toggleSortMode()">
+                    <span id="sortIcon">🔤</span>
+                    <span id="sortText">默认槽位排序</span>
+                </button>
+                <div class="filter-chip-group">
+                    <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
+                    <button class="filter-btn" onclick="setFilter('ready', this)">就绪</button>
+                    <button class="filter-btn" onclick="setFilter('cooldown', this)">冷却中</button>
+                </div>
+            </div>
         </div>
 
         <!-- 槽位卡片网格 -->
         <section class="slot-grid" id="slotsContainer">
             <!-- 动态注入 slot-card -->
+        </section>
+
+        <!-- 底部折叠抽屉：切号审计与运行动态 (Activity Timeline) -->
+        <section class="audit-panel">
+            <div class="audit-header" onclick="toggleTimeline()">
+                <div class="audit-title-box">
+                    <span style="font-size: 14px;">📌</span>
+                    <span style="font-weight: 700; font-size: 13px; color: #fff;">切号审计与运行动态</span>
+                    <span class="audit-summary-pill" id="auditSummaryPill">正在读取审计日志...</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                    <span id="timelineToggleText">展开时间轴 ▾</span>
+                </div>
+            </div>
+            <div class="audit-timeline-content" id="timelineContent">
+                <!-- 动态注入 timeline-item -->
+            </div>
         </section>
     </main>
 
@@ -773,7 +1230,7 @@
             <p style="font-size: 13px; color: var(--text-secondary);">
                 请输入槽位名称（例如 a, b, c，若留空将自动分配字母代号）：
             </p>
-            <input type="text" class="modal-input" id="slotInput" placeholder="槽位字母 (如 g)" maxlength="8">
+            <input type="text" class="modal-input" id="slotInput" placeholder="槽位字母 (如 i)" maxlength="8">
             <div class="modal-actions">
                 <button class="btn-icon" onclick="closeSaveModal()">取消</button>
                 <button class="btn-icon btn-primary" onclick="confirmSaveSlot()">立即加密保存</button>
@@ -785,35 +1242,32 @@
         let pollTimer = null;
         let countdownSeconds = 8;
         let isFetching = false;
+        let globalData = null;
+        let isSortByQuota = false;
+        let currentFilter = 'all'; // 'all' | 'ready' | 'cooldown'
+        let timelineOpen = false;
 
         function showToast(msg) {
             const toast = document.getElementById("toast");
             toast.textContent = msg;
             toast.classList.add("show");
-            setTimeout(() => toast.classList.remove("show"), 3000);
+            setTimeout(() => toast.classList.remove("show"), 2800);
+        }
+
+        function copyEmail(email, event) {
+            if (event) event.stopPropagation();
+            if (!email) return;
+            navigator.clipboard.writeText(email).then(() => {
+                showToast(`已复制邮箱: ${email}`);
+            }).catch(() => {
+                showToast(`复制失败，请手动选择复制`);
+            });
         }
 
         function getPctColorClass(pct) {
             if (pct <= 1) return "red";
             if (pct <= 40) return "yellow";
             return "green";
-        }
-
-        async function fetchStatus(isManual = false) {
-            if (isFetching) return;
-            isFetching = true;
-            try {
-                const resp = await fetch("/api/status" + (isManual ? "?force=true" : ""));
-                if (!resp.ok) throw new Error("HTTP " + resp.status);
-                const data = await resp.json();
-                renderDashboard(data);
-                if (isManual) showToast("已成功从云端刷新配额数据！");
-            } catch (err) {
-                console.error("Fetch status failed:", err);
-            } finally {
-                isFetching = false;
-                countdownSeconds = 8;
-            }
         }
 
         function formatMetricCountdownHtml(cdStr) {
@@ -829,10 +1283,130 @@
             return `<span class="metric-countdown cooldown" title="${cdStr}">⏱️ ${cdStr}</span>`;
         }
 
+        function toggleSortMode() {
+            isSortByQuota = !isSortByQuota;
+            const sortText = document.getElementById("sortText");
+            const sortIcon = document.getElementById("sortIcon");
+            if (isSortByQuota) {
+                sortText.textContent = "配额余量降序";
+                sortIcon.textContent = "⚡";
+                showToast("已切换为：按当前锁定模型配额余量从高到低排序");
+            } else {
+                sortText.textContent = "默认槽位排序";
+                sortIcon.textContent = "🔤";
+                showToast("已恢复为：按字母槽位默认序号排序");
+            }
+            if (globalData) renderSlots(globalData);
+        }
+
+        function setFilter(filterType, elem) {
+            currentFilter = filterType;
+            document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+            if (elem) elem.classList.add("active");
+            if (globalData) renderSlots(globalData);
+        }
+
+        function toggleCardDrawer(elem, event) {
+            if (event) event.stopPropagation();
+            const card = elem.closest(".slot-card");
+            if (!card) return;
+            const drawer = card.querySelector(".other-models-drawer");
+            if (drawer) {
+                const isOpen = drawer.classList.toggle("open");
+                elem.querySelector("span").textContent = isOpen ? "▴ 收起其他模型配额" : elem.dataset.originalLabel;
+            }
+        }
+
+        function toggleTimeline() {
+            timelineOpen = !timelineOpen;
+            const content = document.getElementById("timelineContent");
+            const toggleText = document.getElementById("timelineToggleText");
+            if (timelineOpen) {
+                content.classList.add("open");
+                toggleText.textContent = "收起时间轴 ▴";
+            } else {
+                content.classList.remove("open");
+                toggleText.textContent = "展开时间轴 ▾";
+            }
+        }
+
+        async function fetchStatus(isManual = false) {
+            if (isFetching) return;
+            isFetching = true;
+            const btnRefresh = document.getElementById("btnRefresh");
+            const refreshIcon = document.getElementById("refreshIcon");
+            if (isManual) {
+                refreshIcon.classList.add("rotating");
+            }
+
+            try {
+                const resp = await fetch("/api/status" + (isManual ? "?force=true" : ""));
+                if (!resp.ok) throw new Error("HTTP " + resp.status);
+                const data = await resp.json();
+                globalData = data;
+                renderDashboard(data);
+                if (isManual) showToast("已成功从云端刷新全部账号配额数据！");
+            } catch (err) {
+                console.error("Fetch status failed:", err);
+            } finally {
+                isFetching = false;
+                countdownSeconds = 8;
+                if (isManual) {
+                    setTimeout(() => refreshIcon.classList.remove("rotating"), 500);
+                }
+            }
+        }
+
+        async function refreshSingleSlot(slotName, btnElem, event) {
+            if (event) event.stopPropagation();
+            if (!slotName) return;
+            if (btnElem) {
+                btnElem.classList.add("rotating");
+            }
+            showToast(`正在单独同步槽位 [${slotName}] 的云端配额...`);
+            try {
+                const resp = await fetch("/api/action/refresh-slot", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ slot: slotName })
+                });
+                const res = await resp.json();
+                if (res.success) {
+                    showToast(res.message || `槽位 [${slotName}] 配额已成功更新！`);
+                    fetchStatus(false);
+                } else {
+                    showToast("同步出错: " + (res.message || "未能成功"));
+                }
+            } catch (e) {
+                showToast("网络请求失败: " + e.message);
+            } finally {
+                if (btnElem) {
+                    setTimeout(() => btnElem.classList.remove("rotating"), 600);
+                }
+            }
+        }
+
+        async function toggleSkipSlot(slotName, event) {
+            if (event) event.stopPropagation();
+            if (!slotName) return;
+            try {
+                const resp = await fetch("/api/action/toggle-skip", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ slot: slotName })
+                });
+                const res = await resp.json();
+                showToast(res.message);
+                fetchStatus(false);
+            } catch (e) {
+                showToast("请求失败: " + e.message);
+            }
+        }
+
         function renderDashboard(data) {
             if (!data || !data.success) return;
 
-            // 守护状态
+            // 1. 顶部 Header 状态
             const dBadge = document.getElementById("daemonBadge");
             const dText = document.getElementById("daemonText");
             if (data.daemon && data.daemon.isRunning) {
@@ -843,16 +1417,15 @@
                 dText.textContent = "守护未运行";
             }
 
-            // 锁定模型
             document.getElementById("lockedModelText").textContent = data.current.activeModelLabel || data.current.activeModelGroup;
 
-            // Hero 当前账号
+            // 2. Hero 当前账号
             document.getElementById("heroSlotBadge").textContent = data.current.slotName || "-";
             document.getElementById("heroEmail").textContent = data.current.email || "未检测到登录";
             document.getElementById("heroFp").textContent = "指纹: " + (data.current.tokenFingerprint || "--");
-            document.getElementById("heroCountdown").textContent = data.current.countdownText || "就绪";
             document.getElementById("heroSyncTime").textContent = data.current.lastQuotaSyncAt ? `${data.current.lastQuotaSyncAt} 已同步` : "实时";
             document.getElementById("footerTimestamp").textContent = "更新时间: " + data.timestamp;
+
             const cd5 = data.current.gemini5hCountdown;
             const cdWk = data.current.geminiWeeklyCountdown;
             const h5Elem = document.getElementById("hero5hCountdown");
@@ -866,14 +1439,13 @@
                 hwElem.className = "countdown-badge " + (cdWk && (cdWk.includes("后重置") || cdWk.includes("限额")) ? "cooldown" : "ready");
             }
 
-            // 寻找当前 slot 对象
             const curSlot = (data.slots || []).find(s => s.slotName === data.current.slotName);
             if (curSlot) {
                 const g5 = Math.max(0, curSlot.gemini5hPct);
                 const gw = Math.max(0, curSlot.geminiWeeklyPct);
                 document.getElementById("hero5hPct").textContent = g5 + "%";
                 document.getElementById("heroWeeklyPct").textContent = gw + "%";
-                
+
                 const b5 = document.getElementById("hero5hBar");
                 b5.style.width = g5 + "%";
                 b5.className = "progress-fill " + getPctColorClass(g5);
@@ -883,13 +1455,53 @@
                 bw.className = "progress-fill " + getPctColorClass(gw);
             }
 
-            // 槽位池卡片网格
+            // 3. 全池宏观水位大盘 (Pool Runway Strip)
+            if (data.runway) {
+                document.getElementById("runwayReadyVal").innerHTML = `${data.runway.readyCount} / ${data.runway.totalCount} <span class="runway-sub">待命中</span>`;
+                document.getElementById("runwayModelTitle").textContent = `${data.runway.activeModelGroup} 全池均值`;
+                document.getElementById("runwayAvgVal").innerHTML = `${data.runway.activeModelAvgPct}% <span class="runway-sub">平均水位</span>`;
+                document.getElementById("runwayCooldownVal").innerHTML = `${data.runway.cooldownCount} <span class="runway-sub">槽位限额冷却</span>`;
+            }
+
+            // 4. 渲染槽位池卡片
+            renderSlots(data);
+
+            // 5. 渲染切号审计时间轴
+            renderAuditTimeline(data);
+        }
+
+        function renderSlots(data) {
             const container = document.getElementById("slotsContainer");
             container.innerHTML = "";
 
-            (data.slots || []).forEach(s => {
+            let slots = (data.slots || []).slice();
+            const activeGrp = (data.current && data.current.activeModelGroup) || "Gemini";
+
+            // 过滤
+            if (currentFilter === 'ready') {
+                slots = slots.filter(s => s.statusKey === 'ready' || s.statusKey === 'active');
+            } else if (currentFilter === 'cooldown') {
+                slots = slots.filter(s => s.statusKey.includes('exhausted') || s.status === 'cooldown');
+            }
+
+            // 排序
+            if (isSortByQuota) {
+                slots.sort((a, b) => {
+                    const getSortVal = (s) => {
+                        if (activeGrp === "Claude") return s.claude5hPct >= 0 ? s.claude5hPct : -1;
+                        if (activeGrp === "Argon") return s.argonWeeklyPct >= 0 ? s.argonWeeklyPct : -1;
+                        return s.gemini5hPct >= 0 ? s.gemini5hPct : -1;
+                    };
+                    return getSortVal(b) - getSortVal(a);
+                });
+            }
+
+            slots.forEach(s => {
                 const card = document.createElement("div");
-                card.className = "slot-card" + (s.isActive ? " active-slot" : "");
+                let cardClass = "slot-card";
+                if (s.isActive) cardClass += " active-slot";
+                if (s.isSkipped) cardClass += " is-skipped";
+                card.className = cardClass;
 
                 let statusClass = "ready";
                 if (s.statusKey === "active") statusClass = "active";
@@ -903,34 +1515,99 @@
                 const cw = s.claudeWeeklyPct >= 0 ? s.claudeWeeklyPct : -1;
                 const ar = s.argonWeeklyPct;
                 const idxLabel = s.slotIndex ? `#${s.slotIndex} · ${s.slotName}` : s.slotName;
+
+                // 模型标签
                 const modelsList = Array.isArray(s.supportedModels) && s.supportedModels.length > 0
                     ? s.supportedModels
                     : ["Gemini 3.8 Flash", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B"];
                 const modelsHtml = modelsList.map(m => {
                     const isSpecial = /Argon|5\.5/i.test(m);
-                    const styleStr = isSpecial
-                        ? "font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-weight:600;"
-                        : "font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,0.05);color:var(--text-secondary);border:1px solid rgba(255,255,255,0.08);";
-                    return `<span style="${styleStr}">${m}</span>`;
+                    return `<span class="model-pill ${isSpecial ? 'special' : ''}">${m}</span>`;
                 }).join("");
 
-                card.innerHTML = `
-                    <div class="slot-card-header">
-                        <div class="slot-title-group">
-                            <div class="slot-letter-badge" style="width:auto;min-width:46px;padding:0 8px;font-size:12px;">${idxLabel}</div>
-                            <div class="slot-email-text" title="${s.email}">${s.email}</div>
-                        </div>
-                        <span class="status-chip ${statusClass}">${s.status}</span>
-                    </div>
+                // 主次分明配额构建
+                let primaryMetricsHtml = "";
+                let otherMetricsHtml = "";
+                let otherCount = 0;
 
-                    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:-4px;margin-bottom:2px;">
-                        ${modelsHtml}
-                    </div>
-
-                    <div class="slot-metrics">
+                if (activeGrp === "Claude") {
+                    primaryMetricsHtml = `
                         <div class="metric-row">
                             <div class="metric-label-row">
-                                <span>Gemini 5小时配额</span>
+                                <span style="font-weight:600;color:#fff;">🎯 Claude 5小时配额 (核心)</span>
+                                <span class="metric-val-group">
+                                    <span class="metric-val">${Math.max(0, c5)}%</span>
+                                    ${formatMetricCountdownHtml(s.claude5hCountdown)}
+                                </span>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-fill ${getPctColorClass(Math.max(0, c5))}" style="width: ${Math.max(0, c5)}%"></div>
+                            </div>
+                        </div>
+                        <div class="metric-row">
+                            <div class="metric-label-row">
+                                <span>Claude 周配额</span>
+                                <span class="metric-val-group">
+                                    <span class="metric-val">${Math.max(0, cw)}%</span>
+                                    ${formatMetricCountdownHtml(s.claudeWeeklyCountdown)}
+                                </span>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-fill ${getPctColorClass(Math.max(0, cw))}" style="width: ${Math.max(0, cw)}%"></div>
+                            </div>
+                        </div>`;
+                    otherMetricsHtml = `
+                        <div class="metric-row">
+                            <div class="metric-label-row">
+                                <span>Gemini 5小时</span>
+                                <span class="metric-val">${g5}%</span>
+                            </div>
+                            <div class="progress-track"><div class="progress-fill ${getPctColorClass(g5)}" style="width:${g5}%"></div></div>
+                        </div>
+                        <div class="metric-row">
+                            <div class="metric-label-row">
+                                <span>Gemini 周配额</span>
+                                <span class="metric-val">${gw}%</span>
+                            </div>
+                            <div class="progress-track"><div class="progress-fill ${getPctColorClass(gw)}" style="width:${gw}%"></div></div>
+                        </div>`;
+                    otherCount = 2;
+                } else if (activeGrp === "Argon") {
+                    primaryMetricsHtml = `
+                        <div class="metric-row">
+                            <div class="metric-label-row">
+                                <span style="font-weight:600;color:#fff;">🎯 Argon 周配额 (核心)</span>
+                                <span class="metric-val-group">
+                                    <span class="metric-val">${ar >= 0 ? ar + '%' : '不支持'}</span>
+                                    ${formatMetricCountdownHtml(s.argonWeeklyCountdown)}
+                                </span>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-fill ${ar >= 0 ? getPctColorClass(ar) : 'red'}" style="width: ${ar >= 0 ? ar : 0}%"></div>
+                            </div>
+                        </div>`;
+                    otherMetricsHtml = `
+                        <div class="metric-row">
+                            <div class="metric-label-row">
+                                <span>Gemini 5小时</span>
+                                <span class="metric-val">${g5}%</span>
+                            </div>
+                            <div class="progress-track"><div class="progress-fill ${getPctColorClass(g5)}" style="width:${g5}%"></div></div>
+                        </div>
+                        <div class="metric-row">
+                            <div class="metric-label-row">
+                                <span>Gemini 周配额</span>
+                                <span class="metric-val">${gw}%</span>
+                            </div>
+                            <div class="progress-track"><div class="progress-fill ${getPctColorClass(gw)}" style="width:${gw}%"></div></div>
+                        </div>`;
+                    otherCount = 2;
+                } else {
+                    // Default Gemini
+                    primaryMetricsHtml = `
+                        <div class="metric-row">
+                            <div class="metric-label-row">
+                                <span style="font-weight:600;color:#fff;">🎯 Gemini 5小时 (核心)</span>
                                 <span class="metric-val-group">
                                     <span class="metric-val">${g5}%</span>
                                     ${formatMetricCountdownHtml(s.gemini5hCountdown)}
@@ -951,65 +1628,139 @@
                             <div class="progress-track">
                                 <div class="progress-fill ${getPctColorClass(gw)}" style="width: ${gw}%"></div>
                             </div>
+                        </div>`;
+
+                    if (c5 >= 0 || cw >= 0 || ar >= 0) {
+                        if (c5 >= 0 || cw >= 0) {
+                            otherMetricsHtml += `
+                                <div class="metric-row">
+                                    <div class="metric-label-row">
+                                        <span>Claude / GPT 5小时</span>
+                                        <span class="metric-val">${Math.max(0, c5)}%</span>
+                                    </div>
+                                    <div class="progress-track"><div class="progress-fill ${getPctColorClass(Math.max(0, c5))}" style="width:${Math.max(0, c5)}%"></div></div>
+                                </div>
+                                <div class="metric-row">
+                                    <div class="metric-label-row">
+                                        <span>Claude / GPT 周配额</span>
+                                        <span class="metric-val">${Math.max(0, cw)}%</span>
+                                    </div>
+                                    <div class="progress-track"><div class="progress-fill ${getPctColorClass(Math.max(0, cw))}" style="width:${Math.max(0, cw)}%"></div></div>
+                                </div>`;
+                            otherCount += 2;
+                        }
+                        if (ar >= 0) {
+                            otherMetricsHtml += `
+                                <div class="metric-row">
+                                    <div class="metric-label-row">
+                                        <span>Argon 周配额</span>
+                                        <span class="metric-val">${ar}%</span>
+                                    </div>
+                                    <div class="progress-track"><div class="progress-fill ${getPctColorClass(ar)}" style="width:${ar}%"></div></div>
+                                </div>`;
+                            otherCount += 1;
+                        }
+                    }
+                }
+
+                const drawerHtml = otherCount > 0 ? `
+                    <div class="other-models-toggle" data-original-label="▾ 查看其他模型配额 (${otherCount}项)" onclick="toggleCardDrawer(this, event)">
+                        <span>▾ 查看其他模型配额 (${otherCount}项)</span>
+                    </div>
+                    <div class="other-models-drawer">
+                        ${otherMetricsHtml}
+                    </div>
+                ` : "";
+
+                card.innerHTML = `
+                    <div class="slot-card-header">
+                        <div class="slot-title-group">
+                            <div class="slot-letter-badge">${idxLabel}</div>
+                            <div class="slot-email-text" title="点击复制邮箱: ${s.email}" onclick="copyEmail('${s.email}', event)">${s.email}</div>
                         </div>
-                        ${(c5 >= 0 || cw >= 0) ? `
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Claude / GPT 5小时配额</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${Math.max(0, c5)}%</span>
-                                    ${formatMetricCountdownHtml(s.claude5hCountdown)}
-                                </span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${getPctColorClass(Math.max(0, c5))}" style="width: ${Math.max(0, c5)}%"></div>
-                            </div>
+                        <div class="slot-header-tags">
+                            ${s.isSkipped ? '<span class="status-chip skipped">🚫 免切跳过</span>' : ''}
+                            <span class="status-chip ${statusClass}">${s.status}</span>
                         </div>
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Claude / GPT 周配额</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${Math.max(0, cw)}%</span>
-                                    ${formatMetricCountdownHtml(s.claudeWeeklyCountdown)}
-                                </span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${getPctColorClass(Math.max(0, cw))}" style="width: ${Math.max(0, cw)}%"></div>
-                            </div>
-                        </div>` : ''}
-                        ${ar >= 0 ? `
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Argon 周配额</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${ar}%</span>
-                                    ${formatMetricCountdownHtml(s.argonWeeklyCountdown)}
-                                </span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${getPctColorClass(ar)}" style="width: ${ar}%"></div>
-                            </div>
-                        </div>` : ''}
+                    </div>
+
+                    <div class="slot-models-row">
+                        ${modelsHtml}
+                    </div>
+
+                    <div class="slot-metrics">
+                        ${primaryMetricsHtml}
+                        ${drawerHtml}
                     </div>
 
                     <div class="slot-footer">
                         <div class="slot-countdown">
                             <span>⏱️ ${s.countdown || "就绪"}</span>
-                            <span style="color: var(--text-muted); margin-left: 6px;">(切号 ${s.switchCount}次)</span>
+                            <span style="color: var(--text-muted); margin-left: 4px;">(${s.switchCount}次)</span>
                         </div>
-                        ${s.isActive ? `
-                            <button class="btn-switch current">● 当前使用中</button>
-                        ` : `
-                            <button class="btn-switch" onclick="switchSlot('${s.slotIndex || s.slotName}')">⚡ 切入 #${s.slotIndex || s.slotName}</button>
-                        `}
+                        <div class="card-actions-group">
+                            <button class="btn-mini" title="复制账号邮箱" onclick="copyEmail('${s.email}', event)">
+                                📋
+                            </button>
+                            <button class="btn-mini" title="单卡精准测试云端配额" onclick="refreshSingleSlot('${s.slotName}', this, event)">
+                                🔄
+                            </button>
+                            <button class="btn-mini ${s.isSkipped ? 'skip-active' : ''}" title="${s.isSkipped ? '恢复自动切号' : '设置免切/跳过'}" onclick="toggleSkipSlot('${s.slotName}', event)">
+                                ${s.isSkipped ? '✔️ 恢复' : '🚫 免切'}
+                            </button>
+                            ${s.isActive ? `
+                                <button class="btn-switch-primary" disabled>
+                                    ★ 使用中
+                                </button>
+                            ` : `
+                                <button class="btn-switch-primary" onclick="triggerSwitchSlot('${s.slotName}')">
+                                    ⚡ 切换
+                                </button>
+                            `}
+                        </div>
                     </div>
                 `;
+
                 container.appendChild(card);
             });
         }
 
-        async function switchSlot(slotName) {
-            showToast(`正在切换至槽位 [${slotName}] 并重载客户端...`);
+        function renderAuditTimeline(data) {
+            const summaryPill = document.getElementById("auditSummaryPill");
+            const timelineContent = document.getElementById("timelineContent");
+            const history = Array.isArray(data.history) ? data.history.slice().reverse() : [];
+
+            if (history.length === 0) {
+                summaryPill.textContent = "暂无最近切号事件记录";
+                timelineContent.innerHTML = `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:12px;">暂无历史切换流水</div>`;
+                return;
+            }
+
+            const latest = history[0];
+            const latestFrom = latest.fromSlot ? `[${latest.fromSlot}]` : '';
+            const latestTo = latest.toSlot ? `[${latest.toSlot}]` : '';
+            summaryPill.textContent = `最新: ${latest.timestamp} 切入 ${latestTo} (原因: ${latest.reason || '自动切号'})`;
+
+            timelineContent.innerHTML = history.map(item => {
+                const isHourly = (item.type === 'hourly');
+                const tagColor = isHourly ? '#fbbf24' : '#c084fc';
+                return `
+                    <div class="timeline-item">
+                        <div class="timeline-left">
+                            <span class="timeline-time">${item.timestamp}</span>
+                            <span class="timeline-transfer">槽位 [${item.fromSlot || '?'}] ➔ [${item.toSlot || '?'}]</span>
+                            <span style="font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,0.06);color:${tagColor};">${item.type || 'auto'}</span>
+                        </div>
+                        <div class="timeline-reason" title="${item.reason || ''}">${item.reason || '平滑轮换切入'}</div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        // 操作调用
+        async function triggerSwitchSlot(slotName) {
+            if (!confirm(`确定要切换至槽位 [${slotName}] 吗？\n切换后将自动更新凭据并无缝唤出 Antigravity 2.0。`)) return;
+            showToast(`正在切换至槽位 [${slotName}]...`);
             try {
                 const resp = await fetch("/api/action/switch", {
                     method: "POST",
@@ -1017,101 +1768,91 @@
                     body: JSON.stringify({ slot: slotName })
                 });
                 const res = await resp.json();
-                if (res.success) {
-                    showToast(`已成功切入槽位 [${slotName}]！`);
-                    setTimeout(() => fetchStatus(true), 1500);
-                } else {
-                    showToast("切号失败: " + res.message);
-                }
+                showToast(res.message);
+                fetchStatus(false);
             } catch (err) {
-                showToast("切号请求失败: " + err);
+                showToast("切换请求失败: " + err.message);
             }
         }
 
         async function triggerNextSlot() {
-            showToast("正在轮换至下一个最优配额账号...");
+            showToast("正在轮换至下一个可用账号...");
             try {
                 const resp = await fetch("/api/action/next", { method: "POST" });
                 const res = await resp.json();
-                if (res.success) {
-                    showToast("已轮换至下一账号！");
-                    setTimeout(() => fetchStatus(true), 1500);
-                }
+                showToast(res.message);
+                fetchStatus(false);
             } catch (err) {
-                showToast("轮换请求失败");
+                showToast("轮换请求失败: " + err.message);
             }
         }
 
         async function triggerResume() {
-            showToast("正在向当前活跃会话注入断点续接指令...");
+            showToast("正在触发断点会话恢复与原会话点开...");
             try {
                 const resp = await fetch("/api/action/resume", { method: "POST" });
                 const res = await resp.json();
-                showToast(res.message || "原会话续接指令已下发！");
+                showToast(res.message);
             } catch (err) {
-                showToast("续接请求失败");
+                showToast("恢复请求失败: " + err.message);
             }
         }
 
         async function triggerResetCooldown() {
-            if (!confirm("确认重置所有槽位的冷却计时器吗？")) return;
+            if (!confirm("确定要立即重置所有槽位的 5小时与周限额冷却吗？")) return;
+            showToast("正在重置全部槽位冷却...");
             try {
-                await fetch("/api/action/reset-cooldown", { method: "POST" });
-                showToast("已重置全部槽位冷却计时器！");
+                const resp = await fetch("/api/action/reset-cooldown", { method: "POST" });
+                const res = await resp.json();
+                showToast(res.message);
                 fetchStatus(true);
             } catch (err) {
-                showToast("重置冷却失败");
+                showToast("重置失败: " + err.message);
             }
         }
 
-        async function openTerminalTui() {
+        async function openTuiTerminal() {
+            showToast("正在呼出经典控制台终端...");
             try {
                 await fetch("/api/action/open-tui", { method: "POST" });
-                showToast("已在桌面呼出经典终端 TUI 窗口！");
-            } catch (err) {
-                showToast("呼出终端失败");
-            }
-        }
-
-        function manualRefresh() {
-            fetchStatus(true);
+            } catch (e) {}
         }
 
         function openSaveModal() {
-            document.getElementById("saveModal").classList.add("show");
+            document.getElementById("saveModal").classList.add("open");
+            document.getElementById("slotInput").value = "";
             document.getElementById("slotInput").focus();
         }
 
         function closeSaveModal() {
-            document.getElementById("saveModal").classList.remove("show");
+            document.getElementById("saveModal").classList.remove("open");
         }
 
         async function confirmSaveSlot() {
-            const name = document.getElementById("slotInput").value.trim();
+            const slotName = document.getElementById("slotInput").value.trim().toLowerCase();
             closeSaveModal();
-            showToast("正在备份当前官方凭据至槽位...");
+            showToast("正在加密备份当前登录凭据至槽位...");
             try {
                 const resp = await fetch("/api/action/save-current", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ slot: name })
+                    body: JSON.stringify({ slot: slotName })
                 });
                 const res = await resp.json();
-                showToast(res.message || "槽位备份成功！");
-                fetchStatus(true);
+                showToast(res.message);
+                fetchStatus(false);
             } catch (err) {
-                showToast("保存槽位失败");
+                showToast("保存失败: " + err.message);
             }
         }
 
-        // 遵循规则 7：防抖与隐藏时暂停轮询
+        // 倒计时与轮询驱动
         function startPolling() {
-            if (pollTimer) clearInterval(pollTimer);
+            fetchStatus(false);
             pollTimer = setInterval(() => {
-                if (document.hidden) return; // 页面隐藏时暂停
                 countdownSeconds--;
-                const elem = document.getElementById("pollCountdown");
-                if (elem) elem.textContent = countdownSeconds + "s";
+                const badge = document.getElementById("refreshCountdownBadge");
+                if (badge) badge.textContent = `(${countdownSeconds}s)`;
                 if (countdownSeconds <= 0) {
                     fetchStatus(false);
                 }
@@ -1119,14 +1860,14 @@
         }
 
         document.addEventListener("visibilitychange", () => {
-            if (!document.hidden) {
-                fetchStatus(false);
+            if (document.hidden) {
+                clearInterval(pollTimer);
+            } else {
+                startPolling();
             }
         });
 
-        // 页面初始化
-        fetchStatus(false);
-        startPolling();
+        window.onload = startPolling;
     </script>
 </body>
 </html>

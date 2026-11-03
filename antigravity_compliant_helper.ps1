@@ -9412,6 +9412,31 @@ function Sync-AllSlotsQuotaInfo {
     return $state
 }
 
+function Sync-SingleSlotQuotaInfo {
+    param([string]$SlotName)
+    if ([string]::IsNullOrWhiteSpace($SlotName)) { return $null }
+    $state = Get-SlotPoolState
+    $prop = $state.slots.PSObject.Properties[$SlotName]
+    if (-not $prop) { return $null }
+    $sObj = $prop.Value
+    $isCurr = ($SlotName -eq $state.currentSlot)
+    $remoteQ = Get-SlotRemoteQuotaSummary -SlotName $SlotName
+    $lsQuota = if ($isCurr) { Get-LocalLanguageServerQuota } else { $null }
+    $finalQ = if ($isCurr -and $lsQuota) {
+        Merge-QuotaSnapshots -Primary $lsQuota -Secondary $remoteQ
+    } else {
+        $remoteQ
+    }
+    if ($finalQ) {
+        Apply-QuotaSnapshotToSlotObject -SlotObj $sObj -QuotaSnap $finalQ -IsCurrentActiveSlot $isCurr
+        $state.lastQuotaSyncAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        Save-SlotPoolState -State $state
+        return $finalQ
+    }
+    return $null
+}
+
+
 function Get-CurrentActiveModelInfo {
     param([switch]$ForceRefresh)
     $now = Get-Date
@@ -9800,6 +9825,9 @@ function Switch-ToNextAvailableSlot {
                     } catch {
                         Set-SafeProp $candidateObj "status" "ready"
                     }
+                }
+                if ([bool](Get-SafeProp $candidateObj "isSkipped" $false)) {
+                    continue
                 }
                 $candFp = [string](Get-SafeProp $candidateObj "tokenFingerprint" "")
                 if ($pass -eq 1 -and $currentFingerprint -and $candFp -eq $currentFingerprint -and $currentFingerprint -ne "none") {
@@ -13049,6 +13077,7 @@ function Get-SlotPoolGuiPayload {
             slotIndex              = ($i + 1)
             slotName               = $name
             email                  = [string](Get-SafeProp $s "email" "")
+            isSkipped              = [bool](Get-SafeProp $s "isSkipped" $false)
             status                 = $statusText
             statusKey              = $statusKey
             isActive               = $isActive
@@ -13071,9 +13100,33 @@ function Get-SlotPoolGuiPayload {
         })
     }
 
+    $readyCount = 0
+    $cooldownCount = 0
+    $activeModelQuotaSum = 0
+    $activeModelQuotaCount = 0
+
+    foreach ($sl in $slotsList) {
+        $isRdy = ($sl.statusKey -eq "ready" -or $sl.statusKey -eq "active")
+        if ($isRdy) { $readyCount++ } else { $cooldownCount++ }
+
+        $val = if ($activeGrp -eq "Claude") { $sl.claude5hPct } elseif ($activeGrp -eq "Argon") { $sl.argonWeeklyPct } else { $sl.gemini5hPct }
+        if ($val -ge 0) {
+            $activeModelQuotaSum += $val
+            $activeModelQuotaCount++
+        }
+    }
+    $activeModelAvg = if ($activeModelQuotaCount -gt 0) { [Math]::Round($activeModelQuotaSum / $activeModelQuotaCount) } else { 0 }
+
     $activeSlotObj = $slotsList | Where-Object { $_.isActive } | Select-Object -First 1
 
     return [ordered]@{
+        runway        = [ordered]@{
+            readyCount        = $readyCount
+            totalCount        = $slotsList.Count
+            cooldownCount     = $cooldownCount
+            activeModelGroup  = $activeGrp
+            activeModelAvgPct = $activeModelAvg
+        }
         success       = $true
         timestamp     = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
         daemon        = [ordered]@{
@@ -13241,6 +13294,59 @@ function Start-SlotPoolHttpServer {
             if ($urlPath -eq "/api/action/reset-cooldown" -and $method -eq "POST") {
                 Reset-SlotCooldown
                 $res = @{ success = $true; message = "全部槽位冷却已重置" }
+                $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes(($res | ConvertTo-Json))
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.OutputStream.Write($jsonBytes, 0, $jsonBytes.Length)
+                $response.Close()
+                continue
+            }
+
+            if ($urlPath -eq "/api/action/refresh-slot" -and $method -eq "POST") {
+                $bodyReader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+                $bodyText = $bodyReader.ReadToEnd()
+                $bodyObj = $bodyText | ConvertFrom-Json
+                $targetSlot = [string]$bodyObj.slot
+                $res = @{ success = $false; message = "" }
+                try {
+                    $syncRes = Sync-SingleSlotQuotaInfo -SlotName $targetSlot
+                    if ($syncRes) {
+                        $res.success = $true
+                        $res.message = "已更新槽位 [$targetSlot] 实时云端配额"
+                    } else {
+                        $res.message = "未获取到槽位 [$targetSlot] 的有效云端响应"
+                    }
+                } catch {
+                    $res.message = $_.Exception.Message
+                }
+                $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes(($res | ConvertTo-Json))
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.OutputStream.Write($jsonBytes, 0, $jsonBytes.Length)
+                $response.Close()
+                continue
+            }
+
+            if ($urlPath -eq "/api/action/toggle-skip" -and $method -eq "POST") {
+                $bodyReader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+                $bodyText = $bodyReader.ReadToEnd()
+                $bodyObj = $bodyText | ConvertFrom-Json
+                $targetSlot = [string]$bodyObj.slot
+                $res = @{ success = $false; message = ""; isSkipped = $false }
+                try {
+                    $state = Get-SlotPoolState
+                    $prop = $state.slots.PSObject.Properties[$targetSlot]
+                    if ($prop) {
+                        $curVal = [bool](Get-SafeProp $prop.Value "isSkipped" $false)
+                        Set-SafeProp $prop.Value "isSkipped" (-not $curVal)
+                        Save-SlotPoolState -State $state
+                        $res.success = $true
+                        $res.isSkipped = (-not $curVal)
+                        $res.message = if (-not $curVal) { "已设置槽位 [$targetSlot] 为免切/跳过" } else { "已恢复槽位 [$targetSlot] 参与自动轮换" }
+                    } else {
+                        $res.message = "未找到目标槽位 [$targetSlot]"
+                    }
+                } catch {
+                    $res.message = $_.Exception.Message
+                }
                 $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes(($res | ConvertTo-Json))
                 $response.ContentType = "application/json; charset=utf-8"
                 $response.OutputStream.Write($jsonBytes, 0, $jsonBytes.Length)
