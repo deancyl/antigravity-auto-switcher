@@ -3341,94 +3341,40 @@ function Invoke-UnattendedConversationResume {
     $resumedCount = 0
 
     if ($conversationsToResume.Count -gt 0) {
-        Write-Host "    [*] 正在探测本地已连接的 LanguageServer Connect-RPC 接口..." -ForegroundColor Gray
-        $lsQuota = Get-LocalLanguageServerQuota
-        $endpoint = $Script:CachedLsEndpoint
+        Write-Host "    [*] 正在探测本地已连接的 LanguageServer Connect-RPC 接口 (就绪轮询重试中，上限 15 秒)..." -ForegroundColor Gray
+        $endpoint = $null
+        $probeDeadline = (Get-Date).AddSeconds(15)
+        while ((Get-Date) -lt $probeDeadline) {
+            $lsQuota = Get-LocalLanguageServerQuota -ForceRefresh
+            if ($Script:CachedLsEndpoint -and $Script:CachedLsEndpoint.BaseUrl -and $Script:CachedLsEndpoint.Csrf) {
+                $endpoint = $Script:CachedLsEndpoint
+                break
+            }
+            Start-Sleep -Milliseconds 600
+        }
 
         if ($endpoint -and $endpoint.BaseUrl -and $endpoint.Csrf) {
             $baseUrl = [string]$endpoint.BaseUrl
             $csrf = [string]$endpoint.Csrf
 
-            # 解析锁定模型
-            $lockedEnum = $null
-            if ($Script:LockedActiveModelEnum) {
-                $lockedEnum = $Script:LockedActiveModelEnum
-            } elseif ($Script:LastActiveManifest -and $Script:LastActiveManifest.locked_model_enum) {
-                $lockedEnum = [string]$Script:LastActiveManifest.locked_model_enum
-            } elseif (Test-Path $ResumeManifestPath) {
-                try {
-                    $mfObj = (Read-Utf8StripBom -Path $ResumeManifestPath) | ConvertFrom-Json
-                    if ($mfObj.locked_model_enum) { $lockedEnum = [string]$mfObj.locked_model_enum }
-                } catch {}
-            }
-            if (-not $lockedEnum) {
-                try {
-                    $st = Get-SlotPoolState
-                    if ($st.lockedModelEnum) { $lockedEnum = [string]$st.lockedModelEnum }
-                } catch {}
-            }
-            if (-not $lockedEnum) {
-                $lockedEnum = (Get-CurrentActiveModelInfo).ModelEnum
-            }
-            $targetModel = if ($lockedEnum) { $lockedEnum } else { "MODEL_PLACEHOLDER_M318" }
-
-            $modelDataResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/GetCascadeModelConfigData", $csrf, "{}", 2000)
-            if ($modelDataResp -match '^200\|(.+)$') {
-                try {
-                    $mData = $Matches[1] | ConvertFrom-Json
-                    if (-not $lockedEnum) {
-                        if ($mData.defaultOverrideModelConfig -and $mData.defaultOverrideModelConfig.modelOrAlias -and $mData.defaultOverrideModelConfig.modelOrAlias.model) {
-                            $targetModel = [string]$mData.defaultOverrideModelConfig.modelOrAlias.model
-                        } elseif ($mData.clientModelConfigs -and $mData.clientModelConfigs.Count -gt 0) {
-                            $targetModel = [string]$mData.clientModelConfigs[0].modelOrAlias.model
-                        }
-                    }
-                } catch {}
-            }
-
-            # 调用官方 GetResolvedCascadeConfig
-            $resolvePayload = @"
-{
-    "overrideConfig": {
-        "plannerConfig": {
-            "planModel": "$targetModel"
-        }
-    }
-}
-"@
-            $resolvedConfigJson = $null
-            $resConfigResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/GetResolvedCascadeConfig", $csrf, $resolvePayload, 3000)
-            if ($resConfigResp -match '^200\|(.+)$') {
-                try {
-                    $resObj = $Matches[1] | ConvertFrom-Json
-                    if ($resObj.cascadeConfig) {
-                        $resolvedConfigJson = ($resObj.cascadeConfig | ConvertTo-Json -Depth 20 -Compress)
-                    }
-                } catch {}
-            }
-
-            $cleanPrompt = $safePrompt.Replace('\', '\\').Replace('"', '\"').Replace("`r", "").Replace("`n", "\n")
-            $agentSpecJson = '{"builtinAgent":{"defaultAgent":{"isGoogle":false,"isInteractive":true,"surface":"AGENT_SURFACE_HUB"}}}'
-            $configField = if ($resolvedConfigJson) { "`"cascadeConfig`": $resolvedConfigJson," } else { "" }
-
             foreach ($conv in $conversationsToResume) {
                 $cId = $conv.ConversationId
                 $cTitle = if ($conv.Title) { $conv.Title } else { $cId }
-                $rpcPayload = @"
-{
-    "cascadeId": "$cId",
-    "items": [
-        {
-            "text": "$cleanPrompt"
-        }
-    ],
-    $configField
-    "customAgentSpec": $agentSpecJson
-}
-"@
-                Write-Host ("    [*] 正在通过 LanguageServer RPC 唤醒会话 [{0}] (ID: {1})..." -f $cTitle, $cId) -ForegroundColor Gray
 
-                $maxResumeRetries = 4
+                # 采用标准 Hashtable 转换为单行压缩 JSON，确保符合官方 protojson 规范 (杜绝 \n unmarshal 错误)
+                $rpcObj = [ordered]@{
+                    cascadeId = $cId
+                    items = @(
+                        @{
+                            text = $safePrompt
+                        }
+                    )
+                }
+                $rpcPayload = $rpcObj | ConvertTo-Json -Compress
+
+                Write-Host ("    [*] 正在通过 LanguageServer Connect-RPC 官方协议唤醒会话 [{0}] (ID: {1})..." -f $cTitle, $cId) -ForegroundColor Gray
+
+                $maxResumeRetries = 6
                 for ($attempt = 1; $attempt -le $maxResumeRetries; $attempt++) {
                     $sendResp = [AntigravityCompliantHelper.NativeVaultV4]::PostLocalConnectRpc("$baseUrl/SendUserCascadeMessage", $csrf, $rpcPayload, 5000)
                     if ($sendResp -match '^200\|') {
@@ -3438,18 +3384,19 @@ function Invoke-UnattendedConversationResume {
                         Write-Host ("    [✓] 已成功向会话 [{0}] 注入断点续接指令，模型已正常恢复生成！" -f $cTitle) -ForegroundColor Green
                         Write-DaemonLog ("已成功向会话 [{0}] (ID: {1}) 注入断点续接指令" -f $cTitle, $cId) "RESUME"
                         break
-                    } elseif ($sendResp -match 'trajectory not found') {
+                    } elseif ($sendResp -match 'trajectory not found' -or $sendResp -match 'loading') {
                         Write-Host ("    [~] 会话轨迹加载中 (尝试 {0}/{1})..." -f $attempt, $maxResumeRetries) -ForegroundColor Yellow
                         Start-Sleep -Milliseconds (600 * $attempt)
                     } else {
                         Write-Host ("    [~] RPC 响应: {0}" -f $sendResp) -ForegroundColor Gray
-                        break
+                        Start-Sleep -Milliseconds 500
                     }
                 }
             }
+        } else {
+            Write-Host "    [!] 未在 15 秒内探测到 LanguageServer RPC 端点，已转入剪贴板托底模式。" -ForegroundColor Yellow
         }
     }
-
     if (-not $lsSuccess) {
         Write-Host "    [✓] 已将原会话续接指令复制至剪贴板，客户端已激活置顶，点开原会话后按 Ctrl+V 回车即可瞬间继续。" -ForegroundColor Green
     }
@@ -3551,11 +3498,20 @@ function Restart-AntigravityApp {
 
     Wait-ForAntigravityUpdaterIfRunning
 
+    # 遵循准则 4 进程脱钩与单实例防御：清理任何霸占 SingleInstanceLock 的无窗口僵死进程 (MainWindowHandle == 0)
+    $zombies = @(Get-RunningAntigravityProcesses | Where-Object { $_.MainWindowHandle -eq 0 -and $_.ProcessName -match '^(?i)Antigravity$' })
+    foreach ($z in $zombies) {
+        try { Stop-Process -Id $z.Id -Force -ErrorAction SilentlyContinue } catch {}
+    }
+
     Write-Host "[*] 正在以完全独立进程树启动 Antigravity 2.0 (与当前控制台隔离，按 Ctrl+C 不会退出)..." -ForegroundColor Cyan
 
     try {
-
-        $launchedPid = Start-DetachedAntigravityProcess -ExePath $exePath -Arguments "--remote-debugging-port=$CdpDefaultPort"
+        $launchArgs = "--remote-debugging-port=$CdpDefaultPort"
+        if (Test-Path "D:\Google\Workspace") {
+            $launchArgs = "$launchArgs `"D:\Google\Workspace`""
+        }
+        $launchedPid = Start-DetachedAntigravityProcess -ExePath $exePath -Arguments $launchArgs
 
         Start-Sleep -Milliseconds 2500
 
