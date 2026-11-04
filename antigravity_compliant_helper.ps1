@@ -237,6 +237,9 @@ function ConvertTo-SafeInt {
 function ConvertTo-LocalDateTime {
     param($DateVal)
     if ($null -eq $DateVal) { return $null }
+    if ($DateVal -is [DateTimeOffset]) {
+        return $DateVal.LocalDateTime
+    }
     if ($DateVal -is [DateTime]) {
         if ($DateVal.Kind -eq [System.DateTimeKind]::Utc) { return $DateVal.ToLocalTime() }
         if ($DateVal.Kind -eq [System.DateTimeKind]::Unspecified) { return [DateTime]::SpecifyKind($DateVal, [System.DateTimeKind]::Local) }
@@ -8994,7 +8997,7 @@ function Start-SlotPoolHttpServer {
                 continue
             }
 
-            if ($urlPath -eq "/api/action/remove-slot" -and $method -eq "POST") {
+            if (($urlPath -eq "/api/action/remove-slot" -or $urlPath -eq "/api/action/delete-slot") -and $method -eq "POST") {
                 $bodyReader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
                 $bodyText = $bodyReader.ReadToEnd()
                 $bodyObj = $bodyText | ConvertFrom-Json
@@ -9014,7 +9017,7 @@ function Start-SlotPoolHttpServer {
                 continue
             }
 
-            if ($urlPath -eq "/api/action/daemon" -and $method -eq "POST") {
+            if (($urlPath -eq "/api/action/daemon" -or $urlPath -eq "/api/action/toggle-daemon") -and $method -eq "POST") {
                 $act = "status"
                 try {
                     $bodyReader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
@@ -9054,7 +9057,7 @@ function Start-SlotPoolHttpServer {
                 continue
             }
 
-            if ($urlPath -eq "/api/action/autostart" -and $method -eq "POST") {
+            if (($urlPath -eq "/api/action/autostart" -or $urlPath -eq "/api/action/toggle-autostart") -and $method -eq "POST") {
                 $act = "toggle"
                 try {
                     $bodyReader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
@@ -9223,7 +9226,7 @@ function Start-SlotPoolGuiApp {
 
     if ($edgeExe) {
         # 严格桌面应用隔离规范：彻底禁用所有浏览器插件、扩展与账号同步，确保 100% 极速纯净启动 (0 插件干扰)
-        $appArgs = "--app=$url --user-data-dir=`"$profileDir`" --disable-extensions --disable-plugins --disable-sync --disable-default-apps --no-first-run --no-default-browser-check --window-size=1080,780"
+        $appArgs = "--app=$url --user-data-dir=`"$profileDir`" --disable-extensions --disable-plugins --disable-sync --disable-default-apps --no-first-run --no-default-browser-check --window-size=1280,860"
         try {
             $proc = Start-Process -FilePath $edgeExe -ArgumentList $appArgs -PassThru
             Write-Host "[✓] 已成功唤出 Antigravity 现代桌面控制面板 (Edge App 纯净无插件独立视窗)。" -ForegroundColor Green

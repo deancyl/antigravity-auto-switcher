@@ -1,30 +1,34 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Antigravity 账号管理与配额看板 (双轨桌面面板)</title>
+    <title>Antigravity 账号管理与配额看板 (双轨桌面面板 v0.4.0)</title>
     <style>
         :root {
-            --bg-base: #0a0e17;
-            --bg-card: rgba(18, 25, 42, 0.78);
-            --bg-card-hover: rgba(26, 36, 60, 0.88);
+            --bg-base: #070b12;
+            --bg-surface: #0d1320;
+            --bg-card: rgba(17, 24, 39, 0.82);
+            --bg-card-hover: rgba(24, 34, 54, 0.92);
             --bg-active-card: rgba(16, 185, 129, 0.08);
             --border-card: rgba(255, 255, 255, 0.08);
-            --border-active: rgba(16, 185, 129, 0.38);
-            --text-primary: #f1f5f9;
+            --border-hover: rgba(255, 255, 255, 0.18);
+            --border-active: rgba(16, 185, 129, 0.42);
+            --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
             --accent-green: #10b981;
-            --accent-green-bg: rgba(16, 185, 129, 0.15);
+            --accent-green-bg: rgba(16, 185, 129, 0.14);
             --accent-yellow: #f59e0b;
-            --accent-yellow-bg: rgba(245, 158, 11, 0.15);
+            --accent-yellow-bg: rgba(245, 158, 11, 0.14);
             --accent-red: #ef4444;
-            --accent-red-bg: rgba(239, 68, 68, 0.15);
+            --accent-red-bg: rgba(239, 68, 68, 0.14);
             --accent-cyan: #0ea5e9;
-            --accent-cyan-bg: rgba(14, 165, 233, 0.15);
+            --accent-cyan-bg: rgba(14, 165, 233, 0.14);
             --accent-purple: #a855f7;
-            --accent-purple-bg: rgba(168, 85, 247, 0.15);
+            --accent-purple-bg: rgba(168, 85, 247, 0.14);
+            --accent-indigo: #6366f1;
+            --accent-indigo-bg: rgba(99, 102, 241, 0.14);
         }
 
         * {
@@ -35,150 +39,184 @@
             -webkit-user-select: none;
         }
 
-        /* R2.1 视窗自适应硬锁与紧凑布局 */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
             background-color: var(--bg-base);
             color: var(--text-primary);
-            height: 100vh;
-            max-height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            background-image: 
-                radial-gradient(circle at 15% 15%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(circle at 12% 10%, rgba(14, 165, 233, 0.09) 0%, transparent 38%),
+                radial-gradient(circle at 88% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 38%),
+                radial-gradient(circle at 50% 0%, rgba(168, 85, 247, 0.05) 0%, transparent 35%);
         }
 
-        /* 顶部紧凑导航栏 */
+        /* 顶部导航栏 (不使用截断长截图的浮层遮罩，结构清晰稳固) */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 20px;
-            background: rgba(10, 14, 23, 0.88);
-            backdrop-filter: blur(16px);
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 12px 24px;
+            background: rgba(10, 15, 26, 0.92);
             border-bottom: 1px solid var(--border-card);
-            flex-shrink: 0;
-            z-index: 100;
+            z-index: 40;
         }
 
         .brand-box {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             white-space: nowrap;
-            flex-shrink: 0;
         }
 
         .brand-logo {
-            width: 30px;
-            height: 30px;
-            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
             background: linear-gradient(135deg, #0ea5e9, #10b981);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 800;
             color: #ffffff;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
             flex-shrink: 0;
         }
 
+        .brand-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .brand-title {
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 700;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.4px;
             color: #ffffff;
-            white-space: nowrap;
+        }
+
+        .version-chip {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 5px;
+            background: rgba(14, 165, 233, 0.16);
+            color: #38bdf8;
+            border: 1px solid rgba(14, 165, 233, 0.3);
+        }
+
+        .demo-banner-chip {
+            display: none;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 5px;
+            background: rgba(245, 158, 11, 0.16);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }
+
+        .demo-banner-chip.visible {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .brand-subtitle {
             font-size: 11px;
             color: var(--text-muted);
-            white-space: nowrap;
+            margin-top: 2px;
         }
 
         .header-actions {
             display: flex;
             align-items: center;
             gap: 8px;
-            white-space: nowrap;
-            flex-shrink: 0;
+            flex-wrap: wrap;
         }
 
         .pill-badge {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            padding: 4px 10px;
-            border-radius: 16px;
-            font-size: 11px;
+            gap: 6px;
+            padding: 5px 11px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 600;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-card);
             white-space: nowrap;
-            flex-shrink: 0;
+            transition: all 0.18s ease;
+        }
+
+        .pill-badge.clickable {
+            cursor: pointer;
+        }
+
+        .pill-badge.clickable:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.09);
         }
 
         .pill-badge.green {
             background: var(--accent-green-bg);
             color: #34d399;
-            border-color: rgba(16, 185, 129, 0.3);
+            border-color: rgba(16, 185, 129, 0.32);
         }
 
         .pill-badge.yellow {
             background: var(--accent-yellow-bg);
             color: #fbbf24;
-            border-color: rgba(245, 158, 11, 0.3);
+            border-color: rgba(245, 158, 11, 0.32);
         }
 
-        .pill-badge.interactive {
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .pill-badge.interactive:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.25);
+        .pill-badge.cyan {
+            background: var(--accent-cyan-bg);
+            color: #38bdf8;
+            border-color: rgba(14, 165, 233, 0.32);
         }
 
         .pulse-dot {
-            width: 6px;
-            height: 6px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
             background-color: currentColor;
-            box-shadow: 0 0 6px currentColor;
+            box-shadow: 0 0 8px currentColor;
             animation: pulse-ring 2s infinite ease-in-out;
             flex-shrink: 0;
         }
 
         @keyframes pulse-ring {
             0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.35; transform: scale(0.8); }
+            50% { opacity: 0.35; transform: scale(0.85); }
         }
 
         .btn-icon {
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-card);
             color: var(--text-primary);
-            padding: 5px 11px;
-            border-radius: 7px;
+            padding: 6px 12px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 12px;
             font-weight: 500;
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             transition: all 0.18s ease;
             white-space: nowrap;
-            flex-shrink: 0;
         }
 
         .btn-icon:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.22);
+            background: rgba(255, 255, 255, 0.11);
+            border-color: var(--border-hover);
             transform: translateY(-1px);
         }
 
@@ -186,61 +224,74 @@
             transform: translateY(0);
         }
 
-        .btn-icon.btn-boost {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(239, 68, 68, 0.25));
-            border: 1px solid rgba(245, 158, 11, 0.4);
-            color: #fbbf24;
-            font-weight: 600;
-        }
-
-        .btn-icon.btn-boost:hover {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(239, 68, 68, 0.4));
-            border-color: #fbbf24;
-            box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
+        .btn-icon.active-toggle {
+            background: rgba(14, 165, 233, 0.15);
+            border-color: rgba(14, 165, 233, 0.4);
+            color: #38bdf8;
         }
 
         .btn-primary {
             background: linear-gradient(135deg, #0284c7, #059669);
             color: #fff;
-            border: none;
+            border: 1px solid rgba(16, 185, 129, 0.35);
             font-weight: 600;
-            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+            box-shadow: 0 2px 10px rgba(2, 132, 199, 0.28);
         }
 
         .btn-primary:hover {
             background: linear-gradient(135deg, #0369a1, #047857);
-            box-shadow: 0 3px 12px rgba(2, 132, 199, 0.45);
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.42);
         }
 
-        /* 主体布局 */
+        .btn-boost {
+            background: linear-gradient(135deg, #7c3aed, #0ea5e9);
+            color: #ffffff;
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            font-weight: 600;
+            box-shadow: 0 2px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-boost:hover {
+            background: linear-gradient(135deg, #6d28d9, #0284c7);
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.45);
+        }
+
+        /* 主容器布局 */
         main {
             flex: 1;
-            min-height: 0;
-            overflow: hidden;
-            padding: 8px 18px;
-            max-width: 1440px;
+            padding: 16px 24px 20px;
+            max-width: 1400px;
             width: 100%;
             margin: 0 auto;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 14px;
         }
 
-        /* 顶部 Hero 卡片 */
+        /* 紧凑模式支持：让 8~9 张卡片轻松在一屏内完整呈现 */
+        body.compact-mode main {
+            padding: 10px 20px 12px;
+            gap: 10px;
+        }
+
+        /* 顶部 Hero 卡片 (当前活跃账号) */
         .hero-banner {
             background: var(--bg-card);
             border: 1px solid var(--border-card);
-            border-radius: 12px;
-            padding: 10px 18px;
-            backdrop-filter: blur(12px);
+            border-radius: 14px;
+            padding: 16px 22px;
             display: grid;
-            grid-template-columns: 1fr auto;
+            grid-template-columns: 1.2fr 1fr;
             align-items: center;
-            gap: 16px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            gap: 24px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
             position: relative;
             overflow: hidden;
-            flex-shrink: 0;
+        }
+
+        body.compact-mode .hero-banner {
+            padding: 12px 18px;
+            gap: 16px;
         }
 
         .hero-banner::before {
@@ -248,20 +299,21 @@
             position: absolute;
             top: 0; left: 0; right: 0;
             height: 3px;
-            background: linear-gradient(90deg, #0ea5e9, #10b981, #f59e0b);
+            background: linear-gradient(90deg, #0ea5e9, #10b981, #a855f7);
         }
 
         .hero-info {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 10px;
+            min-width: 0;
         }
 
         .hero-slot-tag {
             display: flex;
             align-items: center;
-            gap: 8px;
-            white-space: nowrap;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .slot-badge-large {
@@ -269,29 +321,39 @@
             color: #ffffff;
             font-weight: 800;
             font-size: 14px;
-            width: 28px;
-            height: 28px;
-            border-radius: 7px;
+            min-width: 32px;
+            height: 30px;
+            padding: 0 8px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
             flex-shrink: 0;
         }
 
         .hero-email {
-            font-size: 15px;
+            font-size: 17px;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: 0.2px;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .hero-email:hover {
+            color: #38bdf8;
+            text-decoration: underline;
         }
 
         .hero-fingerprint {
             font-size: 11px;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             background: rgba(255, 255, 255, 0.05);
-            padding: 2px 7px;
-            border-radius: 5px;
+            padding: 2px 8px;
+            border-radius: 6px;
             border: 1px solid var(--border-card);
             white-space: nowrap;
         }
@@ -301,28 +363,38 @@
             align-items: center;
             gap: 14px;
             flex-wrap: wrap;
-            font-size: 11px;
+            font-size: 12px;
             color: var(--text-secondary);
         }
 
         .hero-meta-item {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             white-space: nowrap;
         }
 
-        .hero-bars {
+        /* Hero 右侧：当前锁定模型主进度 + 三模型矩阵速览 */
+        .hero-right {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            min-width: 300px;
+            gap: 10px;
+        }
+
+        .hero-bars {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            background: rgba(0, 0, 0, 0.22);
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .hero-bar-group {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 5px;
         }
 
         .hero-bar-label {
@@ -331,61 +403,92 @@
             align-items: center;
             font-size: 11px;
             color: var(--text-secondary);
+            gap: 6px;
             white-space: nowrap;
+        }
+
+        .hero-mini-matrix {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 11px;
+        }
+
+        .matrix-pill {
+            flex: 1;
+            min-width: 120px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 7px;
+            padding: 4px 9px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .matrix-pill.active-group {
+            border-color: rgba(14, 165, 233, 0.35);
+            background: rgba(14, 165, 233, 0.08);
         }
 
         .progress-track {
             height: 6px;
-            background: rgba(255, 255, 255, 0.06);
-            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.07);
+            border-radius: 4px;
             overflow: hidden;
             position: relative;
         }
 
         .progress-fill {
             height: 100%;
-            border-radius: 3px;
-            transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 4px;
+            transition: width 0.45s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .progress-fill.green { background: linear-gradient(90deg, #10b981, #34d399); }
+        .progress-fill.cyan { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
         .progress-fill.yellow { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
         .progress-fill.red { background: linear-gradient(90deg, #ef4444, #f87171); }
-        .progress-fill.neutral { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
 
         /* 全池宏观水位大盘 (Pool Runway Strip) */
         .runway-strip {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            flex-shrink: 0;
+            gap: 12px;
         }
 
         .runway-card {
-            background: rgba(18, 25, 42, 0.6);
+            background: rgba(17, 24, 39, 0.68);
             border: 1px solid var(--border-card);
-            border-radius: 10px;
-            padding: 8px 12px;
+            border-radius: 11px;
+            padding: 10px 14px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            backdrop-filter: blur(8px);
+            gap: 12px;
             transition: all 0.2s ease;
         }
 
+        body.compact-mode .runway-card {
+            padding: 8px 12px;
+        }
+
         .runway-card:hover {
-            border-color: rgba(255, 255, 255, 0.16);
-            background: rgba(26, 36, 60, 0.7);
+            border-color: var(--border-hover);
+            background: rgba(24, 34, 54, 0.78);
         }
 
         .runway-icon-box {
-            width: 30px;
-            height: 30px;
-            border-radius: 8px;
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
+            font-size: 15px;
             flex-shrink: 0;
         }
 
@@ -397,91 +500,122 @@
         .runway-body {
             display: flex;
             flex-direction: column;
-            gap: 1px;
+            gap: 2px;
             overflow: hidden;
             white-space: nowrap;
         }
 
         .runway-title {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            white-space: nowrap;
+            letter-spacing: 0.3px;
         }
 
         .runway-val {
-            font-size: 13px;
+            font-size: 15px;
             font-weight: 700;
             color: #ffffff;
             display: flex;
             align-items: baseline;
-            gap: 4px;
-            white-space: nowrap;
+            gap: 5px;
         }
 
         .runway-sub {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--text-secondary);
             font-weight: normal;
         }
 
-        /* 快捷动作栏 + 视图控制 */
+        /* 双层控制工具栏：动作层 + 视图/模型筛选层 */
+        .control-bar-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            padding: 10px 14px;
+        }
+
         .quick-toolbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-wrap: wrap;
-            gap: 8px;
-            flex-shrink: 0;
+            gap: 10px;
+        }
+
+        .toolbar-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.06);
         }
 
         .section-heading {
             font-size: 13px;
             font-weight: 700;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
+            color: var(--text-primary);
+            letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             white-space: nowrap;
+        }
+
+        .slot-count-pill {
+            font-size: 11px;
+            font-weight: 600;
+            color: #38bdf8;
+            background: rgba(14, 165, 233, 0.12);
+            border: 1px solid rgba(14, 165, 233, 0.25);
+            padding: 1px 8px;
+            border-radius: 12px;
         }
 
         .toolbar-btns {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 7px;
             flex-wrap: wrap;
         }
 
         .view-controls {
             display: flex;
             align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-            flex-shrink: 0;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            width: 100%;
         }
 
-        /* 模型视角切换器 */
-        .perspective-chip-group,
-        .filter-chip-group {
+        .view-group-left, .view-group-right {
             display: flex;
             align-items: center;
-            background: rgba(255, 255, 255, 0.04);
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .control-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .filter-chip-group {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.28);
             border: 1px solid var(--border-card);
-            border-radius: 7px;
+            border-radius: 8px;
             padding: 2px;
             gap: 2px;
         }
 
-        .perspective-btn,
         .filter-btn {
             background: transparent;
             border: none;
-            color: var(--text-muted);
-            padding: 3px 8px;
-            border-radius: 5px;
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
             cursor: pointer;
@@ -489,88 +623,79 @@
             white-space: nowrap;
         }
 
-        .perspective-btn:hover,
         .filter-btn:hover {
             color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.04);
         }
 
-        .perspective-btn.active,
         .filter-btn.active {
-            background: rgba(255, 255, 255, 0.12);
-            color: #ffffff;
+            background: rgba(14, 165, 233, 0.2);
+            color: #38bdf8;
+            border: 1px solid rgba(14, 165, 233, 0.35);
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
         }
 
-        /* R2.1 卡片网格独立滚动容器 */
-        .slot-grid-container {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding-right: 4px;
+        .search-input-box {
+            background: rgba(0, 0, 0, 0.28);
+            border: 1px solid var(--border-card);
+            border-radius: 8px;
+            padding: 4px 10px;
+            color: var(--text-primary);
+            font-size: 12px;
+            width: 170px;
+            outline: none;
+            transition: border-color 0.15s ease;
         }
 
-        .slot-grid-container::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .slot-grid-container::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 3px;
-        }
-
-        .slot-grid-container::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.25);
+        .search-input-box:focus {
+            border-color: var(--accent-cyan);
         }
 
         /* 槽位池卡片网格 */
         .slot-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-            gap: 12px;
-            padding-bottom: 6px;
+            gap: 14px;
         }
 
-        /* 紧凑模式 */
-        .slot-grid.compact-mode {
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 8px;
+        body.compact-mode .slot-grid {
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 10px;
         }
 
         .slot-card {
             background: var(--bg-card);
             border: 1px solid var(--border-card);
-            border-radius: 12px;
-            padding: 12px 14px;
-            backdrop-filter: blur(8px);
+            border-radius: 13px;
+            padding: 14px 16px;
             display: flex;
             flex-direction: column;
             gap: 10px;
-            transition: all 0.2s ease;
+            transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
             position: relative;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
         }
 
-        .slot-grid.compact-mode .slot-card {
-            padding: 8px 10px;
-            gap: 6px;
+        body.compact-mode .slot-card {
+            padding: 10px 13px;
+            gap: 7px;
         }
 
         .slot-card:hover {
             background: var(--bg-card-hover);
-            border-color: rgba(255, 255, 255, 0.16);
+            border-color: var(--border-hover);
             transform: translateY(-2px);
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
         }
 
         .slot-card.active-slot {
-            background: var(--bg-active-card);
+            background: linear-gradient(180deg, rgba(16, 185, 129, 0.10) 0%, rgba(17, 24, 39, 0.88) 100%);
             border-color: var(--border-active);
-            box-shadow: 0 4px 18px rgba(16, 185, 129, 0.18);
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.16);
         }
 
         .slot-card.is-skipped {
-            opacity: 0.65;
+            opacity: 0.68;
             border-style: dashed;
         }
 
@@ -578,29 +703,28 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            white-space: nowrap;
             gap: 8px;
         }
 
         .slot-title-group {
             display: flex;
             align-items: center;
-            gap: 7px;
-            overflow: hidden;
-            white-space: nowrap;
+            gap: 8px;
+            min-width: 0;
+            flex: 1;
         }
 
         .slot-letter-badge {
-            min-width: 40px;
-            padding: 0 6px;
+            min-width: 44px;
+            padding: 0 7px;
             height: 24px;
-            border-radius: 5px;
+            border-radius: 6px;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.12);
             font-size: 11px;
             font-weight: 700;
             color: #fff;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             white-space: nowrap;
@@ -614,10 +738,9 @@
         }
 
         .slot-email-text {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--text-primary);
-            max-width: 170px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -633,72 +756,68 @@
             display: flex;
             align-items: center;
             gap: 5px;
-            white-space: nowrap;
             flex-shrink: 0;
         }
 
         .status-chip {
-            padding: 2px 7px;
-            border-radius: 8px;
-            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
             font-weight: 700;
             display: inline-flex;
             align-items: center;
-            gap: 3px;
+            gap: 4px;
             white-space: nowrap;
-            flex-shrink: 0;
         }
 
-        .status-chip.active { background: var(--accent-green-bg); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .status-chip.active { background: var(--accent-green-bg); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
         .status-chip.ready { background: var(--accent-cyan-bg); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
-        .status-chip.exhausted-5h { background: var(--accent-yellow-bg); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-        .status-chip.exhausted-weekly { background: var(--accent-purple-bg); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-        .status-chip.unsupported { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); }
-        .status-chip.skipped { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
+        .status-chip.exhausted-5h { background: var(--accent-yellow-bg); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
+        .status-chip.exhausted-weekly { background: var(--accent-purple-bg); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
+        .status-chip.unsupported { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .status-chip.skipped { background: rgba(239, 68, 68, 0.14); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
 
         /* 模型胶囊标签 */
         .slot-models-row {
             display: flex;
             flex-wrap: wrap;
             gap: 4px;
-            margin-top: -2px;
+        }
+
+        body.compact-mode .slot-models-row {
+            display: none;
         }
 
         .model-pill {
             font-size: 10px;
-            padding: 1px 5px;
+            padding: 1px 6px;
             border-radius: 4px;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.04);
             color: var(--text-secondary);
             border: 1px solid rgba(255, 255, 255, 0.08);
             white-space: nowrap;
         }
 
-        .slot-grid.compact-mode .model-pill {
-            font-size: 9px;
-            padding: 1px 4px;
-        }
-
         .model-pill.special {
             background: rgba(16, 185, 129, 0.14);
             color: #34d399;
-            border-color: rgba(16, 185, 129, 0.3);
+            border-color: rgba(16, 185, 129, 0.32);
             font-weight: 600;
         }
 
-        /* 主次分明配额区域 */
+        /* 配额进度条与语义化倒计时胶囊 */
         .slot-metrics {
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 8px 10px;
+            gap: 7px;
+            background: rgba(0, 0, 0, 0.24);
+            padding: 9px 11px;
             border-radius: 8px;
             border: 1px solid rgba(255, 255, 255, 0.04);
         }
 
-        .slot-grid.compact-mode .slot-metrics {
-            padding: 5px 8px;
+        body.compact-mode .slot-metrics {
+            padding: 7px 9px;
             gap: 5px;
         }
 
@@ -718,20 +837,20 @@
         }
 
         .metric-val-group {
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 6px;
-            white-space: nowrap;
         }
 
         .metric-val {
             font-weight: 700;
             color: #ffffff;
-            font-size: 11px;
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
         }
 
-        /* R2.3 / R2.4 配额状态语义区分样式 */
-        .metric-countdown {
+        /* 统一语义化倒计时胶囊 (同时兼容 metric-countdown 与 countdown-badge) */
+        .metric-countdown, .countdown-badge {
             font-size: 10px;
             font-weight: 600;
             padding: 1px 6px;
@@ -739,141 +858,122 @@
             letter-spacing: 0.2px;
             display: inline-flex;
             align-items: center;
-            gap: 2px;
+            gap: 3px;
             white-space: nowrap;
+            font-variant-numeric: tabular-nums;
         }
 
-        /* 剩余额度 > 20%: 显示中性冷灰/青色正常刷新提示 */
-        .metric-countdown.ready {
-            color: #38bdf8;
-            background: rgba(14, 165, 233, 0.1);
-            border: 1px solid rgba(14, 165, 233, 0.25);
+        /* 满额/就绪：翠绿 */
+        .metric-countdown.ready, .countdown-badge.ready {
+            color: #34d399;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.28);
         }
 
-        /* 剩余额度 <= 20%: 显示黄色预警 */
-        .metric-countdown.warning {
+        /* 额度充足 (>20%) 的正常滚动刷新窗口：冷静青灰，消除虚假黄色警告感 */
+        .metric-countdown.rolling, .countdown-badge.rolling {
+            color: #7dd3fc;
+            background: rgba(14, 165, 233, 0.10);
+            border: 1px solid rgba(14, 165, 233, 0.24);
+        }
+
+        /* 低额度预警 (<=20%)：琥珀黄 */
+        .metric-countdown.cooldown, .countdown-badge.cooldown {
             color: #fbbf24;
             background: rgba(245, 158, 11, 0.14);
-            border: 1px solid rgba(245, 158, 11, 0.35);
+            border: 1px solid rgba(245, 158, 11, 0.32);
         }
 
-        /* 剩余额度 <= 1%: 显示红色限额冷却 */
-        .metric-countdown.cooldown,
-        .metric-countdown.exhausted {
+        /* 限额耗尽 (<=1%)：玫瑰红 */
+        .metric-countdown.exhausted, .countdown-badge.exhausted {
             color: #f87171;
             background: rgba(239, 68, 68, 0.14);
-            border: 1px solid rgba(239, 68, 68, 0.35);
+            border: 1px solid rgba(239, 68, 68, 0.32);
         }
 
-        .metric-countdown.muted {
+        .metric-countdown.muted, .countdown-badge.muted {
             color: var(--text-muted);
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
-        /* 折叠抽屉：其他模型配额 */
+        /* 折叠抽屉：其他模型配额 (状态持久化，不被 8 秒轮询重置) */
         .other-models-toggle {
             font-size: 11px;
             color: var(--text-muted);
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 4px;
-            padding-top: 4px;
-            border-top: 1px dashed rgba(255, 255, 255, 0.06);
-            transition: color 0.2s ease;
-            white-space: nowrap;
+            justify-content: space-between;
+            padding-top: 5px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.07);
+            transition: color 0.18s ease;
         }
 
         .other-models-toggle:hover {
-            color: var(--accent-cyan);
+            color: #38bdf8;
         }
 
         .other-models-drawer {
             display: none;
             flex-direction: column;
-            gap: 6px;
+            gap: 7px;
             margin-top: 4px;
-            padding-top: 4px;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            animation: fadeIn 0.18s ease-in-out;
+            padding-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .other-models-drawer.open {
             display: flex;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* R2.2 卡片底部操作与元数据 */
+        /* 卡片底部：去除重复倒计时文字，展示元信息与完整单卡控制按钮 */
         .slot-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding-top: 2px;
-            white-space: nowrap;
             gap: 8px;
         }
 
-        .slot-footer-meta {
+        .slot-meta-foot {
+            font-size: 11px;
+            color: var(--text-muted);
             display: flex;
             align-items: center;
-            gap: 5px;
-            font-size: 11px;
-            color: var(--text-secondary);
-            overflow: hidden;
+            gap: 6px;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .meta-tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 3px;
-            padding: 2px 6px;
-            border-radius: 4px;
+        .meta-tag-subtle {
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 1px 6px;
+            border-radius: 4px;
             font-size: 10px;
-        }
-
-        .meta-tag.plan {
-            color: #38bdf8;
-            background: rgba(14, 165, 233, 0.1);
-            border-color: rgba(14, 165, 233, 0.2);
-            font-weight: 600;
-        }
-
-        .meta-tag.time {
             color: var(--text-secondary);
-        }
-
-        .meta-tag.count {
-            color: #a78bfa;
-            background: rgba(168, 85, 247, 0.08);
-            border-color: rgba(168, 85, 247, 0.2);
         }
 
         .card-actions-group {
             display: flex;
             align-items: center;
-            gap: 4px;
-            white-space: nowrap;
+            gap: 5px;
+            flex-shrink: 0;
         }
 
         .btn-mini {
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-card);
             color: var(--text-secondary);
-            padding: 3px 7px;
-            border-radius: 5px;
+            padding: 4px 7px;
+            border-radius: 6px;
             font-size: 11px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 2px;
+            gap: 3px;
             transition: all 0.15s ease;
             white-space: nowrap;
         }
@@ -881,33 +981,33 @@
         .btn-mini:hover {
             background: rgba(255, 255, 255, 0.12);
             color: var(--text-primary);
-            border-color: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .btn-mini.danger:hover {
+            background: rgba(239, 68, 68, 0.16);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.35);
         }
 
         .btn-mini.skip-active {
             background: rgba(239, 68, 68, 0.15);
             color: #f87171;
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-
-        .btn-mini.btn-danger-mini:hover {
-            background: rgba(239, 68, 68, 0.2);
-            color: #f87171;
-            border-color: rgba(239, 68, 68, 0.4);
+            border-color: rgba(239, 68, 68, 0.32);
         }
 
         .btn-switch-primary {
             background: linear-gradient(135deg, #0ea5e9, #0284c7);
             color: #fff;
             border: none;
-            padding: 4px 10px;
-            border-radius: 5px;
+            padding: 4px 11px;
+            border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 3px;
+            gap: 4px;
             transition: all 0.15s ease;
             white-space: nowrap;
             box-shadow: 0 2px 6px rgba(14, 165, 233, 0.25);
@@ -920,15 +1020,17 @@
         }
 
         .btn-switch-primary:disabled {
-            background: rgba(255, 255, 255, 0.06);
-            color: var(--text-muted);
+            background: rgba(16, 185, 129, 0.14);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
             box-shadow: none;
-            cursor: not-allowed;
+            cursor: default;
             transform: none;
         }
 
-        /* 旋转动画（单卡刷新） */
+        /* 旋转动画 */
         .rotating {
+            display: inline-block;
             animation: spin 0.8s linear infinite;
         }
 
@@ -937,25 +1039,22 @@
             to { transform: rotate(360deg); }
         }
 
-        /* 底部折叠抽屉：切号审计与运行动态 (Activity Timeline) */
+        /* 底部折叠抽屉：切号审计与运行动态 */
         .audit-panel {
             background: var(--bg-card);
             border: 1px solid var(--border-card);
-            border-radius: 10px;
+            border-radius: 12px;
             overflow: hidden;
-            backdrop-filter: blur(8px);
-            flex-shrink: 0;
         }
 
         .audit-header {
-            padding: 8px 14px;
+            padding: 10px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             cursor: pointer;
-            user-select: none;
-            transition: background 0.2s ease;
-            white-space: nowrap;
+            transition: background 0.18s ease;
+            gap: 12px;
         }
 
         .audit-header:hover {
@@ -965,29 +1064,28 @@
         .audit-title-box {
             display: flex;
             align-items: center;
-            gap: 8px;
-            white-space: nowrap;
-            overflow: hidden;
+            gap: 10px;
+            min-width: 0;
+            flex: 1;
         }
 
         .audit-summary-pill {
-            font-size: 11px;
+            font-size: 12px;
             color: var(--text-secondary);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            max-width: 550px;
         }
 
         .audit-timeline-content {
             display: none;
             flex-direction: column;
             gap: 6px;
-            padding: 10px 14px;
+            padding: 12px 16px;
             border-top: 1px solid var(--border-card);
-            max-height: 160px;
+            max-height: 220px;
             overflow-y: auto;
-            background: rgba(0, 0, 0, 0.15);
+            background: rgba(0, 0, 0, 0.18);
         }
 
         .audit-timeline-content.open {
@@ -998,73 +1096,63 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 11px;
-            padding: 5px 8px;
-            border-radius: 5px;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
             background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            white-space: nowrap;
-            gap: 10px;
-        }
-
-        .timeline-item:hover {
-            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .timeline-left {
             display: flex;
             align-items: center;
-            gap: 8px;
-            white-space: nowrap;
+            gap: 10px;
         }
 
         .timeline-time {
             color: var(--text-muted);
-            font-size: 10px;
+            font-size: 11px;
             font-variant-numeric: tabular-nums;
         }
 
         .timeline-transfer {
             font-weight: 700;
             color: #38bdf8;
-            display: flex;
-            align-items: center;
-            gap: 3px;
         }
 
         .timeline-reason {
             color: var(--text-secondary);
-            font-size: 10.5px;
+            font-size: 11px;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 450px;
         }
 
-        /* 底部说明与时间戳 */
         footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 12px 24px;
             border-top: 1px solid var(--border-card);
-            background: rgba(10, 14, 23, 0.88);
+            background: rgba(10, 14, 23, 0.9);
             font-size: 11px;
             color: var(--text-muted);
-            white-space: nowrap;
-            flex-shrink: 0;
         }
 
         .dual-track-note {
             display: flex;
             align-items: center;
-            gap: 6px;
-            white-space: nowrap;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .track-tag {
             background: rgba(255, 255, 255, 0.08);
-            padding: 1px 5px;
-            border-radius: 3px;
+            padding: 2px 6px;
+            border-radius: 4px;
             font-size: 10px;
             font-weight: 700;
             color: var(--text-secondary);
@@ -1075,22 +1163,23 @@
             position: fixed;
             bottom: 24px;
             right: 24px;
-            background: rgba(18, 25, 42, 0.95);
+            background: rgba(15, 23, 42, 0.96);
             border: 1px solid var(--accent-green);
             color: #ffffff;
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 10px 16px;
+            border-radius: 9px;
             font-size: 12px;
             font-weight: 500;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
             display: flex;
             align-items: center;
-            gap: 7px;
+            gap: 8px;
             z-index: 1000;
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateY(12px);
             pointer-events: none;
             transition: all 0.22s ease;
+            max-width: 440px;
         }
 
         #toast.show {
@@ -1098,45 +1187,34 @@
             transform: translateY(0);
         }
 
-        /* R3.5 暗色毛玻璃模态弹窗体系 */
+        /* 统一暗色毛玻璃模态框 (彻底替代原生 confirm/alert) */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.72);
-            backdrop-filter: blur(12px);
+            background: rgba(0, 0, 0, 0.68);
+            backdrop-filter: blur(5px);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 500;
-            animation: modalFadeIn 0.18s ease-out;
+            padding: 16px;
         }
 
         .modal-overlay.open {
             display: flex;
         }
 
-        @keyframes modalFadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
         .modal-card {
-            background: rgba(17, 24, 39, 0.96);
+            background: #111827;
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 14px;
             padding: 22px;
-            width: 420px;
-            max-width: 90vw;
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.55);
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            animation: cardScaleUp 0.18s ease-out;
-        }
-
-        @keyframes cardScaleUp {
-            from { transform: scale(0.95); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
+            gap: 14px;
         }
 
         .modal-title {
@@ -1148,32 +1226,19 @@
             gap: 8px;
         }
 
-        .modal-message {
-            font-size: 12.5px;
+        .modal-desc {
+            font-size: 13px;
             color: var(--text-secondary);
-            line-height: 1.5;
-        }
-
-        .modal-details {
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 11.5px;
-            color: var(--text-muted);
-            max-height: 180px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
+            line-height: 1.55;
         }
 
         .modal-input {
-            background: rgba(0, 0, 0, 0.4);
+            background: rgba(0, 0, 0, 0.35);
             border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 7px;
-            padding: 8px 12px;
+            border-radius: 8px;
+            padding: 10px 12px;
             color: #ffffff;
-            font-size: 12.5px;
+            font-size: 13px;
             outline: none;
         }
 
@@ -1184,202 +1249,143 @@
         .modal-actions {
             display: flex;
             justify-content: flex-end;
-            gap: 8px;
+            gap: 10px;
             margin-top: 4px;
         }
 
-        .btn-modal-cancel {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid var(--border-card);
-            color: var(--text-secondary);
-            padding: 6px 14px;
-            border-radius: 7px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .btn-modal-cancel:hover {
-            background: rgba(255, 255, 255, 0.12);
-            color: #fff;
-        }
-
-        .btn-modal-confirm {
-            background: linear-gradient(135deg, #0284c7, #059669);
-            border: none;
-            color: #fff;
-            padding: 6px 16px;
-            border-radius: 7px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
-            transition: all 0.15s ease;
-        }
-
-        .btn-modal-confirm:hover {
-            background: linear-gradient(135deg, #0369a1, #047857);
-            box-shadow: 0 3px 12px rgba(2, 132, 199, 0.45);
-        }
-
-        .btn-modal-confirm.danger {
-            background: linear-gradient(135deg, #dc2626, #b91c1c);
-            box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
-        }
-
-        .btn-modal-confirm.danger:hover {
-            background: linear-gradient(135deg, #b91c1c, #991b1b);
-        }
-
-        .btn-modal-confirm:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* 运维与体检弹窗专属样式 */
-        .ops-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin: 6px 0;
-        }
-
-        .ops-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 10px 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .ops-card-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .ops-card-desc {
-            font-size: 11px;
+        .empty-state-box {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 36px 20px;
             color: var(--text-muted);
-            line-height: 1.35;
+            font-size: 13px;
+            background: rgba(17, 24, 39, 0.45);
+            border: 1px dashed var(--border-card);
+            border-radius: 12px;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 980px) {
             .hero-banner { grid-template-columns: 1fr; }
             .runway-strip { grid-template-columns: repeat(2, 1fr); }
             .slot-grid { grid-template-columns: 1fr; }
-            .slot-grid.compact-mode { grid-template-columns: 1fr; }
-            .ops-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-    <!-- 顶部紧凑导航 -->
+    <!-- 顶部导航 -->
     <header>
         <div class="brand-box">
             <div class="brand-logo">A</div>
             <div>
-                <div class="brand-title">Antigravity 双轨智能控制台</div>
-                <div class="brand-subtitle">5小时 / 周配额全自动切号与原会话恢复</div>
+                <div class="brand-title-row">
+                    <span class="brand-title">Antigravity 双轨智能控制台</span>
+                    <span class="version-chip">v0.4.0</span>
+                    <span class="demo-banner-chip" id="demoModeBadge" title="当前处于离线演示模式，在本地 127.0.0.1:4088 运行时将自动连接真实守护引擎">🧪 交互预览模式</span>
+                </div>
+                <div class="brand-subtitle">Zero-CDP 原生 Connect-RPC · 5h/周配额全自动切号与原会话无损恢复</div>
             </div>
         </div>
 
         <div class="header-actions">
-            <!-- 锁定模型胶囊 -->
-            <div class="pill-badge" id="modelBadge">
-                <span style="font-size: 13px;">🎯</span>
+            <div class="pill-badge cyan" id="modelBadge" title="当前 AGY2 严格锁定的模型与模型组">
+                <span>🎯</span>
                 <span id="lockedModelText">锁定模型检测中...</span>
             </div>
-
-            <!-- 守护进程状态徽章 (点击可唤出运维操作) -->
-            <div class="pill-badge green interactive" id="daemonBadge" onclick="openOpsModal()" title="点击管理守护进程与开机自启">
+            <div class="pill-badge green clickable" id="daemonBadge" title="点击切换后台无人值守守护进程启停状态" onclick="triggerToggleDaemon()">
                 <span class="pulse-dot"></span>
                 <span id="daemonText">守护运行中</span>
             </div>
-
-            <!-- ⚡ 极速切号 (/boost) -->
-            <button class="btn-icon btn-boost" id="btnBoost" onclick="triggerBoost()" title="并发测速并瞬间切入当前模型最高配额槽位">
-                ⚡ 极速切号
+            <div class="pill-badge clickable" id="autoStartBadge" title="点击切换 Windows 开机无感知快捷方式自启" onclick="triggerToggleAutoStart()">
+                <span>🚀</span>
+                <span id="autoStartText">开机自启: 检测中</span>
+            </div>
+            <button class="btn-icon" id="btnDensity" title="切换紧凑一屏视图与标准视图" onclick="toggleCompactMode()">
+                <span id="densityIcon">📐</span>
+                <span id="densityText">紧凑视图</span>
             </button>
-
-            <!-- ⚙️ 运维与体检 -->
-            <button class="btn-icon" onclick="openOpsModal()" title="全链路健康体检、开机自启与存储修复">
-                ⚙️ 运维体检
+            <button class="btn-icon" title="备份并净化重置 app_storage.json，解决客户端启动闪退" onclick="triggerRepairStorage()">
+                🔧 修复配置
             </button>
-
-            <!-- 📟 经典终端 -->
-            <button class="btn-icon" onclick="openTuiTerminal()">
+            <button class="btn-icon" title="呼出经典命令行交互式控制台 (TUI)" onclick="openTuiTerminal()">
                 📟 经典终端
             </button>
-
-            <!-- 🔄 刷新配额 -->
+            <button class="btn-icon" id="btnPausePoll" title="暂停或恢复 8 秒自动轮询" onclick="togglePollPause()">
+                <span id="pausePollIcon">⏸️</span>
+            </button>
             <button class="btn-icon btn-primary" id="btnRefresh" onclick="fetchStatus(true)">
                 <span id="refreshIcon">🔄</span>
-                <span>刷新</span>
-                <span id="refreshCountdownBadge" style="font-size: 10px; opacity: 0.8; margin-left: 1px;">(8s)</span>
+                <span>刷新配额</span>
+                <span id="refreshCountdownBadge" style="font-size: 10px; opacity: 0.85;">(8s)</span>
             </button>
         </div>
     </header>
 
     <!-- 主体内容 -->
     <main>
-        <!-- 顶部 Hero 卡片 (当前使用账号) -->
+        <!-- 顶部 Hero 卡片 (当前使用账号 + 实时多模型矩阵) -->
         <section class="hero-banner">
             <div class="hero-info">
                 <div class="hero-slot-tag">
                     <div class="slot-badge-large" id="heroSlotBadge">-</div>
-                    <div class="hero-email" id="heroEmail">正在读取当前账号...</div>
+                    <div class="hero-email" id="heroEmail" title="点击复制当前活跃账号邮箱" onclick="copyCurrentHeroEmail()">正在读取当前账号...</div>
                     <div class="hero-fingerprint" id="heroFp">指纹: --</div>
+                    <div class="hero-fingerprint" id="heroPlan">Pro</div>
                 </div>
                 <div class="hero-meta-row">
                     <div class="hero-meta-item">
-                        <span>● 当前状态:</span>
-                        <span style="color: #34d399; font-weight: 600;" id="heroStatusText">★ 使用中</span>
+                        <span>● 状态:</span>
+                        <span style="color: #34d399; font-weight: 700;" id="heroStatusText">★ 使用中</span>
                     </div>
-                    <!-- R2.4 消除重复 ⏱️ 图标，使用统一 metric-countdown 类名 -->
                     <div class="hero-meta-item">
-                        <span>⏱️ 5小时冷却:</span>
+                        <span>5h 窗口:</span>
                         <span id="hero5hCountdown" class="metric-countdown ready">就绪可用</span>
                     </div>
                     <div class="hero-meta-item">
-                        <span>📅 周重置倒计:</span>
+                        <span>周窗口:</span>
                         <span id="heroWeeklyCountdown" class="metric-countdown ready">就绪可用</span>
                     </div>
                     <div class="hero-meta-item">
-                        <span>☁️ 配额新鲜度:</span>
+                        <span>☁️ 同步:</span>
                         <span id="heroSyncTime" style="color: var(--text-muted);">实时</span>
                     </div>
                 </div>
             </div>
 
-            <!-- R3.2 动态模型组配额绑定 -->
-            <div class="hero-bars">
-                <div class="hero-bar-group">
-                    <div class="hero-bar-label">
-                        <span id="hero5hLabel">当前模型 5小时配额</span>
-                        <span id="hero5hPct" style="font-weight: 700; color: #fff;">--%</span>
+            <div class="hero-right">
+                <div class="hero-bars">
+                    <div class="hero-bar-group">
+                        <div class="hero-bar-label">
+                            <span id="hero5hTitle">当前模型 5小时配额</span>
+                            <span id="hero5hPct" style="font-weight: 700; color: #fff;">--%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill green" id="hero5hBar" style="width: 0%"></div>
+                        </div>
                     </div>
-                    <div class="progress-track">
-                        <div class="progress-fill green" id="hero5hBar" style="width: 0%"></div>
+                    <div class="hero-bar-group">
+                        <div class="hero-bar-label">
+                            <span id="heroWeeklyTitle">当前模型 周配额余量</span>
+                            <span id="heroWeeklyPct" style="font-weight: 700; color: #fff;">--%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill green" id="heroWeeklyBar" style="width: 0%"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="hero-bar-group">
-                    <div class="hero-bar-label">
-                        <span id="heroWeeklyLabel">当前模型 周配额余量</span>
-                        <span id="heroWeeklyPct" style="font-weight: 700; color: #fff;">--%</span>
+                <!-- 当前活跃账号的全模型矩阵速览 -->
+                <div class="hero-mini-matrix">
+                    <div class="matrix-pill" id="heroMatrixGemini">
+                        <span style="color:var(--text-secondary);">💎 Gemini</span>
+                        <span id="heroMatrixGeminiVal" style="font-weight:700;color:#fff;">--% / --%</span>
                     </div>
-                    <div class="progress-track">
-                        <div class="progress-fill green" id="heroWeeklyBar" style="width: 0%"></div>
+                    <div class="matrix-pill" id="heroMatrixClaude">
+                        <span style="color:var(--text-secondary);">🟣 Claude</span>
+                        <span id="heroMatrixClaudeVal" style="font-weight:700;color:#fff;">--% / --%</span>
+                    </div>
+                    <div class="matrix-pill" id="heroMatrixArgon">
+                        <span style="color:var(--text-secondary);">🧪 Argon</span>
+                        <span id="heroMatrixArgonVal" style="font-weight:700;color:#fff;">--</span>
                     </div>
                 </div>
             </div>
@@ -1390,7 +1396,7 @@
             <div class="runway-card">
                 <div class="runway-icon-box green">🟢</div>
                 <div class="runway-body">
-                    <div class="runway-title">全池就绪槽位</div>
+                    <div class="runway-title" id="runwayReadyTitle">全池就绪槽位</div>
                     <div class="runway-val" id="runwayReadyVal">-- / -- <span class="runway-sub">待命中</span></div>
                 </div>
             </div>
@@ -1404,8 +1410,8 @@
             <div class="runway-card">
                 <div class="runway-icon-box yellow">⏱️</div>
                 <div class="runway-body">
-                    <div class="runway-title">冷却中槽位</div>
-                    <div class="runway-val" id="runwayCooldownVal">-- <span class="runway-sub">限额冷却中</span></div>
+                    <div class="runway-title">限额冷却 / 免切槽位</div>
+                    <div class="runway-val" id="runwayCooldownVal">-- <span class="runway-sub">冷却中</span></div>
                 </div>
             </div>
             <div class="runway-card">
@@ -1417,71 +1423,79 @@
             </div>
         </section>
 
-        <!-- 快捷操作区 + 模型组视角切换 + 视图控制 -->
-        <div class="quick-toolbar">
-            <div class="section-heading">
-                <span>槽位池 (Slot Pool)</span>
+        <!-- 双层控制栏：第一层动作按钮 + 第二层模型视角与筛选排序 -->
+        <section class="control-bar-wrap">
+            <div class="quick-toolbar">
+                <div class="section-heading">
+                    <span>全账号槽位池 (SLOT POOL)</span>
+                    <span class="slot-count-pill" id="visibleSlotCountBadge">0 个槽位</span>
+                </div>
+                <div class="toolbar-btns">
+                    <button class="btn-icon btn-boost" title="实时比对全池配额并一键无损跃迁至当前模型最高配额账号 (/boost)" onclick="triggerBoost()">
+                        🚀 极速择优跃迁 (/boost)
+                    </button>
+                    <button class="btn-icon" title="顺延切换至下一个可用槽位并恢复原会话" onclick="triggerNextSlot()">
+                        ⚡ 轮换至下一账号
+                    </button>
+                    <button class="btn-icon" title="通过本地 LanguageServer RPC 立即唤醒并恢复原会话" onclick="triggerResume()">
+                        💬 恢复当前原会话
+                    </button>
+                    <button class="btn-icon" title="将当前客户端登录的账号加密备份到槽位池" onclick="openSaveModal()">
+                        ➕ 备份当前账号至槽位
+                    </button>
+                    <button class="btn-icon" title="重置所有槽位的 5小时与周限额冷却计时器" onclick="triggerResetCooldown('all')">
+                        ⏱️ 重置槽位冷却
+                    </button>
+                </div>
             </div>
-            <div class="toolbar-btns">
-                <button class="btn-icon" onclick="triggerNextSlot()">
-                    ⚡ 轮换下一号
-                </button>
-                <button class="btn-icon" onclick="triggerResume()">
-                    💬 恢复原会话
-                </button>
-                <button class="btn-icon" onclick="openSaveModal()">
-                    ➕ 备份当前
-                </button>
-                <button class="btn-icon" onclick="triggerResetCooldown()">
-                    ⏱️ 重置全池冷却
-                </button>
-            </div>
+
+            <div class="toolbar-divider"></div>
+
             <div class="view-controls">
-                <!-- R3.3 模型组视角切换器 -->
-                <div class="perspective-chip-group" title="切换卡片展示的核心模型视角">
-                    <button class="perspective-btn active" data-perspective="follow" onclick="setPerspective('follow', this)">🎯 跟随活跃</button>
-                    <button class="perspective-btn" data-perspective="Gemini" onclick="setPerspective('Gemini', this)">Gemini</button>
-                    <button class="perspective-btn" data-perspective="Claude" onclick="setPerspective('Claude', this)">Claude</button>
-                    <button class="perspective-btn" data-perspective="Argon" onclick="setPerspective('Argon', this)">Argon</button>
+                <div class="view-group-left">
+                    <span class="control-label">模型配额视角:</span>
+                    <div class="filter-chip-group" id="modelViewGroup">
+                        <button class="filter-btn active" onclick="setModelView('auto', this)">🎯 跟随当前</button>
+                        <button class="filter-btn" onclick="setModelView('Gemini', this)">💎 Gemini</button>
+                        <button class="filter-btn" onclick="setModelView('Claude', this)">🟣 Claude</button>
+                        <button class="filter-btn" onclick="setModelView('Argon', this)">🧪 Argon</button>
+                        <button class="filter-btn" onclick="setModelView('all', this)">📊 全模型展开</button>
+                    </div>
                 </div>
 
-                <!-- R2.1 紧凑视图 / 标准视图切换 -->
-                <button class="btn-icon" id="btnViewMode" onclick="toggleViewMode()" title="切换紧凑视图与标准视图">
-                    <span id="viewModeIcon">📐</span>
-                    <span id="viewModeText">紧凑视图</span>
-                </button>
-
-                <!-- R2.5 三态排序切换 (字母 a-z / 配额降序 / 状态优先) -->
-                <button class="btn-icon" id="btnSortToggle" onclick="toggleSortMode()" title="点击切换排序逻辑 (活跃槽位始终置顶)">
-                    <span id="sortIcon">🔤</span>
-                    <span id="sortText">字母槽位</span>
-                </button>
-
-                <!-- 状态筛选 -->
-                <div class="filter-chip-group">
-                    <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
-                    <button class="filter-btn" onclick="setFilter('ready', this)">就绪</button>
-                    <button class="filter-btn" onclick="setFilter('cooldown', this)">冷却中</button>
+                <div class="view-group-right">
+                    <input type="text" class="search-input-box" id="slotSearchInput" placeholder="🔍 搜索邮箱 / 槽位..." oninput="onSearchInput(this.value)">
+                    <button class="btn-icon active-toggle" id="btnPinActive" title="始终将当前正在使用的账号固定在第一位" onclick="togglePinActive()">
+                        📌 活跃置顶
+                    </button>
+                    <button class="btn-icon" id="btnSortToggle" onclick="cycleSortMode()">
+                        <span id="sortIcon">🔤</span>
+                        <span id="sortText">默认槽位排序</span>
+                    </button>
+                    <div class="filter-chip-group" id="statusFilterGroup">
+                        <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">全部</button>
+                        <button class="filter-btn" data-filter="ready" onclick="setFilter('ready', this)">就绪</button>
+                        <button class="filter-btn" data-filter="cooldown" onclick="setFilter('cooldown', this)">冷却中</button>
+                        <button class="filter-btn" data-filter="argon" onclick="setFilter('argon', this)">含Argon</button>
+                    </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- R2.1 卡片网格独立平滑滚动容器 -->
-        <div class="slot-grid-container">
-            <section class="slot-grid" id="slotsContainer">
-                <!-- 动态注入 slot-card -->
-            </section>
-        </div>
+        <!-- 槽位卡片网格 -->
+        <section class="slot-grid" id="slotsContainer">
+            <!-- 动态注入 slot-card -->
+        </section>
 
         <!-- 底部折叠抽屉：切号审计与运行动态 (Activity Timeline) -->
         <section class="audit-panel">
             <div class="audit-header" onclick="toggleTimeline()">
                 <div class="audit-title-box">
-                    <span style="font-size: 13px;">📌</span>
-                    <span style="font-weight: 700; font-size: 12px; color: #fff;">切号审计与运行动态</span>
+                    <span style="font-size: 14px;">📌</span>
+                    <span style="font-weight: 700; font-size: 13px; color: #fff; white-space: nowrap;">切号审计与运行动态</span>
                     <span class="audit-summary-pill" id="auditSummaryPill">正在读取审计日志...</span>
                 </div>
-                <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 3px;">
+                <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; white-space: nowrap;">
                     <span id="timelineToggleText">展开时间轴 ▾</span>
                 </div>
             </div>
@@ -1495,310 +1509,372 @@
     <footer>
         <div class="dual-track-note">
             <span class="track-tag">双轨架构</span>
-            <span>轨 1: 经典控制台 TUI 模式 (按 [📟 经典终端] 唤出) ｜ 轨 2: 独立桌面应用 Web GUI 模式</span>
+            <span>轨 1: 经典控制台 TUI 模式 (按 [📟 经典终端] 唤出) ｜ 轨 2: 独立桌面应用 Web GUI 模式 (100% 本地离线沙箱)</span>
         </div>
-        <div id="footerTimestamp">最后更新: --:--:--</div>
+        <div id="footerTimestamp">更新时间: --:--:--</div>
     </footer>
 
     <!-- Toast 弹窗 -->
     <div id="toast">已成功执行操作</div>
 
-    <!-- R3.5 暗色毛玻璃统一通用确认模态框 (替代原生 confirm) -->
-    <div class="modal-overlay" id="confirmModal">
-        <div class="modal-card">
-            <div class="modal-title" id="confirmModalTitle">
-                <span>⚠️ 操作确认</span>
-            </div>
-            <div class="modal-message" id="confirmModalMsg">
-                请确认是否执行该操作。
-            </div>
-            <div class="modal-details" id="confirmModalDetails" style="display: none;"></div>
-            <div class="modal-actions">
-                <button class="btn-modal-cancel" id="btnConfirmCancel" onclick="closeConfirmModal(false)">取消</button>
-                <button class="btn-modal-confirm" id="btnConfirmOk">
-                    <span id="confirmSpinner" style="display: none;">⏳ </span>
-                    <span id="confirmBtnText">确认执行</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 备份当前槽位模态框 -->
+    <!-- 备份槽位模态框 -->
     <div class="modal-overlay" id="saveModal">
         <div class="modal-card">
-            <div class="modal-title">
-                <span>➕ 备份当前登录账号至槽位</span>
-            </div>
-            <p class="modal-message">
-                请输入目标槽位字母代号（如 a, b, c，若留空将自动分配下一个空闲字母）：
+            <div class="modal-title">➕ 备份当前 AGY2 登录账号至槽位</div>
+            <p class="modal-desc">
+                请输入槽位名称（例如 a, b, c，若留空将按字母序自动分配新槽位）：
             </p>
-            <input type="text" class="modal-input" id="slotInput" placeholder="槽位字母 (如 i)" maxlength="8">
+            <input type="text" class="modal-input" id="slotInput" placeholder="槽位代号 (如 i，留空自动分配)" maxlength="8">
             <div class="modal-actions">
-                <button class="btn-modal-cancel" onclick="closeSaveModal()">取消</button>
-                <button class="btn-modal-confirm" onclick="confirmSaveSlot()">立即加密备份</button>
+                <button class="btn-icon" onclick="closeSaveModal()">取消</button>
+                <button class="btn-icon btn-primary" onclick="confirmSaveSlot()">立即加密保存</button>
             </div>
         </div>
     </div>
 
-    <!-- R4 运维与全链路健康体检弹窗 -->
-    <div class="modal-overlay" id="opsModal">
-        <div class="modal-card" style="width: 520px;">
-            <div class="modal-title">
-                <span>⚙️ 运维中心与全链路体检</span>
-            </div>
-            <div class="modal-message">
-                管理后台托管守护进程、Windows 开机自启、执行全盘健康体检或重置存储。
-            </div>
-
-            <div class="ops-grid">
-                <!-- 守护进程控制 -->
-                <div class="ops-card">
-                    <div class="ops-card-title">
-                        <span>🛡️ 守护进程状态</span>
-                    </div>
-                    <div class="ops-card-desc" id="opsDaemonStatusText">
-                        检测中...
-                    </div>
-                    <div style="display: flex; gap: 6px; margin-top: 4px;">
-                        <button class="btn-mini" onclick="triggerDaemonAction('restart')">🔄 平滑重启</button>
-                        <button class="btn-mini" id="btnDaemonToggle" onclick="triggerDaemonAction('toggle')">⏹️ 停止守护</button>
-                    </div>
-                </div>
-
-                <!-- 开机自启控制 -->
-                <div class="ops-card">
-                    <div class="ops-card-title">
-                        <span>🚀 Windows 开机自启</span>
-                    </div>
-                    <div class="ops-card-desc" id="opsAutostartText">
-                        读取自启状态中...
-                    </div>
-                    <div style="margin-top: 4px;">
-                        <button class="btn-mini" id="btnToggleAutostart" onclick="triggerToggleAutostart()">⚡ 切换开机自启</button>
-                    </div>
-                </div>
-
-                <!-- 全链路体检 /goal -->
-                <div class="ops-card">
-                    <div class="ops-card-title">
-                        <span>🩺 全链路健康度体检</span>
-                    </div>
-                    <div class="ops-card-desc">
-                        深度核验槽位就绪率、DPAPI 凭据加解密与 CDP 状态。
-                    </div>
-                    <div style="margin-top: 4px;">
-                        <button class="btn-mini" onclick="triggerGoalCheck()">🔍 开始健康体检</button>
-                    </div>
-                </div>
-
-                <!-- 存储应急修复 repair-storage -->
-                <div class="ops-card">
-                    <div class="ops-card-title">
-                        <span>🛠️ 存储应急净化修复</span>
-                    </div>
-                    <div class="ops-card-desc">
-                        修复损坏或非法的 app_storage.json 并创建时间戳备份。
-                    </div>
-                    <div style="margin-top: 4px;">
-                        <button class="btn-mini btn-danger-mini" onclick="triggerRepairStorage()">⚠️ 净化修复</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 体检输出区 -->
-            <div class="modal-details" id="opsOutputBox" style="display: none;"></div>
-
+    <!-- 通用操作确认模态框 (替代浏览器原生 confirm) -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal-card">
+            <div class="modal-title" id="confirmModalTitle">确认执行操作</div>
+            <p class="modal-desc" id="confirmModalDesc">确定要继续执行此操作吗？</p>
             <div class="modal-actions">
-                <button class="btn-modal-cancel" onclick="closeOpsModal()">关闭</button>
+                <button class="btn-icon" onclick="closeConfirmModal()">取消</button>
+                <button class="btn-icon btn-primary" id="confirmModalOkBtn" onclick="executeConfirmCallback()">确认执行</button>
             </div>
         </div>
     </div>
 
     <script>
-        // 全局核心状态机
-        const UIState = {
-            expandedDrawers: new Set(), // 存储展开抽屉的 slotName (R3.1 Anti-Flicker)
-            refreshingSlots: new Set(), // 存储正在单卡刷新的 slotName
-            isCompactView: false,       // 紧凑模式开关 (R2.1)
-            currentPerspective: 'follow', // 'follow' | 'Gemini' | 'Claude' | 'Argon' (R3.3)
-            currentSortMode: 'letter',  // 'letter' (a-z) | 'quota' (配额降序) | 'status' (可用优先) (R2.5)
-            currentFilter: 'all',       // 'all' | 'ready' | 'cooldown'
-            timelineOpen: false
-        };
-
         let pollTimer = null;
         let countdownSeconds = 8;
+        let isPollingPaused = false;
         let isFetching = false;
         let globalData = null;
+        let isDemoMode = false;
 
-        // 通用 Toast 提示
+        // 视图与交互状态持久化 (防止 8 秒轮询抹除用户操作状态)
+        let sortMode = 'default'; // 'default' | 'quota' | 'alpha'
+        let pinActiveFirst = true;
+        let currentFilter = 'all'; // 'all' | 'ready' | 'cooldown' | 'argon'
+        let currentModelView = 'auto'; // 'auto' | 'Gemini' | 'Claude' | 'Argon' | 'all'
+        let searchQuery = '';
+        let isCompactMode = false;
+        let timelineOpen = false;
+        const expandedSlots = new Set();
+        const refreshingSlots = new Set();
+        let pendingConfirmAction = null;
+
+        // 离线/Canvas 预览回退数据 (基于真实 8 槽位快照构建，当本地 4088 后端未连接时自动激活)
+        function createInitialDemoData() {
+            return {
+                success: true,
+                timestamp: "2026-11-03 14:05:12",
+                daemon: { isRunning: true, pid: 22084, heartbeatAgeSec: 2, autoStartEnabled: true },
+                runway: {
+                    readyCount: 6,
+                    totalCount: 8,
+                    cooldownCount: 2,
+                    skippedCount: 0,
+                    activeModelGroup: "Gemini",
+                    activeModelAvgPct: 83,
+                    geminiReadyCount: 6,
+                    claudeReadyCount: 8,
+                    argonReadyCount: 2,
+                    geminiAvgPct: 83,
+                    claudeAvgPct: 92,
+                    argonAvgPct: 88
+                },
+                current: {
+                    slotName: "h",
+                    email: "deancyla@gmail.com",
+                    tokenFingerprint: "9f136d09",
+                    activeModelGroup: "Gemini",
+                    activeModelLabel: "Gemini 3.8 Flash (High)",
+                    gemini5hPct: 97,
+                    geminiWeeklyPct: 95,
+                    claude5hPct: 100,
+                    claudeWeeklyPct: 96,
+                    argonWeeklyPct: 92,
+                    gemini5hCountdown: "02h21m后重置",
+                    geminiWeeklyCountdown: "6d 10h后重置",
+                    claude5hCountdown: "就绪可用",
+                    claudeWeeklyCountdown: "就绪可用",
+                    argonWeeklyCountdown: "5d 18h后重置",
+                    active5hPct: 97,
+                    activeWeeklyPct: 95,
+                    active5hCountdown: "02h21m后重置",
+                    activeWeeklyCountdown: "6d 10h后重置",
+                    planName: "Pro Ultra",
+                    supportsArgon: true,
+                    lastQuotaSyncAt: "2026-11-03 14:05:10"
+                },
+                slots: [
+                    {
+                        slotIndex: 1, slotName: "b", email: "deancyl0607@gmail.com", isSkipped: false,
+                        status: "周限额", statusKey: "exhausted-weekly", isActive: false,
+                        gemini5hPct: 100, geminiWeeklyPct: 0, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 85,
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "2d 04h后重置", argonWeeklyCountdown: "不支持",
+                        claude5hCountdown: "就绪", claudeWeeklyCountdown: "4d 11h后重置",
+                        supportedModels: ["GPT-OSS 120B", "Claude 4.6", "Gemini 3.8 Flash", "Gemini 2.5 Pro"],
+                        supportsArgon: false, switchCount: 7, lastSwitchedAt: "2026-11-02 19:15:00", tokenFingerprint: "4b81e210", planName: "Pro"
+                    },
+                    {
+                        slotIndex: 2, slotName: "c", email: "salomeharriman68@gmail.com", isSkipped: false,
+                        status: "就绪 (可用)", statusKey: "ready", isActive: false,
+                        gemini5hPct: 100, geminiWeeklyPct: 42, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 90,
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "5d 07h后重置", argonWeeklyCountdown: "不支持",
+                        claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
+                        supportedModels: ["Gemini 3.8 Flash", "GPT-OSS 120B", "Claude 4.6", "Gemini 2.5 Pro"],
+                        supportsArgon: false, switchCount: 4, lastSwitchedAt: "2026-11-03 01:40:12", tokenFingerprint: "7c92a104", planName: "Pro"
+                    },
+                    {
+                        slotIndex: 3, slotName: "d", email: "charlescloud0607@gmail.com", isSkipped: false,
+                        status: "就绪 (可用)", statusKey: "ready", isActive: false,
+                        gemini5hPct: 100, geminiWeeklyPct: 38, argonWeeklyPct: -1, claude5hPct: 95, claudeWeeklyPct: 88,
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "2d 11h后重置", argonWeeklyCountdown: "不支持",
+                        claude5hCountdown: "03h12m后重置", claudeWeeklyCountdown: "5d 02h后重置",
+                        supportedModels: ["Gemini 3.8 Flash", "Claude 4.6", "GPT-OSS 120B", "Gemini 2.5 Pro"],
+                        supportsArgon: false, switchCount: 4, lastSwitchedAt: "2026-11-03 05:18:44", tokenFingerprint: "3d19f882", planName: "Pro"
+                    },
+                    {
+                        slotIndex: 4, slotName: "e", email: "pogoyutox@hotmail.com", isSkipped: false,
+                        status: "就绪 (可用)", statusKey: "ready", isActive: false,
+                        gemini5hPct: 100, geminiWeeklyPct: 100, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 100,
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "就绪", argonWeeklyCountdown: "不支持",
+                        claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
+                        supportedModels: ["Gemini 3.8 Flash", "Claude 4.6", "GPT-OSS 120B", "Gemini 2.5 Pro"],
+                        supportsArgon: false, switchCount: 3, lastSwitchedAt: "2026-11-01 22:10:09", tokenFingerprint: "8e55c301", planName: "Pro"
+                    },
+                    {
+                        slotIndex: 5, slotName: "a", email: "priscsavalia@gmail.com", isSkipped: false,
+                        status: "就绪 (可用)", statusKey: "ready", isActive: false,
+                        gemini5hPct: 100, geminiWeeklyPct: 49, argonWeeklyPct: 84, claude5hPct: 100, claudeWeeklyPct: 94,
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "5d 10h后重置", argonWeeklyCountdown: "4d 08h后重置",
+                        claude5hCountdown: "就绪", claudeWeeklyCountdown: "6d 01h后重置",
+                        supportedModels: ["Gemini 3.8 Flash", "Claude 5.5", "Gemini 4 Argon", "Gemini 2.5 Pro", "GPT-OSS 120B"],
+                        supportsArgon: true, switchCount: 4, lastSwitchedAt: "2026-11-03 08:50:19", tokenFingerprint: "1a60b49e", planName: "Pro Ultra"
+                    },
+                    {
+                        slotIndex: 6, slotName: "f", email: "zaraonet@gmail.com", isSkipped: false,
+                        status: "周限额", statusKey: "exhausted-weekly", isActive: false,
+                        gemini5hPct: 100, geminiWeeklyPct: 1, argonWeeklyPct: -1, claude5hPct: 80, claudeWeeklyPct: 72,
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "09h47m后重置", argonWeeklyCountdown: "不支持",
+                        claude5hCountdown: "01h40m后重置", claudeWeeklyCountdown: "3d 14h后重置",
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B"],
+                        supportsArgon: false, switchCount: 1, lastSwitchedAt: "2026-11-02 14:22:05", tokenFingerprint: "6f04d77a", planName: "Pro"
+                    },
+                    {
+                        slotIndex: 7, slotName: "g", email: "ngoclongvu631@gmail.com", isSkipped: false,
+                        status: "就绪 (可用)", statusKey: "ready", isActive: false,
+                        gemini5hPct: 100, geminiWeeklyPct: 67, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 100,
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "3d 03h后重置", argonWeeklyCountdown: "不支持",
+                        claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
+                        supportedModels: ["GPT-OSS 120B", "Claude 4.6", "Gemini 3.8 Flash", "Gemini 2.5 Pro"],
+                        supportsArgon: false, switchCount: 0, lastSwitchedAt: "", tokenFingerprint: "2g71c903", planName: "Pro"
+                    },
+                    {
+                        slotIndex: 8, slotName: "h", email: "deancyla@gmail.com", isSkipped: false,
+                        status: "★ 使用中", statusKey: "active", isActive: true,
+                        gemini5hPct: 97, geminiWeeklyPct: 95, argonWeeklyPct: 92, claude5hPct: 100, claudeWeeklyPct: 96,
+                        gemini5hCountdown: "02h21m后重置", geminiWeeklyCountdown: "6d 10h后重置", argonWeeklyCountdown: "5d 18h后重置",
+                        claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
+                        supportedModels: ["Gemini 3.8 Flash", "Claude 4.6", "GPT-OSS 120B", "Gemini 4 Argon"],
+                        supportsArgon: true, switchCount: 1, lastSwitchedAt: "2026-11-03 11:27:35", tokenFingerprint: "9f136d09", planName: "Pro Ultra"
+                    }
+                ],
+                history: [
+                    { timestamp: "2026-11-03 05:18:44", fromSlot: "c", toSlot: "d", type: "hourly", reason: "Local RPC 检测到 [Gemini] 5小时配额耗尽，平滑切入 [d]" },
+                    { timestamp: "2026-11-03 08:50:19", fromSlot: "d", toSlot: "a", type: "boost", reason: "/boost 极速跃迁至模型组 [Gemini] 最高配额槽位 (100%)" },
+                    { timestamp: "2026-11-03 11:27:35", fromSlot: "a", toSlot: "h", type: "hourly", reason: "Local RPC 检测到当前账号 [Gemini 常规组] 5小时配额已耗尽 (剩余 <= 1%)" }
+                ]
+            };
+        }
+
+        let toastTimeout = null;
         function showToast(msg) {
             const toast = document.getElementById("toast");
+            if (!toast) return;
             toast.textContent = msg;
             toast.classList.add("show");
-            setTimeout(() => toast.classList.remove("show"), 2800);
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => toast.classList.remove("show"), 3000);
         }
 
-        // 剪贴板复制
+        function copyTextSafe(text, label) {
+            if (!text) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast(`已复制${label}: ${text}`);
+                }).catch(() => fallbackCopyText(text, label));
+            } else {
+                fallbackCopyText(text, label);
+            }
+        }
+
+        function fallbackCopyText(text, label) {
+            try {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                ta.style.position = "fixed";
+                ta.style.opacity = "0";
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                showToast(`已复制${label}: ${text}`);
+            } catch (e) {
+                showToast(`复制失败，请手动复制: ${text}`);
+            }
+        }
+
         function copyEmail(email, event) {
             if (event) event.stopPropagation();
-            if (!email) return;
-            navigator.clipboard.writeText(email).then(() => {
-                showToast(`已复制邮箱: ${email}`);
-            }).catch(() => {
-                showToast(`复制失败，请手动选择复制`);
-            });
+            copyTextSafe(email, "邮箱");
         }
 
-        // R2.2 格式化最近切号时间
-        function formatRecentSwitchTime(timeStr) {
-            if (!timeStr || timeStr === "null" || timeStr === "undefined") {
-                return "暂无记录";
-            }
-            try {
-                const d = new Date(timeStr);
-                if (isNaN(d.getTime())) return timeStr;
-                const now = new Date();
-                const isToday = d.getFullYear() === now.getFullYear() &&
-                                d.getMonth() === now.getMonth() &&
-                                d.getDate() === now.getDate();
-                const pad = (n) => n.toString().padStart(2, '0');
-                if (isToday) {
-                    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-                }
-                return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            } catch (e) {
-                return timeStr;
+        function copyCurrentHeroEmail() {
+            if (globalData && globalData.current && globalData.current.email) {
+                copyTextSafe(globalData.current.email, "当前账号邮箱");
             }
         }
 
-        // R2.3 语义区分进度条颜色: >20% green, <=20% yellow, <=1% red
+        // 自定义确认模态框
+        function openConfirmModal(title, desc, onConfirm) {
+            document.getElementById("confirmModalTitle").textContent = title;
+            document.getElementById("confirmModalDesc").textContent = desc;
+            pendingConfirmAction = onConfirm;
+            document.getElementById("confirmModal").classList.add("open");
+        }
+
+        function closeConfirmModal() {
+            document.getElementById("confirmModal").classList.remove("open");
+            pendingConfirmAction = null;
+        }
+
+        function executeConfirmCallback() {
+            const fn = pendingConfirmAction;
+            closeConfirmModal();
+            if (typeof fn === "function") fn();
+        }
+
         function getPctColorClass(pct) {
             if (pct <= 1) return "red";
-            if (pct <= 20) return "yellow";
+            if (pct <= 35) return "yellow";
             return "green";
         }
 
-        // R2.3 配额状态语义区分函数 (双因子决策状态机)
-        // 剩余额度 > 20%: 显示中性冷灰/青色正常刷新提示 (class="metric-countdown ready")
-        // 剩余额度 <= 20%: 显示黄色预警 (class="metric-countdown warning")
-        // 剩余额度 <= 1%: 显示红色限额冷却 (class="metric-countdown cooldown")
-        // 杜绝正常滚动窗口被误标为冷却预警！
+        // 语义化倒计时胶囊：区分满额就绪 (绿)、高配额滚动刷新 (青蓝)、低配额预警 (黄)、限额耗尽 (红)
+        function getSemanticCountdownClass(cdStr, pct) {
+            if (!cdStr || cdStr === "就绪" || cdStr === "就绪可用") return "ready";
+            if (cdStr === "不支持" || cdStr === "待同步" || cdStr === "--") return "muted";
+            if (pct !== undefined && pct !== null && pct >= 0) {
+                if (pct <= 1 || cdStr.includes("限额") || cdStr.includes("耗尽")) return "exhausted";
+                if (pct <= 25) return "cooldown";
+                return "rolling";
+            }
+            if (cdStr.includes("限额") || cdStr.includes("耗尽")) return "exhausted";
+            return "rolling";
+        }
+
         function formatMetricCountdownHtml(cdStr, pct) {
-            if (!cdStr || cdStr === '就绪' || cdStr === '就绪可用') {
+            const cls = getSemanticCountdownClass(cdStr, pct);
+            if (cls === "ready") {
                 return `<span class="metric-countdown ready">⏱️ 就绪</span>`;
             }
-            if (cdStr === '不支持') {
-                return `<span class="metric-countdown muted">不支持</span>`;
+            if (cls === "muted") {
+                return `<span class="metric-countdown muted">${cdStr || '不支持'}</span>`;
             }
-            const numPct = typeof pct === 'number' ? pct : 100;
-            
-            // 1. 红色限额冷却
-            if (numPct <= 1 || cdStr.includes('限额') || cdStr.includes('耗尽')) {
-                return `<span class="metric-countdown cooldown" title="${cdStr}">🛑 ${cdStr}</span>`;
+            if (cls === "exhausted") {
+                return `<span class="metric-countdown exhausted" title="配额已耗尽，等待解冻重置">⛔ ${cdStr}</span>`;
             }
-            // 2. 黄色预警
-            if (numPct <= 20) {
-                return `<span class="metric-countdown warning" title="${cdStr}">⚠️ ${cdStr}</span>`;
+            if (cls === "cooldown") {
+                return `<span class="metric-countdown cooldown" title="配额偏低，距离窗口重置时间">⚠️ ${cdStr}</span>`;
             }
-            // 3. 中性冷灰/青色正常重置提示 (正常滚动窗口)
-            return `<span class="metric-countdown ready" title="${cdStr}">⏱️ ${cdStr}</span>`;
+            return `<span class="metric-countdown rolling" title="配额充足，滚动窗口自然刷新倒计时">🔄 ${cdStr}</span>`;
         }
 
-        // R2.1 紧凑视图 / 标准视图切换
-        function toggleViewMode() {
-            UIState.isCompactView = !UIState.isCompactView;
-            const grid = document.getElementById("slotsContainer");
-            const icon = document.getElementById("viewModeIcon");
-            const text = document.getElementById("viewModeText");
-            if (UIState.isCompactView) {
-                grid.classList.add("compact-mode");
-                icon.textContent = "📖";
-                text.textContent = "标准视图";
-                showToast("已切换为：紧凑视图 (卡片面积缩减，一屏展现更多槽位)");
-            } else {
-                grid.classList.remove("compact-mode");
-                icon.textContent = "📐";
-                text.textContent = "紧凑视图";
-                showToast("已恢复为：标准视图");
-            }
+        function toggleCompactMode() {
+            isCompactMode = !isCompactMode;
+            document.body.classList.toggle("compact-mode", isCompactMode);
+            const btn = document.getElementById("btnDensity");
+            const txt = document.getElementById("densityText");
+            if (btn) btn.classList.toggle("active-toggle", isCompactMode);
+            if (txt) txt.textContent = isCompactMode ? "标准视图" : "紧凑视图";
+            showToast(isCompactMode ? "已切换为紧凑一屏模式（适合多槽位同屏总览）" : "已恢复为标准卡片模式");
         }
 
-        // R2.5 活跃槽位置顶与三态排序切换 (字母 a-z -> 配额降序 -> 可用优先)
-        function toggleSortMode() {
-            const modes = ['letter', 'quota', 'status'];
-            const nextIdx = (modes.indexOf(UIState.currentSortMode) + 1) % modes.length;
-            UIState.currentSortMode = modes[nextIdx];
-            updateSortUI();
+        function togglePinActive() {
+            pinActiveFirst = !pinActiveFirst;
+            const btn = document.getElementById("btnPinActive");
+            if (btn) btn.classList.toggle("active-toggle", pinActiveFirst);
+            showToast(pinActiveFirst ? "已开启：当前使用中的账号始终置顶显示" : "已关闭：当前使用中的账号按原位置排列");
             if (globalData) renderSlots(globalData);
         }
 
-        function updateSortUI() {
+        function cycleSortMode() {
+            if (sortMode === 'default') sortMode = 'quota';
+            else if (sortMode === 'quota') sortMode = 'alpha';
+            else sortMode = 'default';
+
             const sortText = document.getElementById("sortText");
             const sortIcon = document.getElementById("sortIcon");
-            if (UIState.currentSortMode === 'quota') {
+            if (sortMode === 'quota') {
+                sortText.textContent = "配额余量降序";
                 sortIcon.textContent = "⚡";
-                sortText.textContent = "配额降序";
-                showToast("已切换为：按配额余量从高到低排序 (活跃槽位置顶)");
-            } else if (UIState.currentSortMode === 'status') {
-                sortIcon.textContent = "🟢";
-                sortText.textContent = "状态优先";
-                showToast("已切换为：按可用状态优先排序 (活跃槽位置顶)");
+                showToast("排序切换：按当前关注模型的有效配额从高到低排序");
+            } else if (sortMode === 'alpha') {
+                sortText.textContent = "字母顺序 A-Z";
+                sortIcon.textContent = "🔠";
+                showToast("排序切换：严格按槽位字母代号 (a ~ z) 排序");
             } else {
+                sortText.textContent = "默认槽位排序";
                 sortIcon.textContent = "🔤";
-                sortText.textContent = "字母槽位";
-                showToast("已恢复为：按字母槽位 a-z 排序 (活跃槽位置顶)");
+                showToast("排序切换：按槽位池默认序号 (#1 ~ #N) 排序");
             }
-        }
-
-        // R3.3 模型组视角切换
-        function setPerspective(pName, elem) {
-            UIState.currentPerspective = pName;
-            document.querySelectorAll(".perspective-btn").forEach(b => b.classList.remove("active"));
-            if (elem) elem.classList.add("active");
-            showToast(`已切换卡片主配额视角: ${pName === 'follow' ? '跟随当前会话' : pName}`);
             if (globalData) renderSlots(globalData);
         }
 
-        // 状态筛选
+        function setModelView(viewMode, elem) {
+            currentModelView = viewMode;
+            document.querySelectorAll("#modelViewGroup .filter-btn").forEach(b => b.classList.remove("active"));
+            if (elem) elem.classList.add("active");
+            if (globalData) renderDashboard(globalData);
+        }
+
         function setFilter(filterType, elem) {
-            UIState.currentFilter = filterType;
-            document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+            currentFilter = filterType;
+            document.querySelectorAll("#statusFilterGroup .filter-btn").forEach(b => b.classList.remove("active"));
             if (elem) elem.classList.add("active");
             if (globalData) renderSlots(globalData);
         }
 
-        // R3.1 抽屉折叠展开 Hook (保活于 UIState.expandedDrawers)
+        function onSearchInput(val) {
+            searchQuery = (val || "").trim().toLowerCase();
+            if (globalData) renderSlots(globalData);
+        }
+
         function toggleCardDrawer(slotName, elem, event) {
             if (event) event.stopPropagation();
-            const isOpen = UIState.expandedDrawers.has(slotName);
-            if (isOpen) {
-                UIState.expandedDrawers.delete(slotName);
+            if (expandedSlots.has(slotName)) {
+                expandedSlots.delete(slotName);
             } else {
-                UIState.expandedDrawers.add(slotName);
+                expandedSlots.add(slotName);
             }
-            const card = document.querySelector(`.slot-card[data-slot="${slotName}"]`);
-            if (card) {
-                const drawer = card.querySelector(".other-models-drawer");
-                const toggle = card.querySelector(".other-models-toggle span");
-                if (drawer && toggle) {
-                    if (UIState.expandedDrawers.has(slotName)) {
-                        drawer.classList.add("open");
-                        toggle.textContent = "▴ 收起其他模型配额";
-                    } else {
-                        drawer.classList.remove("open");
-                        toggle.textContent = toggle.dataset.origLabel || "▾ 查看其他模型配额";
-                    }
-                }
+            const card = elem.closest(".slot-card");
+            if (!card) return;
+            const drawer = card.querySelector(".other-models-drawer");
+            if (drawer) {
+                const isOpen = expandedSlots.has(slotName);
+                drawer.classList.toggle("open", isOpen);
+                elem.querySelector("span").textContent = isOpen ? "▴ 收起其他模型配额" : elem.dataset.originalLabel;
             }
         }
 
-        // 审计时间轴折叠
         function toggleTimeline() {
-            UIState.timelineOpen = !UIState.timelineOpen;
+            timelineOpen = !timelineOpen;
             const content = document.getElementById("timelineContent");
             const toggleText = document.getElementById("timelineToggleText");
-            if (UIState.timelineOpen) {
+            if (timelineOpen) {
                 content.classList.add("open");
                 toggleText.textContent = "收起时间轴 ▴";
             } else {
@@ -1807,77 +1883,54 @@
             }
         }
 
-        // R3.5 暗色毛玻璃统一通用确认模态框
-        let modalConfirmCallback = null;
-
-        function showConfirmModal({ title, message, details = "", confirmText = "确认执行", isDanger = false, onConfirm }) {
-            const overlay = document.getElementById("confirmModal");
-            const titleElem = document.getElementById("confirmModalTitle");
-            const msgElem = document.getElementById("confirmModalMsg");
-            const detailsElem = document.getElementById("confirmModalDetails");
-            const btnOk = document.getElementById("btnConfirmOk");
-            const btnText = document.getElementById("confirmBtnText");
-            const spinner = document.getElementById("confirmSpinner");
-
-            titleElem.innerHTML = `<span>${title || "操作确认"}</span>`;
-            msgElem.textContent = message || "请确认是否继续。";
-
-            if (details) {
-                detailsElem.textContent = details;
-                detailsElem.style.display = "block";
-            } else {
-                detailsElem.style.display = "none";
-            }
-
-            btnText.textContent = confirmText;
-            btnOk.className = "btn-modal-confirm" + (isDanger ? " danger" : "");
-            btnOk.disabled = false;
-            spinner.style.display = "none";
-
-            modalConfirmCallback = onConfirm;
-            overlay.classList.add("open");
-
-            btnOk.onclick = async () => {
-                btnOk.disabled = true;
-                spinner.style.display = "inline";
-                btnText.textContent = "处理中...";
-                try {
-                    if (modalConfirmCallback) {
-                        await modalConfirmCallback();
-                    }
-                } catch (e) {
-                    showToast("操作出错: " + e.message);
-                } finally {
-                    closeConfirmModal(true);
-                }
-            };
+        function togglePollPause() {
+            isPollingPaused = !isPollingPaused;
+            const icon = document.getElementById("pausePollIcon");
+            const btn = document.getElementById("btnPausePoll");
+            const badge = document.getElementById("refreshCountdownBadge");
+            if (icon) icon.textContent = isPollingPaused ? "▶️" : "⏸️";
+            if (btn) btn.classList.toggle("active-toggle", isPollingPaused);
+            if (badge) badge.textContent = isPollingPaused ? "(已暂停)" : `(${countdownSeconds}s)`;
+            showToast(isPollingPaused ? "已暂停 8 秒自动轮询" : "已恢复 8 秒自动轮询");
         }
 
-        function closeConfirmModal(isOk = false) {
-            const overlay = document.getElementById("confirmModal");
-            overlay.classList.remove("open");
-            modalConfirmCallback = null;
+        function recalculateDemoSummary(data) {
+            const activeSlot = data.slots.find(s => s.isActive) || data.slots[0];
+            if (activeSlot) {
+                data.current.slotName = activeSlot.slotName;
+                data.current.email = activeSlot.email;
+                data.current.tokenFingerprint = activeSlot.tokenFingerprint;
+                data.current.planName = activeSlot.planName;
+                data.current.gemini5hPct = activeSlot.gemini5hPct;
+                data.current.geminiWeeklyPct = activeSlot.geminiWeeklyPct;
+                data.current.claude5hPct = activeSlot.claude5hPct;
+                data.current.claudeWeeklyPct = activeSlot.claudeWeeklyPct;
+                data.current.argonWeeklyPct = activeSlot.argonWeeklyPct;
+                data.current.gemini5hCountdown = activeSlot.gemini5hCountdown;
+                data.current.geminiWeeklyCountdown = activeSlot.geminiWeeklyCountdown;
+                data.current.claude5hCountdown = activeSlot.claude5hCountdown;
+                data.current.claudeWeeklyCountdown = activeSlot.claudeWeeklyCountdown;
+                data.current.argonWeeklyCountdown = activeSlot.argonWeeklyCountdown;
+            }
+            let ready = 0, cooldown = 0, skipped = 0;
+            data.slots.forEach((s, i) => {
+                s.slotIndex = i + 1;
+                if (s.isSkipped) skipped++;
+                if (s.statusKey === "ready" || s.statusKey === "active") ready++;
+                else cooldown++;
+            });
+            data.runway.readyCount = ready;
+            data.runway.totalCount = data.slots.length;
+            data.runway.cooldownCount = cooldown;
+            data.runway.skippedCount = skipped;
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            data.timestamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
         }
 
-        // 点击背景遮罩关闭
-        document.getElementById("confirmModal").addEventListener("click", (e) => {
-            if (e.target.id === "confirmModal") closeConfirmModal(false);
-        });
-
-        // 按 Esc 键关闭模态弹窗
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") {
-                closeConfirmModal(false);
-                closeSaveModal();
-                closeOpsModal();
-            }
-        });
-
-        // 数据拉取与渲染
         async function fetchStatus(isManual = false) {
             if (isFetching) return;
             isFetching = true;
-            const btnRefresh = document.getElementById("btnRefresh");
             const refreshIcon = document.getElementById("refreshIcon");
             if (isManual && refreshIcon) {
                 refreshIcon.classList.add("rotating");
@@ -1887,277 +1940,273 @@
                 const resp = await fetch("/api/status" + (isManual ? "?force=true" : ""));
                 if (!resp.ok) throw new Error("HTTP " + resp.status);
                 const data = await resp.json();
+                isDemoMode = false;
+                const demoBadge = document.getElementById("demoModeBadge");
+                if (demoBadge) demoBadge.classList.remove("visible");
                 globalData = data;
                 renderDashboard(data);
-                if (isManual) showToast("已成功从云端刷新全部账号配额数据！");
+                if (isManual) showToast("已成功从云端同步全部账号最新配额！");
             } catch (err) {
-                console.error("Fetch status failed:", err);
+                // 当在 Canvas 预览或离线打开 HTML 时，优雅回退至内存交互模型
+                if (!globalData) {
+                    globalData = createInitialDemoData();
+                } else if (isManual) {
+                    recalculateDemoSummary(globalData);
+                }
+                isDemoMode = true;
+                const demoBadge = document.getElementById("demoModeBadge");
+                if (demoBadge) demoBadge.classList.add("visible");
+                renderDashboard(globalData);
+                if (isManual) showToast("已在交互预览模式下刷新全部槽位配额数据！");
             } finally {
                 isFetching = false;
                 countdownSeconds = 8;
+                const badge = document.getElementById("refreshCountdownBadge");
+                if (badge && !isPollingPaused) badge.textContent = `(${countdownSeconds}s)`;
                 if (isManual && refreshIcon) {
-                    setTimeout(() => refreshIcon.classList.remove("rotating"), 500);
+                    setTimeout(() => refreshIcon.classList.remove("rotating"), 450);
                 }
             }
         }
 
-        // R3.1 单卡刷新生命周期接管 (Anti-Flicker)
-        async function refreshSingleSlot(slotName, btnElem, event) {
-            if (event) event.stopPropagation();
-            if (!slotName) return;
-            UIState.refreshingSlots.add(slotName);
-            if (btnElem) btnElem.classList.add("rotating");
-            showToast(`正在单独同步槽位 [${slotName}] 的云端配额...`);
-            try {
-                const resp = await fetch("/api/action/refresh-slot", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ slot: slotName })
-                });
-                const res = await resp.json();
-                if (res.success) {
-                    showToast(res.message || `槽位 [${slotName}] 配额已成功更新！`);
-                    fetchStatus(false);
-                } else {
-                    showToast("同步出错: " + (res.message || "未能成功"));
-                }
-            } catch (e) {
-                showToast("网络请求失败: " + e.message);
-            } finally {
-                UIState.refreshingSlots.delete(slotName);
-                if (btnElem) {
-                    setTimeout(() => btnElem.classList.remove("rotating"), 500);
-                }
+        function getEffectiveFocusGroup(data) {
+            if (currentModelView === 'Gemini' || currentModelView === 'Claude' || currentModelView === 'Argon') {
+                return currentModelView;
             }
+            return (data.current && data.current.activeModelGroup) || "Gemini";
         }
 
-        // 免切/跳过切换
-        async function toggleSkipSlot(slotName, event) {
-            if (event) event.stopPropagation();
-            if (!slotName) return;
-            try {
-                const resp = await fetch("/api/action/toggle-skip", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ slot: slotName })
-                });
-                const res = await resp.json();
-                showToast(res.message);
-                fetchStatus(false);
-            } catch (e) {
-                showToast("请求失败: " + e.message);
-            }
-        }
-
-        // R3.2 / R2.4 Hero 区域渲染与动态模型组绑定
         function renderDashboard(data) {
             if (!data || !data.success) return;
+
+            const focusGrp = getEffectiveFocusGroup(data);
 
             // 1. 顶部 Header 状态
             const dBadge = document.getElementById("daemonBadge");
             const dText = document.getElementById("daemonText");
             if (data.daemon && data.daemon.isRunning) {
-                dBadge.className = "pill-badge green interactive";
+                dBadge.className = "pill-badge green clickable";
                 dText.textContent = `守护运行中 (PID: ${data.daemon.pid})`;
             } else {
-                dBadge.className = "pill-badge yellow interactive";
-                dText.textContent = "守护未运行 (点击管理)";
+                dBadge.className = "pill-badge yellow clickable";
+                dText.textContent = "守护未运行 (点击启动)";
             }
 
-            document.getElementById("lockedModelText").textContent = data.current.activeModelLabel || data.current.activeModelGroup || "Gemini 3.8 Flash";
+            const autoBadge = document.getElementById("autoStartBadge");
+            const autoText = document.getElementById("autoStartText");
+            const isAutoOn = data.daemon && data.daemon.autoStartEnabled;
+            if (autoBadge && autoText) {
+                autoBadge.className = "pill-badge clickable " + (isAutoOn ? "green" : "");
+                autoText.textContent = `开机自启: ${isAutoOn ? "ON" : "OFF"}`;
+            }
 
-            // 2. Hero 当前账号
+            document.getElementById("lockedModelText").textContent = data.current.activeModelLabel || data.current.activeModelGroup;
+
+            // 2. Hero 当前活跃账号与动态模型绑定
+            const curSlot = (data.slots || []).find(s => s.slotName === data.current.slotName) || (data.slots || [])[0];
             document.getElementById("heroSlotBadge").textContent = data.current.slotName || "-";
             document.getElementById("heroEmail").textContent = data.current.email || "未检测到登录";
             document.getElementById("heroFp").textContent = "指纹: " + (data.current.tokenFingerprint || "--");
-            document.getElementById("heroSyncTime").textContent = data.current.lastQuotaSyncAt ? `${data.current.lastQuotaSyncAt} 已同步` : "实时";
-            document.getElementById("footerTimestamp").textContent = "更新时间: " + (data.timestamp || "--:--:--");
+            document.getElementById("heroPlan").textContent = (curSlot && curSlot.planName) || data.current.planName || "Pro";
+            document.getElementById("heroSyncTime").textContent = data.current.lastQuotaSyncAt || "实时";
+            document.getElementById("footerTimestamp").textContent = "更新时间: " + data.timestamp;
 
-            const curSlot = (data.slots || []).find(s => s.slotName === data.current.slotName);
-            const activeGrp = data.current.activeModelGroup || "Gemini";
+            let hero5hPctVal = 0;
+            let heroWkPctVal = 0;
+            let hero5hCdStr = "就绪可用";
+            let heroWkCdStr = "就绪可用";
+            let hero5hLabel = `${focusGrp} 5小时配额`;
+            let heroWkLabel = `${focusGrp} 周配额余量`;
 
-            // 动态感知模型组配额与倒计时
+            if (curSlot) {
+                if (focusGrp === "Claude") {
+                    hero5hPctVal = Math.max(0, curSlot.claude5hPct);
+                    heroWkPctVal = Math.max(0, curSlot.claudeWeeklyPct);
+                    hero5hCdStr = curSlot.claude5hCountdown || "就绪可用";
+                    heroWkCdStr = curSlot.claudeWeeklyCountdown || "就绪可用";
+                } else if (focusGrp === "Argon") {
+                    hero5hPctVal = curSlot.argonWeeklyPct >= 0 ? curSlot.argonWeeklyPct : 0;
+                    heroWkPctVal = curSlot.argonWeeklyPct >= 0 ? curSlot.argonWeeklyPct : 0;
+                    hero5hCdStr = curSlot.argonWeeklyPct >= 0 ? "无 5h 限制" : "不支持";
+                    heroWkCdStr = curSlot.argonWeeklyCountdown || "不支持";
+                    hero5hLabel = "Argon 5小时窗口 (无限制)";
+                    heroWkLabel = "Argon 周配额余量";
+                } else {
+                    hero5hPctVal = Math.max(0, curSlot.gemini5hPct);
+                    heroWkPctVal = Math.max(0, curSlot.geminiWeeklyPct);
+                    hero5hCdStr = curSlot.gemini5hCountdown || "就绪可用";
+                    heroWkCdStr = curSlot.geminiWeeklyCountdown || "就绪可用";
+                }
+
+                // 填充三模型矩阵胶囊
+                const g5 = Math.max(0, curSlot.gemini5hPct);
+                const gw = Math.max(0, curSlot.geminiWeeklyPct);
+                const c5 = Math.max(0, curSlot.claude5hPct);
+                const cw = Math.max(0, curSlot.claudeWeeklyPct);
+                const ar = curSlot.argonWeeklyPct;
+
+                document.getElementById("heroMatrixGeminiVal").textContent = `${g5}% / 周 ${gw}%`;
+                document.getElementById("heroMatrixClaudeVal").textContent = `${c5}% / 周 ${cw}%`;
+                document.getElementById("heroMatrixArgonVal").textContent = ar >= 0 ? `周 ${ar}%` : "不支持";
+
+                document.getElementById("heroMatrixGemini").classList.toggle("active-group", focusGrp === "Gemini");
+                document.getElementById("heroMatrixClaude").classList.toggle("active-group", focusGrp === "Claude");
+                document.getElementById("heroMatrixArgon").classList.toggle("active-group", focusGrp === "Argon");
+            }
+
+            document.getElementById("hero5hTitle").textContent = hero5hLabel;
+            document.getElementById("heroWeeklyTitle").textContent = heroWkLabel;
+            document.getElementById("hero5hPct").textContent = (focusGrp === "Argon" && curSlot && curSlot.argonWeeklyPct < 0) ? "不支持" : `${hero5hPctVal}%`;
+            document.getElementById("heroWeeklyPct").textContent = (focusGrp === "Argon" && curSlot && curSlot.argonWeeklyPct < 0) ? "不支持" : `${heroWkPctVal}%`;
+
+            const b5 = document.getElementById("hero5hBar");
+            b5.style.width = `${hero5hPctVal}%`;
+            b5.className = "progress-fill " + getPctColorClass(hero5hPctVal);
+
+            const bw = document.getElementById("heroWeeklyBar");
+            bw.style.width = `${heroWkPctVal}%`;
+            bw.className = "progress-fill " + getPctColorClass(heroWkPctVal);
+
             const h5Elem = document.getElementById("hero5hCountdown");
             const hwElem = document.getElementById("heroWeeklyCountdown");
-            const h5Label = document.getElementById("hero5hLabel");
-            const hwLabel = document.getElementById("heroWeeklyLabel");
-            const h5PctElem = document.getElementById("hero5hPct");
-            const hwPctElem = document.getElementById("heroWeeklyPct");
-            const h5Bar = document.getElementById("hero5hBar");
-            const hwBar = document.getElementById("heroWeeklyBar");
-
-            if (activeGrp === "Claude") {
-                h5Label.textContent = "Claude 5小时配额 (核心)";
-                hwLabel.textContent = "Claude 周配额余量";
-                const c5 = curSlot && curSlot.claude5hPct >= 0 ? curSlot.claude5hPct : 0;
-                const cw = curSlot && curSlot.claudeWeeklyPct >= 0 ? curSlot.claudeWeeklyPct : 0;
-                h5PctElem.textContent = c5 + "%";
-                hwPctElem.textContent = cw + "%";
-                h5Bar.style.width = c5 + "%";
-                h5Bar.className = "progress-fill " + getPctColorClass(c5);
-                hwBar.style.width = cw + "%";
-                hwBar.className = "progress-fill " + getPctColorClass(cw);
-
-                const cd5 = curSlot ? curSlot.claude5hCountdown : "就绪可用";
-                const cdW = curSlot ? curSlot.claudeWeeklyCountdown : "就绪可用";
-                if (h5Elem) {
-                    h5Elem.textContent = cd5 ? cd5.replace(/^⏱️\s*/, "") : "就绪可用";
-                    h5Elem.className = "metric-countdown " + (c5 <= 1 || (cd5 && cd5.includes("限额")) ? "cooldown" : c5 <= 20 ? "warning" : "ready");
-                }
-                if (hwElem) {
-                    hwElem.textContent = cdW ? cdW.replace(/^⏱️\s*/, "") : "就绪可用";
-                    hwElem.className = "metric-countdown " + (cw <= 1 || (cdW && cdW.includes("限额")) ? "cooldown" : cw <= 20 ? "warning" : "ready");
-                }
-            } else if (activeGrp === "Argon") {
-                // Argon 无 5 小时限制时明确提示无 5h 限制
-                h5Label.textContent = "Argon 5小时配额 (无限制)";
-                hwLabel.textContent = "Argon 周配额余量 (核心)";
-                h5PctElem.textContent = "无 5h 限制";
-                h5Bar.style.width = "100%";
-                h5Bar.className = "progress-fill neutral";
-
-                const ar = curSlot && curSlot.argonWeeklyPct >= 0 ? curSlot.argonWeeklyPct : 0;
-                hwPctElem.textContent = ar >= 0 ? ar + "%" : "不支持";
-                hwBar.style.width = Math.max(0, ar) + "%";
-                hwBar.className = "progress-fill " + getPctColorClass(ar);
-
-                if (h5Elem) {
-                    h5Elem.textContent = "无需 5h 冷却";
-                    h5Elem.className = "metric-countdown ready";
-                }
-                const cdW = curSlot ? curSlot.argonWeeklyCountdown : "就绪可用";
-                if (hwElem) {
-                    hwElem.textContent = cdW ? cdW.replace(/^⏱️\s*/, "") : "就绪可用";
-                    hwElem.className = "metric-countdown " + (ar <= 1 || (cdW && cdW.includes("限额")) ? "cooldown" : ar <= 20 ? "warning" : "ready");
-                }
-            } else {
-                // Gemini (默认)
-                h5Label.textContent = "Gemini 5小时配额 (核心)";
-                hwLabel.textContent = "Gemini 周配额余量";
-                const g5 = curSlot ? Math.max(0, curSlot.gemini5hPct) : 0;
-                const gw = curSlot ? Math.max(0, curSlot.geminiWeeklyPct) : 0;
-                h5PctElem.textContent = g5 + "%";
-                hwPctElem.textContent = gw + "%";
-                h5Bar.style.width = g5 + "%";
-                h5Bar.className = "progress-fill " + getPctColorClass(g5);
-                hwBar.style.width = gw + "%";
-                hwBar.className = "progress-fill " + getPctColorClass(gw);
-
-                const cd5 = (curSlot && curSlot.gemini5hCountdown) || data.current.gemini5hCountdown || "就绪可用";
-                const cdW = (curSlot && curSlot.geminiWeeklyCountdown) || data.current.geminiWeeklyCountdown || "就绪可用";
-                if (h5Elem) {
-                    h5Elem.textContent = cd5 ? cd5.replace(/^⏱️\s*/, "") : "就绪可用";
-                    h5Elem.className = "metric-countdown " + (g5 <= 1 || cd5.includes("限额") || cd5.includes("耗尽") ? "cooldown" : g5 <= 20 ? "warning" : "ready");
-                }
-                if (hwElem) {
-                    hwElem.textContent = cdW ? cdW.replace(/^⏱️\s*/, "") : "就绪可用";
-                    hwElem.className = "metric-countdown " + (gw <= 1 || cdW.includes("限额") || cdW.includes("耗尽") ? "cooldown" : gw <= 20 ? "warning" : "ready");
-                }
+            if (h5Elem) {
+                h5Elem.textContent = hero5hCdStr;
+                h5Elem.className = "metric-countdown " + getSemanticCountdownClass(hero5hCdStr, hero5hPctVal);
+            }
+            if (hwElem) {
+                hwElem.textContent = heroWkCdStr;
+                hwElem.className = "metric-countdown " + getSemanticCountdownClass(heroWkCdStr, heroWkPctVal);
             }
 
-            // 3. 全池宏观水位大盘 (Pool Runway Strip)
+            // 3. 全池宏观水位大盘 (跟随当前模型视角联动)
             if (data.runway) {
-                document.getElementById("runwayReadyVal").innerHTML = `${data.runway.readyCount} / ${data.runway.totalCount} <span class="runway-sub">待命中</span>`;
-                document.getElementById("runwayModelTitle").textContent = `${data.runway.activeModelGroup || "当前模型"} 全池均值`;
-                document.getElementById("runwayAvgVal").innerHTML = `${data.runway.activeModelAvgPct}% <span class="runway-sub">平均水位</span>`;
-                document.getElementById("runwayCooldownVal").innerHTML = `${data.runway.cooldownCount} <span class="runway-sub">槽位限额冷却</span>`;
+                let rdyCnt = data.runway.readyCount;
+                let avgPct = data.runway.activeModelAvgPct;
+                if (focusGrp === "Claude" && data.runway.claudeAvgPct !== undefined) {
+                    rdyCnt = data.runway.claudeReadyCount ?? rdyCnt;
+                    avgPct = data.runway.claudeAvgPct;
+                } else if (focusGrp === "Argon" && data.runway.argonAvgPct !== undefined) {
+                    rdyCnt = data.runway.argonReadyCount ?? rdyCnt;
+                    avgPct = data.runway.argonAvgPct;
+                } else if (focusGrp === "Gemini" && data.runway.geminiAvgPct !== undefined) {
+                    rdyCnt = data.runway.geminiReadyCount ?? rdyCnt;
+                    avgPct = data.runway.geminiAvgPct;
+                }
+                document.getElementById("runwayReadyTitle").textContent = `${focusGrp} 可用就绪槽位`;
+                document.getElementById("runwayReadyVal").innerHTML = `${rdyCnt} / ${data.runway.totalCount} <span class="runway-sub">待命中</span>`;
+                document.getElementById("runwayModelTitle").textContent = `${focusGrp} 全池平均水位`;
+                document.getElementById("runwayAvgVal").innerHTML = `${avgPct}% <span class="runway-sub">5h/周均值</span>`;
+                const skipTxt = data.runway.skippedCount > 0 ? ` · ${data.runway.skippedCount} 免切` : "";
+                document.getElementById("runwayCooldownVal").innerHTML = `${data.runway.cooldownCount} <span class="runway-sub">冷却中${skipTxt}</span>`;
             }
 
-            // 4. 渲染槽位池卡片 (Anti-Flicker 保活渲染)
+            // 4. 渲染槽位池卡片
             renderSlots(data);
 
             // 5. 渲染切号审计时间轴
             renderAuditTimeline(data);
         }
 
-        // 获取槽位针对目标模型组的配额余量 (用于排序)
-        function getSlotSortQuota(s, perspective) {
-            if (perspective === "Claude") {
-                return s.claude5hPct >= 0 ? s.claude5hPct : -1;
-            } else if (perspective === "Argon") {
-                return s.argonWeeklyPct >= 0 ? s.argonWeeklyPct : -1;
-            } else {
-                return s.gemini5hPct >= 0 ? s.gemini5hPct : -1;
+        function getSlotEffectiveMetricForSort(s, focusGrp) {
+            if (focusGrp === "Claude") {
+                if (s.claude5hPct < 0) return -1;
+                return Math.min(s.claude5hPct, s.claudeWeeklyPct >= 0 ? s.claudeWeeklyPct : 100);
             }
+            if (focusGrp === "Argon") {
+                return s.argonWeeklyPct >= 0 ? s.argonWeeklyPct : -1;
+            }
+            if (s.gemini5hPct < 0) return -1;
+            return Math.min(s.gemini5hPct, s.geminiWeeklyPct >= 0 ? s.geminiWeeklyPct : 100);
         }
 
-        // 槽位可用状态权重 (用于可用状态优先排序)
-        function getSlotStatusWeight(s) {
-            if (s.isActive) return 0;
-            if (s.statusKey === 'ready' || s.status === '就绪') return 1;
-            if (s.statusKey === 'exhausted-5h') return 2;
-            if (s.statusKey === 'exhausted-weekly') return 3;
-            if (s.statusKey === 'unsupported') return 4;
-            if (s.isSkipped) return 5;
-            return 2;
-        }
-
-        // R3.1 轮询状态保活 (Anti-Flicker) 渲染器
-        // 严禁全量清空 container.innerHTML = ""，通过保持已展开抽屉与卡片节点平滑更新
         function renderSlots(data) {
             const container = document.getElementById("slotsContainer");
-            let slots = (data.slots || []).slice();
-            const activeGrp = (data.current && data.current.activeModelGroup) || "Gemini";
-            const effectivePerspective = UIState.currentPerspective === 'follow' ? activeGrp : UIState.currentPerspective;
+            container.innerHTML = "";
 
-            // 1. 过滤
-            if (UIState.currentFilter === 'ready') {
-                slots = slots.filter(s => s.statusKey === 'ready' || s.statusKey === 'active' || s.isActive);
-            } else if (UIState.currentFilter === 'cooldown') {
-                slots = slots.filter(s => (s.statusKey && s.statusKey.includes('exhausted')) || s.status === 'cooldown');
+            let allSlots = (data.slots || []).slice();
+            const focusGrp = getEffectiveFocusGroup(data);
+
+            // 更新筛选按钮上的实时数量
+            const readyTotal = allSlots.filter(s => s.statusKey === 'ready' || s.statusKey === 'active').length;
+            const cdTotal = allSlots.filter(s => s.statusKey.includes('exhausted') || s.status === 'cooldown').length;
+            const argonTotal = allSlots.filter(s => s.supportsArgon || s.argonWeeklyPct >= 0).length;
+            const filterBtns = document.querySelectorAll("#statusFilterGroup .filter-btn");
+            filterBtns.forEach(btn => {
+                const f = btn.dataset.filter;
+                if (f === "all") btn.textContent = `全部 (${allSlots.length})`;
+                else if (f === "ready") btn.textContent = `就绪 (${readyTotal})`;
+                else if (f === "cooldown") btn.textContent = `冷却中 (${cdTotal})`;
+                else if (f === "argon") btn.textContent = `含Argon (${argonTotal})`;
+            });
+
+            // 1. 状态与关键词过滤
+            let slots = allSlots.filter(s => {
+                if (currentFilter === 'ready' && !(s.statusKey === 'ready' || s.statusKey === 'active')) return false;
+                if (currentFilter === 'cooldown' && !(s.statusKey.includes('exhausted') || s.status === 'cooldown')) return false;
+                if (currentFilter === 'argon' && !(s.supportsArgon || s.argonWeeklyPct >= 0)) return false;
+                if (searchQuery) {
+                    const hay = `${s.slotName} ${s.email} ${s.tokenFingerprint || ''} ${(s.supportedModels || []).join(' ')}`.toLowerCase();
+                    if (!hay.includes(searchQuery)) return false;
+                }
+                return true;
+            });
+
+            // 2. 排序与当前活跃置顶
+            slots.sort((a, b) => {
+                if (pinActiveFirst) {
+                    if (a.isActive && !b.isActive) return -1;
+                    if (!a.isActive && b.isActive) return 1;
+                }
+                if (sortMode === 'quota') {
+                    return getSlotEffectiveMetricForSort(b, focusGrp) - getSlotEffectiveMetricForSort(a, focusGrp);
+                }
+                if (sortMode === 'alpha') {
+                    return String(a.slotName).localeCompare(String(b.slotName));
+                }
+                return (a.slotIndex || 0) - (b.slotIndex || 0);
+            });
+
+            const countBadge = document.getElementById("visibleSlotCountBadge");
+            if (countBadge) countBadge.textContent = `${slots.length} / ${allSlots.length} 个槽位`;
+
+            if (slots.length === 0) {
+                container.innerHTML = `<div class="empty-state-box">未找到符合当前筛选条件的账号槽位</div>`;
+                return;
             }
 
-            // 2. R2.5 活跃槽位置顶与排序
-            slots.sort((a, b) => {
-                // 活跃槽位强制置顶 (Rank 0)
-                if (a.isActive && !b.isActive) return -1;
-                if (!a.isActive && b.isActive) return 1;
-
-                if (UIState.currentSortMode === 'quota') {
-                    return getSlotSortQuota(b, effectivePerspective) - getSlotSortQuota(a, effectivePerspective);
-                } else if (UIState.currentSortMode === 'status') {
-                    return getSlotStatusWeight(a) - getSlotStatusWeight(b);
-                } else {
-                    return (a.slotName || "").localeCompare(b.slotName || "");
-                }
-            });
-
-            // 记录当前存在的目标 slotName 集合
-            const targetSlotNames = new Set(slots.map(s => s.slotName));
-
-            // 清理已不再存在的卡片 DOM 节点
-            Array.from(container.children).forEach(child => {
-                const sName = child.getAttribute("data-slot");
-                if (sName && !targetSlotNames.has(sName)) {
-                    container.removeChild(child);
-                }
-            });
-
-            // 逐个更新或创建卡片
             slots.forEach(s => {
-                let card = container.querySelector(`.slot-card[data-slot="${s.slotName}"]`);
-                const isNew = !card;
-                if (isNew) {
-                    card = document.createElement("div");
-                    card.setAttribute("data-slot", s.slotName);
-                }
-
+                const card = document.createElement("div");
                 let cardClass = "slot-card";
                 if (s.isActive) cardClass += " active-slot";
                 if (s.isSkipped) cardClass += " is-skipped";
                 card.className = cardClass;
-
-                let statusClass = "ready";
-                if (s.statusKey === "active") statusClass = "active";
-                else if (s.statusKey === "exhausted-5h") statusClass = "exhausted-5h";
-                else if (s.statusKey === "exhausted-weekly") statusClass = "exhausted-weekly";
-                else if (s.statusKey === "unsupported") statusClass = "unsupported";
 
                 const g5 = Math.max(0, s.gemini5hPct);
                 const gw = Math.max(0, s.geminiWeeklyPct);
                 const c5 = s.claude5hPct >= 0 ? s.claude5hPct : -1;
                 const cw = s.claudeWeeklyPct >= 0 ? s.claudeWeeklyPct : -1;
                 const ar = s.argonWeeklyPct;
+
+                // 根据当前关注的模型视角动态计算卡片状态标签
+                let displayStatus = s.status;
+                let statusClass = "ready";
+                if (s.isActive) {
+                    displayStatus = "★ 使用中";
+                    statusClass = "active";
+                } else if (focusGrp === "Argon") {
+                    if (ar < 0) { displayStatus = "不支持 Argon"; statusClass = "unsupported"; }
+                    else if (ar <= 1) { displayStatus = "Argon 周限额"; statusClass = "exhausted-weekly"; }
+                    else { displayStatus = "Argon 就绪"; statusClass = "ready"; }
+                } else if (focusGrp === "Claude") {
+                    if (c5 >= 0 && c5 <= 1) { displayStatus = "Claude 5h限额"; statusClass = "exhausted-5h"; }
+                    else if (cw >= 0 && cw <= 1) { displayStatus = "Claude 周限额"; statusClass = "exhausted-weekly"; }
+                    else { displayStatus = "就绪 (可用)"; statusClass = "ready"; }
+                } else {
+                    if (s.statusKey === "exhausted-5h" || g5 <= 1) { displayStatus = "5h限额"; statusClass = "exhausted-5h"; }
+                    else if (s.statusKey === "exhausted-weekly" || gw <= 1) { displayStatus = "周限额"; statusClass = "exhausted-weekly"; }
+                    else if (s.statusKey === "unsupported") { statusClass = "unsupported"; }
+                }
+
                 const idxLabel = s.slotIndex ? `#${s.slotIndex} · ${s.slotName}` : s.slotName;
 
                 // 模型胶囊标签
@@ -2169,214 +2218,112 @@
                     return `<span class="model-pill ${isSpecial ? 'special' : ''}">${m}</span>`;
                 }).join("");
 
-                // 根据当前视角构建主次配额与倒计时胶囊 (R3.3 补齐多模型倒计时)
+                const geminiBlockHtml = `
+                    <div class="metric-row">
+                        <div class="metric-label-row">
+                            <span style="${focusGrp === 'Gemini' ? 'font-weight:600;color:#fff;' : ''}">💎 Gemini 5小时${focusGrp === 'Gemini' ? ' (核心)' : ''}</span>
+                            <span class="metric-val-group">
+                                <span class="metric-val">${g5}%</span>
+                                ${formatMetricCountdownHtml(s.gemini5hCountdown, g5)}
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill ${getPctColorClass(g5)}" style="width: ${g5}%"></div>
+                        </div>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric-label-row">
+                            <span>Gemini 周配额</span>
+                            <span class="metric-val-group">
+                                <span class="metric-val">${gw}%</span>
+                                ${formatMetricCountdownHtml(s.geminiWeeklyCountdown, gw)}
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill ${getPctColorClass(gw)}" style="width: ${gw}%"></div>
+                        </div>
+                    </div>`;
+
+                const claudeBlockHtml = `
+                    <div class="metric-row">
+                        <div class="metric-label-row">
+                            <span style="${focusGrp === 'Claude' ? 'font-weight:600;color:#fff;' : ''}">🟣 Claude / GPT 5小时${focusGrp === 'Claude' ? ' (核心)' : ''}</span>
+                            <span class="metric-val-group">
+                                <span class="metric-val">${Math.max(0, c5)}%</span>
+                                ${formatMetricCountdownHtml(s.claude5hCountdown, Math.max(0, c5))}
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill ${getPctColorClass(Math.max(0, c5))}" style="width: ${Math.max(0, c5)}%"></div>
+                        </div>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric-label-row">
+                            <span>Claude / GPT 周配额</span>
+                            <span class="metric-val-group">
+                                <span class="metric-val">${Math.max(0, cw)}%</span>
+                                ${formatMetricCountdownHtml(s.claudeWeeklyCountdown, Math.max(0, cw))}
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill ${getPctColorClass(Math.max(0, cw))}" style="width: ${Math.max(0, cw)}%"></div>
+                        </div>
+                    </div>`;
+
+                const argonBlockHtml = `
+                    <div class="metric-row">
+                        <div class="metric-label-row">
+                            <span style="${focusGrp === 'Argon' ? 'font-weight:600;color:#fff;' : ''}">🧪 Gemini 4 Argon 周配额</span>
+                            <span class="metric-val-group">
+                                <span class="metric-val">${ar >= 0 ? ar + '%' : '不支持'}</span>
+                                ${formatMetricCountdownHtml(s.argonWeeklyCountdown, ar)}
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill ${ar >= 0 ? getPctColorClass(ar) : 'red'}" style="width: ${ar >= 0 ? ar : 0}%"></div>
+                        </div>
+                    </div>`;
+
                 let primaryMetricsHtml = "";
                 let otherMetricsHtml = "";
                 let otherCount = 0;
 
-                if (effectivePerspective === "Claude") {
-                    primaryMetricsHtml = `
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span style="font-weight:600;color:#fff;">🎯 Claude 5小时配额 (核心)</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${Math.max(0, c5)}%</span>
-                                    ${formatMetricCountdownHtml(s.claude5hCountdown, Math.max(0, c5))}
-                                </span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${getPctColorClass(Math.max(0, c5))}" style="width: ${Math.max(0, c5)}%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Claude 周配额</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${Math.max(0, cw)}%</span>
-                                    ${formatMetricCountdownHtml(s.claudeWeeklyCountdown, Math.max(0, cw))}
-                                </span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${getPctColorClass(Math.max(0, cw))}" style="width: ${Math.max(0, cw)}%"></div>
-                            </div>
-                        </div>`;
-                    otherMetricsHtml = `
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Gemini 5小时</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${g5}%</span>
-                                    ${formatMetricCountdownHtml(s.gemini5hCountdown, g5)}
-                                </span>
-                            </div>
-                            <div class="progress-track"><div class="progress-fill ${getPctColorClass(g5)}" style="width:${g5}%"></div></div>
-                        </div>
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Gemini 周配额</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${gw}%</span>
-                                    ${formatMetricCountdownHtml(s.geminiWeeklyCountdown, gw)}
-                                </span>
-                            </div>
-                            <div class="progress-track"><div class="progress-fill ${getPctColorClass(gw)}" style="width:${gw}%"></div></div>
-                        </div>`;
-                    if (ar >= 0) {
-                        otherMetricsHtml += `
-                            <div class="metric-row">
-                                <div class="metric-label-row">
-                                    <span>Argon 周配额</span>
-                                    <span class="metric-val-group">
-                                        <span class="metric-val">${ar}%</span>
-                                        ${formatMetricCountdownHtml(s.argonWeeklyCountdown, ar)}
-                                    </span>
-                                </div>
-                                <div class="progress-track"><div class="progress-fill ${getPctColorClass(ar)}" style="width:${ar}%"></div></div>
-                            </div>`;
-                        otherCount = 3;
-                    } else {
-                        otherCount = 2;
-                    }
-                } else if (effectivePerspective === "Argon") {
-                    primaryMetricsHtml = `
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span style="font-weight:600;color:#fff;">🎯 Argon 周配额 (核心)</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${ar >= 0 ? ar + '%' : '不支持'}</span>
-                                    ${formatMetricCountdownHtml(s.argonWeeklyCountdown, ar)}
-                                </span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${ar >= 0 ? getPctColorClass(ar) : 'red'}" style="width: ${ar >= 0 ? ar : 0}%"></div>
-                            </div>
-                        </div>`;
-                    otherMetricsHtml = `
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Gemini 5小时</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${g5}%</span>
-                                    ${formatMetricCountdownHtml(s.gemini5hCountdown, g5)}
-                                </span>
-                            </div>
-                            <div class="progress-track"><div class="progress-fill ${getPctColorClass(g5)}" style="width:${g5}%"></div></div>
-                        </div>
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Gemini 周配额</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${gw}%</span>
-                                    ${formatMetricCountdownHtml(s.geminiWeeklyCountdown, gw)}
-                                </span>
-                            </div>
-                            <div class="progress-track"><div class="progress-fill ${getPctColorClass(gw)}" style="width:${gw}%"></div></div>
-                        </div>`;
-                    if (c5 >= 0) {
-                        otherMetricsHtml += `
-                            <div class="metric-row">
-                                <div class="metric-label-row">
-                                    <span>Claude 5小时</span>
-                                    <span class="metric-val-group">
-                                        <span class="metric-val">${c5}%</span>
-                                        ${formatMetricCountdownHtml(s.claude5hCountdown, c5)}
-                                    </span>
-                                </div>
-                                <div class="progress-track"><div class="progress-fill ${getPctColorClass(c5)}" style="width:${c5}%"></div></div>
-                            </div>`;
-                        otherCount = 3;
-                    } else {
-                        otherCount = 2;
-                    }
+                if (currentModelView === 'all') {
+                    primaryMetricsHtml = geminiBlockHtml + claudeBlockHtml + (ar >= 0 ? argonBlockHtml : "");
+                } else if (focusGrp === "Claude") {
+                    primaryMetricsHtml = claudeBlockHtml;
+                    otherMetricsHtml = geminiBlockHtml + (ar >= 0 ? argonBlockHtml : "");
+                    otherCount = ar >= 0 ? 3 : 2;
+                } else if (focusGrp === "Argon") {
+                    primaryMetricsHtml = argonBlockHtml;
+                    otherMetricsHtml = geminiBlockHtml + claudeBlockHtml;
+                    otherCount = 4;
                 } else {
-                    // Gemini (默认)
-                    primaryMetricsHtml = `
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span style="font-weight:600;color:#fff;">🎯 Gemini 5小时 (核心)</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${g5}%</span>
-                                    ${formatMetricCountdownHtml(s.gemini5hCountdown, g5)}
-                                </span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${getPctColorClass(g5)}" style="width: ${g5}%"></div>
-                            </div>
-                        </div>
-                        <div class="metric-row">
-                            <div class="metric-label-row">
-                                <span>Gemini 周配额</span>
-                                <span class="metric-val-group">
-                                    <span class="metric-val">${gw}%</span>
-                                    ${formatMetricCountdownHtml(s.geminiWeeklyCountdown, gw)}
-                                </span>
-                            </div>
-                            <div class="progress-track">
-                                <div class="progress-fill ${getPctColorClass(gw)}" style="width: ${gw}%"></div>
-                            </div>
-                        </div>`;
-
-                    if (c5 >= 0 || cw >= 0 || ar >= 0) {
-                        if (c5 >= 0 || cw >= 0) {
-                            otherMetricsHtml += `
-                                <div class="metric-row">
-                                    <div class="metric-label-row">
-                                        <span>Claude / GPT 5小时</span>
-                                        <span class="metric-val-group">
-                                            <span class="metric-val">${Math.max(0, c5)}%</span>
-                                            ${formatMetricCountdownHtml(s.claude5hCountdown, Math.max(0, c5))}
-                                        </span>
-                                    </div>
-                                    <div class="progress-track"><div class="progress-fill ${getPctColorClass(Math.max(0, c5))}" style="width:${Math.max(0, c5)}%"></div></div>
-                                </div>
-                                <div class="metric-row">
-                                    <div class="metric-label-row">
-                                        <span>Claude / GPT 周配额</span>
-                                        <span class="metric-val-group">
-                                            <span class="metric-val">${Math.max(0, cw)}%</span>
-                                            ${formatMetricCountdownHtml(s.claudeWeeklyCountdown, Math.max(0, cw))}
-                                        </span>
-                                    </div>
-                                    <div class="progress-track"><div class="progress-fill ${getPctColorClass(Math.max(0, cw))}" style="width:${Math.max(0, cw)}%"></div></div>
-                                </div>`;
-                            otherCount += 2;
-                        }
-                        if (ar >= 0) {
-                            otherMetricsHtml += `
-                                <div class="metric-row">
-                                    <div class="metric-label-row">
-                                        <span>Argon 周配额</span>
-                                        <span class="metric-val-group">
-                                            <span class="metric-val">${ar}%</span>
-                                            ${formatMetricCountdownHtml(s.argonWeeklyCountdown, ar)}
-                                        </span>
-                                    </div>
-                                    <div class="progress-track"><div class="progress-fill ${getPctColorClass(ar)}" style="width:${ar}%"></div></div>
-                                </div>`;
-                            otherCount += 1;
-                        }
+                    primaryMetricsHtml = geminiBlockHtml;
+                    if (c5 >= 0 || cw >= 0) {
+                        otherMetricsHtml += claudeBlockHtml;
+                        otherCount += 2;
+                    }
+                    if (ar >= 0) {
+                        otherMetricsHtml += argonBlockHtml;
+                        otherCount += 1;
                     }
                 }
 
-                // 抽屉展开状态恢复 (R3.1)
-                const isDrawerOpen = UIState.expandedDrawers.has(s.slotName);
-                const drawerToggleLabel = isDrawerOpen ? "▴ 收起其他模型配额" : `▾ 查看其他模型配额 (${otherCount}项)`;
+                const isDrawerOpen = expandedSlots.has(s.slotName);
+                const origDrawerLabel = `▾ 查看其他模型配额 (${otherCount}项)`;
                 const drawerHtml = otherCount > 0 ? `
-                    <div class="other-models-toggle" onclick="toggleCardDrawer('${s.slotName}', this, event)">
-                        <span data-orig-label="▾ 查看其他模型配额 (${otherCount}项)">${drawerToggleLabel}</span>
+                    <div class="other-models-toggle" data-original-label="${origDrawerLabel}" onclick="toggleCardDrawer('${s.slotName}', this, event)">
+                        <span>${isDrawerOpen ? '▴ 收起其他模型配额' : origDrawerLabel}</span>
+                        <span style="font-size:10px;opacity:0.75;">${ar >= 0 ? '含 Argon' : 'Claude/GPT'}</span>
                     </div>
                     <div class="other-models-drawer ${isDrawerOpen ? 'open' : ''}">
                         ${otherMetricsHtml}
                     </div>
                 ` : "";
 
-                // R3.1 单卡刷新旋转状态恢复
-                const isCardRefreshing = UIState.refreshingSlots.has(s.slotName);
-
-                // R2.2 彻底消除底部倒计时冗余，释放空间展示套餐类型、最近切换时间与累计切换次数
-                const switchCountDisplay = (s.switchCount !== undefined && s.switchCount !== null) ? s.switchCount : 0;
-                const planNameDisplay = s.planName || "标准套餐";
-                const lastSwitchDisplay = formatRecentSwitchTime(s.lastSwitchedAt);
+                const isSlotRefreshing = refreshingSlots.has(s.slotName);
+                const fpShort = s.tokenFingerprint ? s.tokenFingerprint.slice(0, 8) : "--";
 
                 card.innerHTML = `
                     <div class="slot-card-header">
@@ -2385,8 +2332,8 @@
                             <div class="slot-email-text" title="点击复制邮箱: ${s.email}" onclick="copyEmail('${s.email}', event)">${s.email}</div>
                         </div>
                         <div class="slot-header-tags">
-                            ${s.isSkipped ? '<span class="status-chip skipped">🚫 免切跳过</span>' : ''}
-                            <span class="status-chip ${statusClass}">${s.status}</span>
+                            ${s.isSkipped ? '<span class="status-chip skipped">🚫 免切</span>' : ''}
+                            <span class="status-chip ${statusClass}">${displayStatus}</span>
                         </div>
                     </div>
 
@@ -2400,34 +2347,35 @@
                     </div>
 
                     <div class="slot-footer">
-                        <div class="slot-footer-meta">
-                            <span class="meta-tag plan" title="套餐类型">${planNameDisplay}</span>
-                            <span class="meta-tag time" title="最近切换时间">🕒 ${lastSwitchDisplay}</span>
-                            <span class="meta-tag count" title="累计切换次数">🔀 ${switchCountDisplay}次</span>
+                        <div class="slot-meta-foot" title="${s.lastSwitchedAt ? '上次切入: ' + s.lastSwitchedAt : '尚未切入记录'}">
+                            <span class="meta-tag-subtle">${s.planName || 'Pro'}</span>
+                            <span>🔑 ${fpShort}</span>
+                            <span>· 切入 ${s.switchCount || 0} 次</span>
                         </div>
-
                         <div class="card-actions-group">
-                            <button class="btn-mini" title="复制账号邮箱" onclick="copyEmail('${s.email}', event)">
+                            <button class="btn-mini" title="复制账号邮箱 (${s.email})" onclick="copyEmail('${s.email}', event)">
                                 📋
                             </button>
-                            <button class="btn-mini ${isCardRefreshing ? 'rotating' : ''}" title="单卡精准测试云端配额" onclick="refreshSingleSlot('${s.slotName}', this, event)">
-                                🔄
+                            <button class="btn-mini" title="单独同步此槽位的云端实时配额" onclick="refreshSingleSlot('${s.slotName}', this, event)">
+                                <span class="${isSlotRefreshing ? 'rotating' : ''}">🔄</span>
                             </button>
-                            <button class="btn-mini" title="重置该槽位冷却状态" onclick="triggerResetSingleCooldown('${s.slotName}', event)">
+                            <button class="btn-mini" title="单独重置槽位 [${s.slotName}] 的冷却计时器与限额状态" onclick="triggerResetCooldown('${s.slotName}', event)">
                                 ⏱️
                             </button>
-                            <button class="btn-mini ${s.isSkipped ? 'skip-active' : ''}" title="${s.isSkipped ? '恢复自动切号' : '设置免切/跳过'}" onclick="toggleSkipSlot('${s.slotName}', event)">
+                            <button class="btn-mini ${s.isSkipped ? 'skip-active' : ''}" title="${s.isSkipped ? '恢复参与自动切号' : '设为免切保护 (自动轮换时跳过)'}" onclick="toggleSkipSlot('${s.slotName}', event)">
                                 ${s.isSkipped ? '✔️ 恢复' : '🚫 免切'}
                             </button>
-                            <button class="btn-mini btn-danger-mini" title="删除该槽位" onclick="triggerDeleteSlot('${s.slotName}', event)">
-                                🗑️
-                            </button>
+                            ${!s.isActive ? `
+                                <button class="btn-mini danger" title="删除加密槽位 [${s.slotName}]" onclick="triggerDeleteSlot('${s.slotName}', '${s.email}', event)">
+                                    🗑️
+                                </button>
+                            ` : ''}
                             ${s.isActive ? `
                                 <button class="btn-switch-primary" disabled>
                                     ★ 使用中
                                 </button>
                             ` : `
-                                <button class="btn-switch-primary" onclick="triggerSwitchSlot('${s.slotName}')">
+                                <button class="btn-switch-primary" onclick="triggerSwitchSlot('${s.slotName}', '${s.email}')">
                                     ⚡ 切换
                                 </button>
                             `}
@@ -2435,12 +2383,10 @@
                     </div>
                 `;
 
-                // 平滑维护节点顺序
                 container.appendChild(card);
             });
         }
 
-        // 渲染切号审计时间轴
         function renderAuditTimeline(data) {
             const summaryPill = document.getElementById("auditSummaryPill");
             const timelineContent = document.getElementById("timelineContent");
@@ -2448,23 +2394,25 @@
 
             if (history.length === 0) {
                 summaryPill.textContent = "暂无最近切号事件记录";
-                timelineContent.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:10px;">暂无历史切换流水</div>`;
+                timelineContent.innerHTML = `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:12px;">暂无历史切换流水</div>`;
                 return;
             }
 
             const latest = history[0];
             const latestTo = latest.toSlot ? `[${latest.toSlot}]` : '';
-            summaryPill.textContent = `最新: ${latest.timestamp} 切入 ${latestTo} (原因: ${latest.reason || '自动切号'})`;
+            summaryPill.textContent = `最新: ${latest.timestamp} 切入 ${latestTo} (${latest.reason || '自动切号'})`;
 
             timelineContent.innerHTML = history.map(item => {
-                const isHourly = (item.type === 'hourly');
-                const tagColor = isHourly ? '#fbbf24' : '#c084fc';
+                let tagColor = '#38bdf8';
+                if (item.type === 'hourly') tagColor = '#fbbf24';
+                else if (item.type === 'weekly') tagColor = '#c084fc';
+                else if (item.type === 'boost') tagColor = '#34d399';
                 return `
                     <div class="timeline-item">
                         <div class="timeline-left">
                             <span class="timeline-time">${item.timestamp}</span>
                             <span class="timeline-transfer">槽位 [${item.fromSlot || '?'}] ➔ [${item.toSlot || '?'}]</span>
-                            <span style="font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,0.06);color:${tagColor};">${item.type || 'auto'}</span>
+                            <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,0.06);color:${tagColor};font-weight:600;">${item.type || 'auto'}</span>
                         </div>
                         <div class="timeline-reason" title="${item.reason || ''}">${item.reason || '平滑轮换切入'}</div>
                     </div>
@@ -2472,149 +2420,356 @@
             }).join("");
         }
 
-        // R3.5 / R4 动作派发体系 (暗色毛玻璃弹窗替代原生 confirm，防连点保护)
+        // 单卡精准刷新（带持久化动画状态）
+        async function refreshSingleSlot(slotName, btnElem, event) {
+            if (event) event.stopPropagation();
+            if (!slotName || refreshingSlots.has(slotName)) return;
+            refreshingSlots.add(slotName);
+            const iconSpan = btnElem ? (btnElem.querySelector("span") || btnElem) : null;
+            if (iconSpan) iconSpan.classList.add("rotating");
+            showToast(`正在单独同步槽位 [${slotName}] 的云端实时配额...`);
 
-        // 1. 切号操作
-        function triggerSwitchSlot(slotName) {
-            showConfirmModal({
-                title: "⚡ 账号切换确认",
-                message: `确定要切换至槽位 [${slotName}] 吗？`,
-                details: "系统将自动完成凭据安全写入、应用进程重载并原位恢复会话上下文。",
-                confirmText: "立即切换",
-                onConfirm: async () => {
-                    showToast(`正在切换至槽位 [${slotName}]...`);
-                    const resp = await fetch("/api/action/switch", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ slot: slotName })
-                    });
-                    const res = await resp.json();
-                    showToast(res.message || "切换指令已派发！");
-                    fetchStatus(false);
-                }
-            });
+            if (isDemoMode) {
+                setTimeout(() => {
+                    refreshingSlots.delete(slotName);
+                    recalculateDemoSummary(globalData);
+                    renderDashboard(globalData);
+                    showToast(`槽位 [${slotName}] 云端配额同步完成！`);
+                }, 500);
+                return;
+            }
+
+            try {
+                const resp = await fetch("/api/action/refresh-slot", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ slot: slotName })
+                });
+                const res = await resp.json();
+                showToast(res.message || `槽位 [${slotName}] 配额已更新！`);
+                await fetchStatus(false);
+            } catch (e) {
+                showToast("同步失败: " + e.message);
+            } finally {
+                refreshingSlots.delete(slotName);
+                if (iconSpan) iconSpan.classList.remove("rotating");
+            }
         }
 
-        // 2. 轮换下一号
+        async function toggleSkipSlot(slotName, event) {
+            if (event) event.stopPropagation();
+            if (!slotName) return;
+            if (isDemoMode && globalData) {
+                const target = globalData.slots.find(s => s.slotName === slotName);
+                if (target) {
+                    target.isSkipped = !target.isSkipped;
+                    recalculateDemoSummary(globalData);
+                    renderDashboard(globalData);
+                    showToast(target.isSkipped ? `已设置槽位 [${slotName}] 为免切保护` : `已恢复槽位 [${slotName}] 参与自动切号`);
+                }
+                return;
+            }
+            try {
+                const resp = await fetch("/api/action/toggle-skip", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ slot: slotName })
+                });
+                const res = await resp.json();
+                showToast(res.message);
+                fetchStatus(false);
+            } catch (e) {
+                showToast("操作失败: " + e.message);
+            }
+        }
+
+        function triggerSwitchSlot(slotName, email) {
+            openConfirmModal(
+                `⚡ 切换至槽位 [${slotName}]`,
+                `确定要切换至账号 ${email || slotName} 吗？切换后将自动同步 DPAPI 凭据并无损恢复当前 Antigravity 原会话。`,
+                async () => {
+                    showToast(`正在切换至槽位 [${slotName}]...`);
+                    if (isDemoMode && globalData) {
+                        const prev = globalData.current.slotName;
+                        globalData.slots.forEach(s => {
+                            if (s.slotName === slotName) {
+                                s.isActive = true;
+                                s.status = "★ 使用中";
+                                s.statusKey = "active";
+                                s.switchCount = (s.switchCount || 0) + 1;
+                            } else if (s.isActive) {
+                                s.isActive = false;
+                                s.status = s.geminiWeeklyPct <= 1 ? "周限额" : "就绪 (可用)";
+                                s.statusKey = s.geminiWeeklyPct <= 1 ? "exhausted-weekly" : "ready";
+                            }
+                        });
+                        recalculateDemoSummary(globalData);
+                        globalData.history.push({
+                            timestamp: globalData.timestamp,
+                            fromSlot: prev,
+                            toSlot: slotName,
+                            type: "manual",
+                            reason: `用户手动指定切换至槽位 [${slotName}] (${email || ''})`
+                        });
+                        renderDashboard(globalData);
+                        showToast(`已切换至槽位 [${slotName}] (${email || ''})`);
+                        return;
+                    }
+                    try {
+                        const resp = await fetch("/api/action/switch", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ slot: slotName })
+                        });
+                        const res = await resp.json();
+                        showToast(res.message);
+                        fetchStatus(false);
+                    } catch (err) {
+                        showToast("切换请求失败: " + err.message);
+                    }
+                }
+            );
+        }
+
+        async function triggerBoost() {
+            const focusGrp = globalData ? getEffectiveFocusGroup(globalData) : "Gemini";
+            showToast(`正在并行核验 [${focusGrp}] 最优配额槽位并执行 /boost 极速跃迁...`);
+            if (isDemoMode && globalData) {
+                let best = null;
+                let maxQ = -1;
+                globalData.slots.forEach(s => {
+                    if (s.isSkipped) return;
+                    const q = getSlotEffectiveMetricForSort(s, focusGrp);
+                    if (q > maxQ) { maxQ = q; best = s; }
+                });
+                if (best && !best.isActive) {
+                    const prev = globalData.current.slotName;
+                    globalData.slots.forEach(s => {
+                        if (s.slotName === best.slotName) {
+                            s.isActive = true;
+                            s.status = "★ 使用中";
+                            s.statusKey = "active";
+                            s.switchCount = (s.switchCount || 0) + 1;
+                        } else if (s.isActive) {
+                            s.isActive = false;
+                            s.status = "就绪 (可用)";
+                            s.statusKey = "ready";
+                        }
+                    });
+                    recalculateDemoSummary(globalData);
+                    globalData.history.push({
+                        timestamp: globalData.timestamp,
+                        fromSlot: prev,
+                        toSlot: best.slotName,
+                        type: "boost",
+                        reason: `/boost 极速跃迁至模型组 [${focusGrp}] 最高配额槽位 (${maxQ}%)`
+                    });
+                    renderDashboard(globalData);
+                    showToast(`🚀 已极速跃迁至最高配额槽位 [${best.slotName}] (${best.email} | ${focusGrp}: ${maxQ}%)`);
+                } else if (best && best.isActive) {
+                    showToast(`当前槽位 [${best.slotName}] 已经是 [${focusGrp}] 配额最高的槽位 (${maxQ}%)！`);
+                }
+                return;
+            }
+            try {
+                const resp = await fetch("/api/action/boost", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ modelGroup: focusGrp, syncLive: true })
+                });
+                const res = await resp.json();
+                showToast(res.message || "已完成 /boost 极速择优跃迁");
+                fetchStatus(false);
+            } catch (err) {
+                showToast("/boost 请求失败: " + err.message);
+            }
+        }
+
         async function triggerNextSlot() {
-            showToast("正在轮换至下一个可用账号...");
+            showToast("正在顺延轮换至下一个可用账号...");
+            if (isDemoMode && globalData) {
+                const readyCandidates = globalData.slots.filter(s => !s.isActive && !s.isSkipped && s.statusKey === "ready");
+                if (readyCandidates.length > 0) {
+                    const target = readyCandidates[0];
+                    const prev = globalData.current.slotName;
+                    globalData.slots.forEach(s => {
+                        if (s.slotName === target.slotName) {
+                            s.isActive = true; s.status = "★ 使用中"; s.statusKey = "active"; s.switchCount++;
+                        } else if (s.isActive) {
+                            s.isActive = false; s.status = "就绪 (可用)"; s.statusKey = "ready";
+                        }
+                    });
+                    recalculateDemoSummary(globalData);
+                    globalData.history.push({
+                        timestamp: globalData.timestamp,
+                        fromSlot: prev,
+                        toSlot: target.slotName,
+                        type: "auto",
+                        reason: "用户在 Web 控制面板触发手动顺延轮换"
+                    });
+                    renderDashboard(globalData);
+                    showToast(`已轮换至下一可用槽位 [${target.slotName}] (${target.email})`);
+                }
+                return;
+            }
             try {
                 const resp = await fetch("/api/action/next", { method: "POST" });
                 const res = await resp.json();
-                showToast(res.message || "已轮换至下一账号");
+                showToast(res.message);
                 fetchStatus(false);
             } catch (err) {
                 showToast("轮换请求失败: " + err.message);
             }
         }
 
-        // 3. 恢复会话
         async function triggerResume() {
-            showToast("正在触发断点会话恢复与原会话点开...");
+            showToast("正在通过 Zero-CDP Local RPC 触发原会话无损恢复...");
+            if (isDemoMode) {
+                setTimeout(() => showToast("⚡ Zero-CDP Connect-RPC 续接指令已下发 (< 200ms)"), 300);
+                return;
+            }
             try {
                 const resp = await fetch("/api/action/resume", { method: "POST" });
                 const res = await resp.json();
-                showToast(res.message || "已触发会话恢复");
+                showToast(res.message);
             } catch (err) {
                 showToast("恢复请求失败: " + err.message);
             }
         }
 
-        // 4. 重置全池冷却
-        function triggerResetCooldown() {
-            showConfirmModal({
-                title: "⏱️ 重置全池冷却状态",
-                message: "确定要立即解除全池所有槽位的 5小时与周限额冷却标记吗？",
-                details: "解除后系统将在下一轮轮换时重新探测所有槽位的云端配额。",
-                confirmText: "重置全部",
-                onConfirm: async () => {
-                    showToast("正在重置全部槽位冷却...");
+        function triggerResetCooldown(targetSlot = "all", event = null) {
+            if (event) event.stopPropagation();
+            const isAll = (!targetSlot || targetSlot === "all");
+            const title = isAll ? "⏱️ 重置全池槽位冷却" : `⏱️ 重置槽位 [${targetSlot}] 冷却`;
+            const desc = isAll
+                ? "确定要立即重置所有槽位的 5小时与周限额冷却计时器，并将耗尽槽位恢复为就绪状态吗？"
+                : `确定要重置槽位 [${targetSlot}] 的冷却计时器并恢复其可用状态吗？`;
+
+            openConfirmModal(title, desc, async () => {
+                showToast(isAll ? "正在重置全部槽位冷却..." : `正在重置槽位 [${targetSlot}] 冷却...`);
+                if (isDemoMode && globalData) {
+                    globalData.slots.forEach(s => {
+                        if (isAll || s.slotName === targetSlot) {
+                            if (!s.isActive) { s.status = "就绪 (可用)"; s.statusKey = "ready"; }
+                            if (s.gemini5hPct <= 1) s.gemini5hPct = 100;
+                            if (s.geminiWeeklyPct <= 1) s.geminiWeeklyPct = 100;
+                            s.gemini5hCountdown = "就绪";
+                            s.geminiWeeklyCountdown = "就绪";
+                        }
+                    });
+                    recalculateDemoSummary(globalData);
+                    renderDashboard(globalData);
+                    showToast(isAll ? "已重置全部槽位冷却状态！" : `已重置槽位 [${targetSlot}] 冷却状态！`);
+                    return;
+                }
+                try {
                     const resp = await fetch("/api/action/reset-cooldown", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({})
+                        body: JSON.stringify({ slot: targetSlot })
                     });
                     const res = await resp.json();
-                    showToast(res.message || "全池冷却已重置！");
+                    showToast(res.message);
                     fetchStatus(true);
+                } catch (err) {
+                    showToast("重置失败: " + err.message);
                 }
             });
         }
 
-        // 5. R4 重置单槽冷却
-        function triggerResetSingleCooldown(slotName, event) {
+        function triggerDeleteSlot(slotName, email, event) {
             if (event) event.stopPropagation();
-            showConfirmModal({
-                title: "⏱️ 重置单槽冷却",
-                message: `确定要立即清除槽位 [${slotName}] 的冷却锁定吗？`,
-                confirmText: "确认重置",
-                onConfirm: async () => {
-                    showToast(`正在重置槽位 [${slotName}] 冷却...`);
-                    const resp = await fetch("/api/action/reset-cooldown", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ slot: slotName })
-                    });
-                    const res = await resp.json();
-                    showToast(res.message || `槽位 [${slotName}] 冷却已重置！`);
-                    fetchStatus(true);
+            openConfirmModal(
+                `🗑️ 删除加密槽位 [${slotName}]`,
+                `确定要从槽位池永久删除槽位 [${slotName}] (${email || ''}) 的加密凭据快照吗？此操作不可撤销。`,
+                async () => {
+                    if (isDemoMode && globalData) {
+                        globalData.slots = globalData.slots.filter(s => s.slotName !== slotName);
+                        recalculateDemoSummary(globalData);
+                        renderDashboard(globalData);
+                        showToast(`已安全删除槽位 [${slotName}]`);
+                        return;
+                    }
+                    try {
+                        const resp = await fetch("/api/action/delete-slot", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ slot: slotName })
+                        });
+                        const res = await resp.json();
+                        showToast(res.message);
+                        fetchStatus(false);
+                    } catch (err) {
+                        showToast("删除失败: " + err.message);
+                    }
                 }
-            });
+            );
         }
 
-        // 6. R4 删除失效槽位
-        function triggerDeleteSlot(slotName, event) {
-            if (event) event.stopPropagation();
-            showConfirmModal({
-                title: "🗑️ 删除槽位确认",
-                message: `确定要永久删除槽位 [${slotName}] 及其关联的本地凭据吗？`,
-                details: "注意：此操作不可逆！删除后该槽位将从槽位池中彻底移除。",
-                confirmText: "确认删除",
-                isDanger: true,
-                onConfirm: async () => {
-                    showToast(`正在删除槽位 [${slotName}]...`);
-                    const resp = await fetch("/api/action/remove-slot", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ slot: slotName })
-                    });
-                    const res = await resp.json();
-                    showToast(res.message || `槽位 [${slotName}] 已删除`);
-                    fetchStatus(true);
-                }
-            });
-        }
-
-        // 7. R4 极速切号 (/boost)
-        async function triggerBoost() {
-            showToast("🚀 正在发起极速测速并择优跃迁...");
-            const btn = document.getElementById("btnBoost");
-            if (btn) btn.disabled = true;
+        async function triggerToggleDaemon() {
+            const isRunning = globalData && globalData.daemon && globalData.daemon.isRunning;
+            if (isDemoMode && globalData) {
+                globalData.daemon.isRunning = !isRunning;
+                renderDashboard(globalData);
+                showToast(globalData.daemon.isRunning ? "已启动后台无人值守守护进程" : "已停止后台无人值守守护进程");
+                return;
+            }
+            showToast(isRunning ? "正在停止后台守护进程..." : "正在拉起后台无人值守守护进程...");
             try {
-                const resp = await fetch("/api/action/boost", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({})
-                });
+                const resp = await fetch("/api/action/toggle-daemon", { method: "POST" });
                 const res = await resp.json();
-                showToast(res.message || "极速跃迁完成！");
+                showToast(res.message);
                 fetchStatus(false);
-            } catch (e) {
-                showToast("极速跃迁失败: " + e.message);
-            } finally {
-                if (btn) btn.disabled = false;
+            } catch (err) {
+                showToast("守护进程操作失败: " + err.message);
             }
         }
 
-        // 8. 呼出经典控制台终端
+        async function triggerToggleAutoStart() {
+            if (isDemoMode && globalData) {
+                globalData.daemon.autoStartEnabled = !globalData.daemon.autoStartEnabled;
+                renderDashboard(globalData);
+                showToast(globalData.daemon.autoStartEnabled ? "已开启 Windows 开机无感自启守护" : "已关闭 Windows 开机自启守护");
+                return;
+            }
+            try {
+                const resp = await fetch("/api/action/toggle-autostart", { method: "POST" });
+                const res = await resp.json();
+                showToast(res.message);
+                fetchStatus(false);
+            } catch (err) {
+                showToast("切换开机自启失败: " + err.message);
+            }
+        }
+
+        function triggerRepairStorage() {
+            openConfirmModal(
+                "🔧 应急修复 app_storage.json",
+                "该操作将自动备份当前配置 (.bak) 并净化重置 app_storage.json，保留当前登录邮箱以彻底解决客户端闪退。确认执行吗？",
+                async () => {
+                    if (isDemoMode) {
+                        showToast("已备份并净化重置 app_storage.json！");
+                        return;
+                    }
+                    try {
+                        const resp = await fetch("/api/action/repair-storage", { method: "POST" });
+                        const res = await resp.json();
+                        showToast(res.message);
+                    } catch (err) {
+                        showToast("修复失败: " + err.message);
+                    }
+                }
+            );
+        }
+
         async function openTuiTerminal() {
-            showToast("正在呼出经典控制台终端...");
+            showToast("正在呼出经典控制台终端 (TUI)...");
+            if (isDemoMode) return;
             try {
                 await fetch("/api/action/open-tui", { method: "POST" });
             } catch (e) {}
         }
 
-        // 9. 备份当前登录账号
         function openSaveModal() {
             document.getElementById("saveModal").classList.add("open");
             document.getElementById("slotInput").value = "";
@@ -2629,6 +2784,30 @@
             const slotName = document.getElementById("slotInput").value.trim().toLowerCase();
             closeSaveModal();
             showToast("正在加密备份当前登录凭据至槽位...");
+            if (isDemoMode && globalData) {
+                const newName = slotName || "i";
+                const existing = globalData.slots.find(s => s.slotName === newName);
+                if (!existing) {
+                    globalData.slots.push({
+                        slotIndex: globalData.slots.length + 1,
+                        slotName: newName,
+                        email: globalData.current.email || "new_backup@gmail.com",
+                        isSkipped: false,
+                        status: "就绪 (可用)",
+                        statusKey: "ready",
+                        isActive: false,
+                        gemini5hPct: 100, geminiWeeklyPct: 100, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 100,
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "就绪", argonWeeklyCountdown: "不支持",
+                        claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B"],
+                        supportsArgon: false, switchCount: 0, lastSwitchedAt: "", tokenFingerprint: "c409e81b", planName: "Pro"
+                    });
+                    recalculateDemoSummary(globalData);
+                    renderDashboard(globalData);
+                }
+                showToast(`已成功加密保存当前账号至槽位 [${newName}]`);
+                return;
+            }
             try {
                 const resp = await fetch("/api/action/save-current", {
                     method: "POST",
@@ -2636,126 +2815,26 @@
                     body: JSON.stringify({ slot: slotName })
                 });
                 const res = await resp.json();
-                showToast(res.message || "凭据已安全保存！");
+                showToast(res.message);
                 fetchStatus(false);
             } catch (err) {
                 showToast("保存失败: " + err.message);
             }
         }
 
-        // 10. R4 运维中心控制 (守护启停/开机自启/体检/存储修复)
-        function openOpsModal() {
-            const overlay = document.getElementById("opsModal");
-            overlay.classList.add("open");
-            document.getElementById("opsOutputBox").style.display = "none";
-            updateOpsModalData();
-        }
-
-        function closeOpsModal() {
-            document.getElementById("opsModal").classList.remove("open");
-        }
-
-        function updateOpsModalData() {
-            if (globalData && globalData.daemon) {
-                const isRun = globalData.daemon.isRunning;
-                document.getElementById("opsDaemonStatusText").textContent = isRun ? `运行中 (PID: ${globalData.daemon.pid})` : "已停止";
-                document.getElementById("btnDaemonToggle").textContent = isRun ? "⏹️ 停止守护" : "▶️ 启动守护";
-                document.getElementById("opsAutostartText").textContent = globalData.daemon.autoStart ? "已开启 (开机静默启动)" : "未开启";
-                document.getElementById("btnToggleAutostart").textContent = globalData.daemon.autoStart ? "❌ 关闭自启" : "✔️ 开启自启";
-            }
-        }
-
-        async function triggerDaemonAction(act) {
-            showToast(`正在${act === 'restart' ? '重启' : '切换'}守护进程...`);
-            try {
-                const resp = await fetch("/api/action/daemon", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: act })
-                });
-                const res = await resp.json();
-                showToast(res.message || "守护进程指令已执行");
-                fetchStatus(false);
-                setTimeout(updateOpsModalData, 600);
-            } catch (e) {
-                showToast("守护操作失败: " + e.message);
-            }
-        }
-
-        async function triggerToggleAutostart() {
-            showToast("正在切换 Windows 开机自启状态...");
-            try {
-                const resp = await fetch("/api/action/autostart", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "toggle" })
-                });
-                const res = await resp.json();
-                showToast(res.message || "开机自启已更新");
-                fetchStatus(false);
-                setTimeout(updateOpsModalData, 600);
-            } catch (e) {
-                showToast("自启设置失败: " + e.message);
-            }
-        }
-
-        async function triggerGoalCheck() {
-            const box = document.getElementById("opsOutputBox");
-            box.style.display = "block";
-            box.textContent = "🔍 正在执行全链路健康度体检 (/goal)...";
-            try {
-                const resp = await fetch("/api/action/goal", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({})
-                });
-                const res = await resp.json();
-                box.textContent = JSON.stringify(res.data || res, null, 2);
-                showToast("体检完成！");
-            } catch (e) {
-                box.textContent = "体检请求失败: " + e.message;
-            }
-        }
-
-        function triggerRepairStorage() {
-            showConfirmModal({
-                title: "🛠️ 应急净化修复存储",
-                message: "确定要执行 app_storage.json 安全净化重置吗？",
-                details: "该操作将备份现有存储并清除坏死/非法的 JSON 节点，用于排查登录秒退或凭据损坏。",
-                confirmText: "执行修复",
-                isDanger: true,
-                onConfirm: async () => {
-                    showToast("正在执行存储应急净化...");
-                    const resp = await fetch("/api/action/repair-storage", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({})
-                    });
-                    const res = await resp.json();
-                    showToast(res.message || "存储净化完成！");
-                    fetchStatus(false);
-                }
-            });
-        }
-
-        // R3.4 页面可见性定时器防抖与轮询驱动
-        function stopPolling() {
+        // 防叠加轮询引擎
+        function startPolling() {
             if (pollTimer) {
                 clearInterval(pollTimer);
                 pollTimer = null;
             }
-        }
-
-        function startPolling() {
-            stopPolling(); // 强制前置幂等清理旧定时器，防止叠加倍速轮询
-            countdownSeconds = 8;
             fetchStatus(false);
             pollTimer = setInterval(() => {
+                if (isPollingPaused) return;
                 countdownSeconds--;
                 const badge = document.getElementById("refreshCountdownBadge");
                 if (badge) badge.textContent = `(${countdownSeconds}s)`;
                 if (countdownSeconds <= 0) {
-                    countdownSeconds = 8;
                     fetchStatus(false);
                 }
             }, 1000);
@@ -2763,7 +2842,10 @@
 
         document.addEventListener("visibilitychange", () => {
             if (document.hidden) {
-                stopPolling();
+                if (pollTimer) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                }
             } else {
                 startPolling();
             }
