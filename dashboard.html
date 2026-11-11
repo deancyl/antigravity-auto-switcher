@@ -805,6 +805,39 @@
             font-weight: 600;
         }
 
+        .model-pill.carbon-pill {
+            background: rgba(6, 182, 212, 0.16);
+            color: #22d3ee;
+            border-color: rgba(6, 182, 212, 0.36);
+            font-weight: 600;
+        }
+
+        .model-pill.argon-pill {
+            background: rgba(16, 185, 129, 0.16);
+            color: #34d399;
+            border-color: rgba(16, 185, 129, 0.36);
+            font-weight: 600;
+        }
+
+        .model-pill.gpt-pill {
+            background: rgba(139, 92, 246, 0.16);
+            color: #a78bfa;
+            border-color: rgba(139, 92, 246, 0.36);
+            font-weight: 600;
+        }
+
+        .model-pill.claude-pill {
+            background: rgba(168, 85, 247, 0.14);
+            color: #c084fc;
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        .model-pill.gemini-pill {
+            background: rgba(14, 165, 233, 0.12);
+            color: #38bdf8;
+            border-color: rgba(14, 165, 233, 0.28);
+        }
+
         /* 配额进度条与语义化倒计时胶囊 */
         .slot-metrics {
             display: flex;
@@ -1373,18 +1406,18 @@
                         </div>
                     </div>
                 </div>
-                <!-- 当前活跃账号的全模型矩阵速览 -->
+                <!-- 当前活跃账号的全模型矩阵速览 (双族宏观架构) -->
                 <div class="hero-mini-matrix">
-                    <div class="matrix-pill" id="heroMatrixGemini">
-                        <span style="color:var(--text-secondary);">💎 Gemini</span>
+                    <div class="matrix-pill" id="heroMatrixGemini" title="Gemini 官方模型族 (Flash / Carbon / Argon / Pro)">
+                        <span style="color:var(--text-secondary);">💎 Gemini Models</span>
                         <span id="heroMatrixGeminiVal" style="font-weight:700;color:#fff;">--% / --%</span>
                     </div>
-                    <div class="matrix-pill" id="heroMatrixClaude">
-                        <span style="color:var(--text-secondary);">🟣 Claude</span>
+                    <div class="matrix-pill" id="heroMatrixClaude" title="Claude 与开源大模型族 (Claude 4.6 / GPT-OSS 120B)">
+                        <span style="color:var(--text-secondary);">🟣 Claude & GPT</span>
                         <span id="heroMatrixClaudeVal" style="font-weight:700;color:#fff;">--% / --%</span>
                     </div>
-                    <div class="matrix-pill" id="heroMatrixArgon">
-                        <span style="color:var(--text-secondary);">🧪 Argon</span>
+                    <div class="matrix-pill" id="heroMatrixArgon" title="Gemini 4 Argon (Gemini 共享池成员)">
+                        <span style="color:var(--text-secondary);">🧪 Gemini 4 Argon</span>
                         <span id="heroMatrixArgonVal" style="font-weight:700;color:#fff;">--</span>
                     </div>
                 </div>
@@ -1456,10 +1489,12 @@
                     <span class="control-label">模型配额视角:</span>
                     <div class="filter-chip-group" id="modelViewGroup">
                         <button class="filter-btn active" onclick="setModelView('auto', this)">🎯 跟随当前</button>
-                        <button class="filter-btn" onclick="setModelView('Gemini', this)">💎 Gemini</button>
-                        <button class="filter-btn" onclick="setModelView('Claude', this)">🟣 Claude</button>
-                        <button class="filter-btn" onclick="setModelView('Argon', this)">🧪 Argon</button>
-                        <button class="filter-btn" onclick="setModelView('all', this)">📊 全模型展开</button>
+                        <button class="filter-btn" onclick="setModelView('Gemini', this)">💎 Gemini Models</button>
+                        <button class="filter-btn" onclick="setModelView('Carbon', this)">⚡ Gemini 4 Carbon</button>
+                        <button class="filter-btn" onclick="setModelView('Argon', this)">🧪 Gemini 4 Argon</button>
+                        <button class="filter-btn" onclick="setModelView('Claude', this)">🟣 Claude 4.6</button>
+                        <button class="filter-btn" onclick="setModelView('GPT', this)">🤖 GPT-OSS 120B</button>
+                        <button class="filter-btn" onclick="setModelView('all', this)">📊 双族全展开</button>
                     </div>
                 </div>
 
@@ -1544,6 +1579,23 @@
         </div>
     </div>
 
+    <!-- /boost 极速择优跃迁专用模态框 -->
+    <div class="modal-overlay" id="boostModal">
+        <div class="modal-card">
+            <div class="modal-title">🚀 /boost 极速择优跃迁</div>
+            <p class="modal-desc" id="boostModalDesc">
+                正在比对全池槽位配额数据...
+            </p>
+            <div id="boostCandidateBox" style="margin: 14px 0; padding: 12px 14px; background: rgba(255,255,255,0.04); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 13px; line-height: 1.6;">
+                <!-- 动态渲染候选槽位信息 -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn-icon" onclick="closeBoostModal()">取消</button>
+                <button class="btn-icon btn-primary btn-boost" id="btnConfirmBoost" onclick="executeBoostConfirmed()">立即极速跃迁</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let pollTimer = null;
         let countdownSeconds = 8;
@@ -1579,10 +1631,10 @@
                     activeModelAvgPct: 83,
                     geminiReadyCount: 6,
                     claudeReadyCount: 8,
-                    argonReadyCount: 2,
+                    argonReadyCount: 6,
                     geminiAvgPct: 83,
                     claudeAvgPct: 92,
-                    argonAvgPct: 88
+                    argonAvgPct: 83
                 },
                 current: {
                     slotName: "h",
@@ -1613,37 +1665,37 @@
                         slotIndex: 1, slotName: "b", email: "deancyl0607@gmail.com", isSkipped: false,
                         status: "周限额", statusKey: "exhausted-weekly", isActive: false,
                         gemini5hPct: 100, geminiWeeklyPct: 0, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 85,
-                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "2d 04h后重置", argonWeeklyCountdown: "不支持",
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "2d 04h后重置", argonWeeklyCountdown: "Gemini族共池",
                         claude5hCountdown: "就绪", claudeWeeklyCountdown: "4d 11h后重置",
-                        supportedModels: ["GPT-OSS 120B", "Claude 4.6", "Gemini 3.8 Flash", "Gemini 2.5 Pro"],
-                        supportsArgon: false, switchCount: 7, lastSwitchedAt: "2026-11-02 19:15:00", tokenFingerprint: "4b81e210", planName: "Pro"
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "Claude 4.6", "GPT-OSS 120B", "Gemini 2.5 Pro"],
+                        supportsArgon: true, switchCount: 7, lastSwitchedAt: "2026-11-02 19:15:00", tokenFingerprint: "4b81e210", planName: "Pro"
                     },
                     {
                         slotIndex: 2, slotName: "c", email: "salomeharriman68@gmail.com", isSkipped: false,
                         status: "就绪 (可用)", statusKey: "ready", isActive: false,
                         gemini5hPct: 100, geminiWeeklyPct: 42, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 90,
-                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "5d 07h后重置", argonWeeklyCountdown: "不支持",
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "5d 07h后重置", argonWeeklyCountdown: "Gemini族共池",
                         claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
-                        supportedModels: ["Gemini 3.8 Flash", "GPT-OSS 120B", "Claude 4.6", "Gemini 2.5 Pro"],
-                        supportsArgon: false, switchCount: 4, lastSwitchedAt: "2026-11-03 01:40:12", tokenFingerprint: "7c92a104", planName: "Pro"
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "GPT-OSS 120B", "Claude 4.6", "Gemini 2.5 Pro"],
+                        supportsArgon: true, switchCount: 4, lastSwitchedAt: "2026-11-03 01:40:12", tokenFingerprint: "7c92a104", planName: "Pro"
                     },
                     {
                         slotIndex: 3, slotName: "d", email: "charlescloud0607@gmail.com", isSkipped: false,
                         status: "就绪 (可用)", statusKey: "ready", isActive: false,
                         gemini5hPct: 100, geminiWeeklyPct: 38, argonWeeklyPct: -1, claude5hPct: 95, claudeWeeklyPct: 88,
-                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "2d 11h后重置", argonWeeklyCountdown: "不支持",
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "2d 11h后重置", argonWeeklyCountdown: "Gemini族共池",
                         claude5hCountdown: "03h12m后重置", claudeWeeklyCountdown: "5d 02h后重置",
-                        supportedModels: ["Gemini 3.8 Flash", "Claude 4.6", "GPT-OSS 120B", "Gemini 2.5 Pro"],
-                        supportsArgon: false, switchCount: 4, lastSwitchedAt: "2026-11-03 05:18:44", tokenFingerprint: "3d19f882", planName: "Pro"
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "Claude 4.6", "GPT-OSS 120B", "Gemini 2.5 Pro"],
+                        supportsArgon: true, switchCount: 4, lastSwitchedAt: "2026-11-03 05:18:44", tokenFingerprint: "3d19f882", planName: "Pro"
                     },
                     {
                         slotIndex: 4, slotName: "e", email: "pogoyutox@hotmail.com", isSkipped: false,
                         status: "就绪 (可用)", statusKey: "ready", isActive: false,
                         gemini5hPct: 100, geminiWeeklyPct: 100, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 100,
-                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "就绪", argonWeeklyCountdown: "不支持",
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "就绪", argonWeeklyCountdown: "Gemini族共池",
                         claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
-                        supportedModels: ["Gemini 3.8 Flash", "Claude 4.6", "GPT-OSS 120B", "Gemini 2.5 Pro"],
-                        supportsArgon: false, switchCount: 3, lastSwitchedAt: "2026-11-01 22:10:09", tokenFingerprint: "8e55c301", planName: "Pro"
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "Claude 4.6", "GPT-OSS 120B", "Gemini 2.5 Pro"],
+                        supportsArgon: true, switchCount: 3, lastSwitchedAt: "2026-11-01 22:10:09", tokenFingerprint: "8e55c301", planName: "Pro"
                     },
                     {
                         slotIndex: 5, slotName: "a", email: "priscsavalia@gmail.com", isSkipped: false,
@@ -1651,26 +1703,26 @@
                         gemini5hPct: 100, geminiWeeklyPct: 49, argonWeeklyPct: 84, claude5hPct: 100, claudeWeeklyPct: 94,
                         gemini5hCountdown: "就绪", geminiWeeklyCountdown: "5d 10h后重置", argonWeeklyCountdown: "4d 08h后重置",
                         claude5hCountdown: "就绪", claudeWeeklyCountdown: "6d 01h后重置",
-                        supportedModels: ["Gemini 3.8 Flash", "Claude 5.5", "Gemini 4 Argon", "Gemini 2.5 Pro", "GPT-OSS 120B"],
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "Claude 5.5", "Gemini 4 Argon", "Gemini 2.5 Pro", "GPT-OSS 120B"],
                         supportsArgon: true, switchCount: 4, lastSwitchedAt: "2026-11-03 08:50:19", tokenFingerprint: "1a60b49e", planName: "Pro Ultra"
                     },
                     {
                         slotIndex: 6, slotName: "f", email: "zaraonet@gmail.com", isSkipped: false,
                         status: "周限额", statusKey: "exhausted-weekly", isActive: false,
                         gemini5hPct: 100, geminiWeeklyPct: 1, argonWeeklyPct: -1, claude5hPct: 80, claudeWeeklyPct: 72,
-                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "09h47m后重置", argonWeeklyCountdown: "不支持",
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "09h47m后重置", argonWeeklyCountdown: "Gemini族共池",
                         claude5hCountdown: "01h40m后重置", claudeWeeklyCountdown: "3d 14h后重置",
-                        supportedModels: ["Gemini 3.8 Flash", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B"],
-                        supportsArgon: false, switchCount: 1, lastSwitchedAt: "2026-11-02 14:22:05", tokenFingerprint: "6f04d77a", planName: "Pro"
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B"],
+                        supportsArgon: true, switchCount: 1, lastSwitchedAt: "2026-11-02 14:22:05", tokenFingerprint: "6f04d77a", planName: "Pro"
                     },
                     {
                         slotIndex: 7, slotName: "g", email: "ngoclongvu631@gmail.com", isSkipped: false,
                         status: "就绪 (可用)", statusKey: "ready", isActive: false,
                         gemini5hPct: 100, geminiWeeklyPct: 67, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 100,
-                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "3d 03h后重置", argonWeeklyCountdown: "不支持",
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "3d 03h后重置", argonWeeklyCountdown: "Gemini族共池",
                         claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
-                        supportedModels: ["GPT-OSS 120B", "Claude 4.6", "Gemini 3.8 Flash", "Gemini 2.5 Pro"],
-                        supportsArgon: false, switchCount: 0, lastSwitchedAt: "", tokenFingerprint: "2g71c903", planName: "Pro"
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "GPT-OSS 120B", "Claude 4.6", "Gemini 2.5 Pro"],
+                        supportsArgon: true, switchCount: 0, lastSwitchedAt: "", tokenFingerprint: "2g71c903", planName: "Pro"
                     },
                     {
                         slotIndex: 8, slotName: "h", email: "deancyla@gmail.com", isSkipped: false,
@@ -1678,7 +1730,7 @@
                         gemini5hPct: 97, geminiWeeklyPct: 95, argonWeeklyPct: 92, claude5hPct: 100, claudeWeeklyPct: 96,
                         gemini5hCountdown: "02h21m后重置", geminiWeeklyCountdown: "6d 10h后重置", argonWeeklyCountdown: "5d 18h后重置",
                         claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
-                        supportedModels: ["Gemini 3.8 Flash", "Claude 4.6", "GPT-OSS 120B", "Gemini 4 Argon"],
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "Claude 4.6", "GPT-OSS 120B", "Gemini 4 Argon", "Gemini 2.5 Pro"],
                         supportsArgon: true, switchCount: 1, lastSwitchedAt: "2026-11-03 11:27:35", tokenFingerprint: "9f136d09", planName: "Pro Ultra"
                     }
                 ],
@@ -1970,10 +2022,16 @@
         }
 
         function getEffectiveFocusGroup(data) {
-            if (currentModelView === 'Gemini' || currentModelView === 'Claude' || currentModelView === 'Argon') {
+            if (['Gemini', 'Claude', 'Argon', 'Carbon', 'GPT'].includes(currentModelView)) {
                 return currentModelView;
             }
-            return (data.current && data.current.activeModelGroup) || "Gemini";
+            const curGroup = (data && data.current && data.current.activeModelGroup) || "Gemini";
+            const curLabel = (data && data.current && data.current.activeModelLabel) || "";
+            if (/carbon/i.test(curLabel)) return "Carbon";
+            if (/argon/i.test(curLabel)) return "Argon";
+            if (/gpt|120b/i.test(curLabel)) return "GPT";
+            if (/claude/i.test(curLabel) || /claude/i.test(curGroup)) return "Claude";
+            return "Gemini";
         }
 
         function renderDashboard(data) {
@@ -2000,64 +2058,80 @@
                 autoText.textContent = `开机自启: ${isAutoOn ? "ON" : "OFF"}`;
             }
 
-            document.getElementById("lockedModelText").textContent = data.current.activeModelLabel || data.current.activeModelGroup;
+            document.getElementById("lockedModelText").textContent = (data.current && (data.current.activeModelLabel || data.current.activeModelGroup)) || "Gemini";
 
             // 2. Hero 当前活跃账号与动态模型绑定
-            const curSlot = (data.slots || []).find(s => s.slotName === data.current.slotName) || (data.slots || [])[0];
-            document.getElementById("heroSlotBadge").textContent = data.current.slotName || "-";
-            document.getElementById("heroEmail").textContent = data.current.email || "未检测到登录";
-            document.getElementById("heroFp").textContent = "指纹: " + (data.current.tokenFingerprint || "--");
-            document.getElementById("heroPlan").textContent = (curSlot && curSlot.planName) || data.current.planName || "Pro";
-            document.getElementById("heroSyncTime").textContent = data.current.lastQuotaSyncAt || "实时";
-            document.getElementById("footerTimestamp").textContent = "更新时间: " + data.timestamp;
+            const curSlot = (data.slots || []).find(s => s.slotName === (data.current && data.current.slotName)) || (data.slots || [])[0];
+            document.getElementById("heroSlotBadge").textContent = (data.current && data.current.slotName) || (curSlot && curSlot.slotName) || "-";
+            document.getElementById("heroEmail").textContent = (data.current && data.current.email) || (curSlot && curSlot.email) || "未检测到登录";
+            document.getElementById("heroFp").textContent = "指纹: " + ((data.current && data.current.tokenFingerprint) || (curSlot && curSlot.tokenFingerprint) || "--");
+            document.getElementById("heroPlan").textContent = (curSlot && curSlot.planName) || (data.current && data.current.planName) || "Pro";
+            document.getElementById("heroSyncTime").textContent = (data.current && data.current.lastQuotaSyncAt) || "实时";
+            document.getElementById("footerTimestamp").textContent = "更新时间: " + (data.timestamp || "--:--:--");
 
             let hero5hPctVal = 0;
             let heroWkPctVal = 0;
             let hero5hCdStr = "就绪可用";
             let heroWkCdStr = "就绪可用";
-            let hero5hLabel = `${focusGrp} 5小时配额`;
-            let heroWkLabel = `${focusGrp} 周配额余量`;
+            let hero5hLabel = "Gemini Models 5小时配额";
+            let heroWkLabel = "Gemini Models 周配额余量";
 
             if (curSlot) {
-                if (focusGrp === "Claude") {
+                if (focusGrp === "Claude" || focusGrp === "GPT") {
+                    const modName = (focusGrp === "GPT") ? "GPT-OSS 120B" : "Claude 4.6";
                     hero5hPctVal = Math.max(0, curSlot.claude5hPct);
                     heroWkPctVal = Math.max(0, curSlot.claudeWeeklyPct);
                     hero5hCdStr = curSlot.claude5hCountdown || "就绪可用";
                     heroWkCdStr = curSlot.claudeWeeklyCountdown || "就绪可用";
+                    hero5hLabel = `Claude & GPT (${modName}) 5小时配额`;
+                    heroWkLabel = `Claude & GPT (${modName}) 周配额余量`;
                 } else if (focusGrp === "Argon") {
-                    hero5hPctVal = curSlot.argonWeeklyPct >= 0 ? curSlot.argonWeeklyPct : 0;
-                    heroWkPctVal = curSlot.argonWeeklyPct >= 0 ? curSlot.argonWeeklyPct : 0;
-                    hero5hCdStr = curSlot.argonWeeklyPct >= 0 ? "无 5h 限制" : "不支持";
-                    heroWkCdStr = curSlot.argonWeeklyCountdown || "不支持";
-                    hero5hLabel = "Argon 5小时窗口 (无限制)";
-                    heroWkLabel = "Argon 周配额余量";
+                    // Argon 是 Gemini Models 共享池成员，显示 Gemini 池周配额
+                    const ar = curSlot.argonWeeklyPct;
+                    const gw = curSlot.geminiWeeklyPct;
+                    hero5hPctVal = Math.max(0, curSlot.gemini5hPct);
+                    heroWkPctVal = Math.max(0, (ar !== undefined && ar >= 0 ? ar : gw));
+                    hero5hCdStr = curSlot.gemini5hCountdown || "就绪可用";
+                    heroWkCdStr = (curSlot.argonWeeklyCountdown && curSlot.argonWeeklyCountdown !== "不支持") ? curSlot.argonWeeklyCountdown : (curSlot.geminiWeeklyCountdown || "就绪可用");
+                    hero5hLabel = "Gemini Models (Argon) 5小时配额";
+                    heroWkLabel = "Gemini Models (Argon) 周配额余量";
+                } else if (focusGrp === "Carbon") {
+                    hero5hPctVal = Math.max(0, curSlot.gemini5hPct);
+                    heroWkPctVal = Math.max(0, curSlot.geminiWeeklyPct);
+                    hero5hCdStr = curSlot.gemini5hCountdown || "就绪可用";
+                    heroWkCdStr = curSlot.geminiWeeklyCountdown || "就绪可用";
+                    hero5hLabel = "Gemini Models (Carbon) 5小时配额";
+                    heroWkLabel = "Gemini Models (Carbon) 周配额余量";
                 } else {
                     hero5hPctVal = Math.max(0, curSlot.gemini5hPct);
                     heroWkPctVal = Math.max(0, curSlot.geminiWeeklyPct);
                     hero5hCdStr = curSlot.gemini5hCountdown || "就绪可用";
                     heroWkCdStr = curSlot.geminiWeeklyCountdown || "就绪可用";
+                    hero5hLabel = "Gemini Models (Flash/Pro) 5小时配额";
+                    heroWkLabel = "Gemini Models (Flash/Pro) 周配额余量";
                 }
 
-                // 填充三模型矩阵胶囊
+                // 填充双族与多模型矩阵胶囊 (从不误报不支持)
                 const g5 = Math.max(0, curSlot.gemini5hPct);
                 const gw = Math.max(0, curSlot.geminiWeeklyPct);
                 const c5 = Math.max(0, curSlot.claude5hPct);
                 const cw = Math.max(0, curSlot.claudeWeeklyPct);
                 const ar = curSlot.argonWeeklyPct;
+                const arVal = (ar !== undefined && ar >= 0) ? ar : gw;
 
-                document.getElementById("heroMatrixGeminiVal").textContent = `${g5}% / 周 ${gw}%`;
-                document.getElementById("heroMatrixClaudeVal").textContent = `${c5}% / 周 ${cw}%`;
-                document.getElementById("heroMatrixArgonVal").textContent = ar >= 0 ? `周 ${ar}%` : "不支持";
+                document.getElementById("heroMatrixGeminiVal").textContent = `5h ${g5}% / 周 ${gw}%`;
+                document.getElementById("heroMatrixClaudeVal").textContent = `5h ${c5}% / 周 ${cw}%`;
+                document.getElementById("heroMatrixArgonVal").textContent = ar >= 0 ? `周 ${ar}% (独立)` : `周 ${arVal}% (共池)`;
 
-                document.getElementById("heroMatrixGemini").classList.toggle("active-group", focusGrp === "Gemini");
-                document.getElementById("heroMatrixClaude").classList.toggle("active-group", focusGrp === "Claude");
+                document.getElementById("heroMatrixGemini").classList.toggle("active-group", focusGrp === "Gemini" || focusGrp === "Carbon" || focusGrp === "Argon");
+                document.getElementById("heroMatrixClaude").classList.toggle("active-group", focusGrp === "Claude" || focusGrp === "GPT");
                 document.getElementById("heroMatrixArgon").classList.toggle("active-group", focusGrp === "Argon");
             }
 
             document.getElementById("hero5hTitle").textContent = hero5hLabel;
             document.getElementById("heroWeeklyTitle").textContent = heroWkLabel;
-            document.getElementById("hero5hPct").textContent = (focusGrp === "Argon" && curSlot && curSlot.argonWeeklyPct < 0) ? "不支持" : `${hero5hPctVal}%`;
-            document.getElementById("heroWeeklyPct").textContent = (focusGrp === "Argon" && curSlot && curSlot.argonWeeklyPct < 0) ? "不支持" : `${heroWkPctVal}%`;
+            document.getElementById("hero5hPct").textContent = `${hero5hPctVal}%`;
+            document.getElementById("heroWeeklyPct").textContent = `${heroWkPctVal}%`;
 
             const b5 = document.getElementById("hero5hBar");
             b5.style.width = `${hero5hPctVal}%`;
@@ -2082,19 +2156,28 @@
             if (data.runway) {
                 let rdyCnt = data.runway.readyCount;
                 let avgPct = data.runway.activeModelAvgPct;
-                if (focusGrp === "Claude" && data.runway.claudeAvgPct !== undefined) {
+                let titlePrefix = "Gemini Models";
+
+                if (focusGrp === "Claude" || focusGrp === "GPT") {
                     rdyCnt = data.runway.claudeReadyCount ?? rdyCnt;
                     avgPct = data.runway.claudeAvgPct;
-                } else if (focusGrp === "Argon" && data.runway.argonAvgPct !== undefined) {
-                    rdyCnt = data.runway.argonReadyCount ?? rdyCnt;
-                    avgPct = data.runway.argonAvgPct;
-                } else if (focusGrp === "Gemini" && data.runway.geminiAvgPct !== undefined) {
+                    titlePrefix = (focusGrp === "GPT") ? "GPT-OSS 120B (Claude族)" : "Claude & GPT Models";
+                } else if (focusGrp === "Argon") {
+                    rdyCnt = (data.runway.argonReadyCount && data.runway.argonReadyCount > 0) ? data.runway.argonReadyCount : (data.runway.geminiReadyCount ?? rdyCnt);
+                    avgPct = (data.runway.argonAvgPct !== undefined && data.runway.argonAvgPct > 0) ? data.runway.argonAvgPct : (data.runway.geminiAvgPct ?? avgPct);
+                    titlePrefix = "Gemini Models (Argon)";
+                } else if (focusGrp === "Carbon") {
                     rdyCnt = data.runway.geminiReadyCount ?? rdyCnt;
                     avgPct = data.runway.geminiAvgPct;
+                    titlePrefix = "Gemini Models (Carbon)";
+                } else {
+                    rdyCnt = data.runway.geminiReadyCount ?? rdyCnt;
+                    avgPct = data.runway.geminiAvgPct;
+                    titlePrefix = "Gemini Models";
                 }
-                document.getElementById("runwayReadyTitle").textContent = `${focusGrp} 可用就绪槽位`;
+                document.getElementById("runwayReadyTitle").textContent = `${titlePrefix} 可用就绪槽位`;
                 document.getElementById("runwayReadyVal").innerHTML = `${rdyCnt} / ${data.runway.totalCount} <span class="runway-sub">待命中</span>`;
-                document.getElementById("runwayModelTitle").textContent = `${focusGrp} 全池平均水位`;
+                document.getElementById("runwayModelTitle").textContent = `${titlePrefix} 全池平均水位`;
                 document.getElementById("runwayAvgVal").innerHTML = `${avgPct}% <span class="runway-sub">5h/周均值</span>`;
                 const skipTxt = data.runway.skippedCount > 0 ? ` · ${data.runway.skippedCount} 免切` : "";
                 document.getElementById("runwayCooldownVal").innerHTML = `${data.runway.cooldownCount} <span class="runway-sub">冷却中${skipTxt}</span>`;
@@ -2108,13 +2191,16 @@
         }
 
         function getSlotEffectiveMetricForSort(s, focusGrp) {
-            if (focusGrp === "Claude") {
+            if (focusGrp === "Claude" || focusGrp === "GPT") {
                 if (s.claude5hPct < 0) return -1;
                 return Math.min(s.claude5hPct, s.claudeWeeklyPct >= 0 ? s.claudeWeeklyPct : 100);
             }
             if (focusGrp === "Argon") {
-                return s.argonWeeklyPct >= 0 ? s.argonWeeklyPct : -1;
+                const ar = (s.argonWeeklyPct !== undefined && s.argonWeeklyPct >= 0) ? s.argonWeeklyPct : s.geminiWeeklyPct;
+                const g5 = s.gemini5hPct >= 0 ? s.gemini5hPct : 100;
+                return Math.min(g5, ar >= 0 ? ar : 100);
             }
+            // Gemini or Carbon
             if (s.gemini5hPct < 0) return -1;
             return Math.min(s.gemini5hPct, s.geminiWeeklyPct >= 0 ? s.geminiWeeklyPct : 100);
         }
@@ -2129,7 +2215,7 @@
             // 更新筛选按钮上的实时数量
             const readyTotal = allSlots.filter(s => s.statusKey === 'ready' || s.statusKey === 'active').length;
             const cdTotal = allSlots.filter(s => s.statusKey.includes('exhausted') || s.status === 'cooldown').length;
-            const argonTotal = allSlots.filter(s => s.supportsArgon || s.argonWeeklyPct >= 0).length;
+            const argonTotal = allSlots.filter(s => s.supportsArgon || (s.argonWeeklyPct !== undefined && s.argonWeeklyPct >= 0) || (s.geminiWeeklyPct !== undefined && s.geminiWeeklyPct >= 0)).length;
             const filterBtns = document.querySelectorAll("#statusFilterGroup .filter-btn");
             filterBtns.forEach(btn => {
                 const f = btn.dataset.filter;
@@ -2143,7 +2229,7 @@
             let slots = allSlots.filter(s => {
                 if (currentFilter === 'ready' && !(s.statusKey === 'ready' || s.statusKey === 'active')) return false;
                 if (currentFilter === 'cooldown' && !(s.statusKey.includes('exhausted') || s.status === 'cooldown')) return false;
-                if (currentFilter === 'argon' && !(s.supportsArgon || s.argonWeeklyPct >= 0)) return false;
+                if (currentFilter === 'argon' && !(s.supportsArgon || (s.argonWeeklyPct !== undefined && s.argonWeeklyPct >= 0) || (s.geminiWeeklyPct !== undefined && s.geminiWeeklyPct >= 0))) return false;
                 if (searchQuery) {
                     const hay = `${s.slotName} ${s.email} ${s.tokenFingerprint || ''} ${(s.supportedModels || []).join(' ')}`.toLowerCase();
                     if (!hay.includes(searchQuery)) return false;
@@ -2194,34 +2280,51 @@
                     displayStatus = "★ 使用中";
                     statusClass = "active";
                 } else if (focusGrp === "Argon") {
-                    if (ar < 0) { displayStatus = "不支持 Argon"; statusClass = "unsupported"; }
-                    else if (ar <= 1) { displayStatus = "Argon 周限额"; statusClass = "exhausted-weekly"; }
-                    else { displayStatus = "Argon 就绪"; statusClass = "ready"; }
-                } else if (focusGrp === "Claude") {
-                    if (c5 >= 0 && c5 <= 1) { displayStatus = "Claude 5h限额"; statusClass = "exhausted-5h"; }
-                    else if (cw >= 0 && cw <= 1) { displayStatus = "Claude 周限额"; statusClass = "exhausted-weekly"; }
-                    else { displayStatus = "就绪 (可用)"; statusClass = "ready"; }
+                    const arEff = (ar !== undefined && ar >= 0 ? ar : gw);
+                    if (g5 <= 1) { displayStatus = "Gemini 5h 限额"; statusClass = "exhausted-5h"; }
+                    else if (arEff <= 1) { displayStatus = "Argon 周限额"; statusClass = "exhausted-weekly"; }
+                    else { displayStatus = "Argon 就绪 (共池)"; statusClass = "ready"; }
+                } else if (focusGrp === "Carbon") {
+                    if (g5 <= 1) { displayStatus = "Carbon 5h 限额"; statusClass = "exhausted-5h"; }
+                    else if (gw <= 1) { displayStatus = "Carbon 周限额"; statusClass = "exhausted-weekly"; }
+                    else { displayStatus = "Carbon 就绪 (共池)"; statusClass = "ready"; }
+                } else if (focusGrp === "Claude" || focusGrp === "GPT") {
+                    const prefix = (focusGrp === "GPT") ? "GPT-OSS" : "Claude";
+                    if (c5 >= 0 && c5 <= 1) { displayStatus = `${prefix} 5h限额`; statusClass = "exhausted-5h"; }
+                    else if (cw >= 0 && cw <= 1) { displayStatus = `${prefix} 周限额`; statusClass = "exhausted-weekly"; }
+                    else { displayStatus = `${prefix} 就绪`; statusClass = "ready"; }
                 } else {
-                    if (s.statusKey === "exhausted-5h" || g5 <= 1) { displayStatus = "5h限额"; statusClass = "exhausted-5h"; }
-                    else if (s.statusKey === "exhausted-weekly" || gw <= 1) { displayStatus = "周限额"; statusClass = "exhausted-weekly"; }
+                    if (s.statusKey === "exhausted-5h" || g5 <= 1) { displayStatus = "Gemini 5h限额"; statusClass = "exhausted-5h"; }
+                    else if (s.statusKey === "exhausted-weekly" || gw <= 1) { displayStatus = "Gemini 周限额"; statusClass = "exhausted-weekly"; }
                     else if (s.statusKey === "unsupported") { statusClass = "unsupported"; }
                 }
 
                 const idxLabel = s.slotIndex ? `#${s.slotIndex} · ${s.slotName}` : s.slotName;
 
-                // 模型胶囊标签
+                // 模型胶囊标签 (支持 Gemini 4 Carbon、GPT-OSS 120B、Gemini 4 Argon 等)
                 const modelsList = Array.isArray(s.supportedModels) && s.supportedModels.length > 0
                     ? s.supportedModels
-                    : ["Gemini 3.8 Flash", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B"];
+                    : ["Gemini 3.8 Flash", "Gemini 4 Carbon", "Gemini 4 Argon", "Claude 4.6", "GPT-OSS 120B", "Gemini 2.5 Pro"];
                 const modelsHtml = modelsList.map(m => {
-                    const isSpecial = /Argon|5\.5/i.test(m);
-                    return `<span class="model-pill ${isSpecial ? 'special' : ''}">${m}</span>`;
+                    let pillClass = "model-pill";
+                    if (/argon/i.test(m)) {
+                        pillClass += " special argon-pill";
+                    } else if (/carbon/i.test(m)) {
+                        pillClass += " special carbon-pill";
+                    } else if (/gpt|120b/i.test(m)) {
+                        pillClass += " special gpt-pill";
+                    } else if (/claude/i.test(m)) {
+                        pillClass += " claude-pill";
+                    } else {
+                        pillClass += " gemini-pill";
+                    }
+                    return `<span class="${pillClass}">${m}</span>`;
                 }).join("");
 
                 const geminiBlockHtml = `
                     <div class="metric-row">
                         <div class="metric-label-row">
-                            <span style="${focusGrp === 'Gemini' ? 'font-weight:600;color:#fff;' : ''}">💎 Gemini 5小时${focusGrp === 'Gemini' ? ' (核心)' : ''}</span>
+                            <span style="${(focusGrp === 'Gemini' || focusGrp === 'Carbon') ? 'font-weight:600;color:#fff;' : ''}">💎 Gemini Models 5小时${(focusGrp === 'Gemini' || focusGrp === 'Carbon') ? ' (核心)' : ''}</span>
                             <span class="metric-val-group">
                                 <span class="metric-val">${g5}%</span>
                                 ${formatMetricCountdownHtml(s.gemini5hCountdown, g5)}
@@ -2233,7 +2336,7 @@
                     </div>
                     <div class="metric-row">
                         <div class="metric-label-row">
-                            <span>Gemini 周配额</span>
+                            <span>Gemini Models 周配额 (含 Argon 共池)</span>
                             <span class="metric-val-group">
                                 <span class="metric-val">${gw}%</span>
                                 ${formatMetricCountdownHtml(s.geminiWeeklyCountdown, gw)}
@@ -2247,7 +2350,7 @@
                 const claudeBlockHtml = `
                     <div class="metric-row">
                         <div class="metric-label-row">
-                            <span style="${focusGrp === 'Claude' ? 'font-weight:600;color:#fff;' : ''}">🟣 Claude / GPT 5小时${focusGrp === 'Claude' ? ' (核心)' : ''}</span>
+                            <span style="${(focusGrp === 'Claude' || focusGrp === 'GPT') ? 'font-weight:600;color:#fff;' : ''}">🟣 Claude & GPT Models 5小时${(focusGrp === 'Claude' || focusGrp === 'GPT') ? ' (核心)' : ''}</span>
                             <span class="metric-val-group">
                                 <span class="metric-val">${Math.max(0, c5)}%</span>
                                 ${formatMetricCountdownHtml(s.claude5hCountdown, Math.max(0, c5))}
@@ -2259,7 +2362,7 @@
                     </div>
                     <div class="metric-row">
                         <div class="metric-label-row">
-                            <span>Claude / GPT 周配额</span>
+                            <span>Claude & GPT Models 周配额</span>
                             <span class="metric-val-group">
                                 <span class="metric-val">${Math.max(0, cw)}%</span>
                                 ${formatMetricCountdownHtml(s.claudeWeeklyCountdown, Math.max(0, cw))}
@@ -2270,17 +2373,19 @@
                         </div>
                     </div>`;
 
+                const arPct = (ar !== undefined && ar >= 0) ? ar : gw;
+                const arCd = (s.argonWeeklyCountdown && s.argonWeeklyCountdown !== "不支持") ? s.argonWeeklyCountdown : s.geminiWeeklyCountdown;
                 const argonBlockHtml = `
                     <div class="metric-row">
                         <div class="metric-label-row">
-                            <span style="${focusGrp === 'Argon' ? 'font-weight:600;color:#fff;' : ''}">🧪 Gemini 4 Argon 周配额</span>
+                            <span style="${focusGrp === 'Argon' ? 'font-weight:600;color:#fff;' : ''}">🧪 Gemini 4 Argon 周配额 (Gemini族共池)</span>
                             <span class="metric-val-group">
-                                <span class="metric-val">${ar >= 0 ? ar + '%' : '不支持'}</span>
-                                ${formatMetricCountdownHtml(s.argonWeeklyCountdown, ar)}
+                                <span class="metric-val">${arPct}%</span>
+                                ${formatMetricCountdownHtml(arCd, arPct)}
                             </span>
                         </div>
                         <div class="progress-track">
-                            <div class="progress-fill ${ar >= 0 ? getPctColorClass(ar) : 'red'}" style="width: ${ar >= 0 ? ar : 0}%"></div>
+                            <div class="progress-fill ${getPctColorClass(arPct)}" style="width: ${arPct}%"></div>
                         </div>
                     </div>`;
 
@@ -2289,25 +2394,24 @@
                 let otherCount = 0;
 
                 if (currentModelView === 'all') {
-                    primaryMetricsHtml = geminiBlockHtml + claudeBlockHtml + (ar >= 0 ? argonBlockHtml : "");
-                } else if (focusGrp === "Claude") {
+                    primaryMetricsHtml = geminiBlockHtml + claudeBlockHtml + argonBlockHtml;
+                } else if (focusGrp === "Claude" || focusGrp === "GPT") {
                     primaryMetricsHtml = claudeBlockHtml;
-                    otherMetricsHtml = geminiBlockHtml + (ar >= 0 ? argonBlockHtml : "");
-                    otherCount = ar >= 0 ? 3 : 2;
+                    otherMetricsHtml = geminiBlockHtml + argonBlockHtml;
+                    otherCount = 3;
                 } else if (focusGrp === "Argon") {
-                    primaryMetricsHtml = argonBlockHtml;
-                    otherMetricsHtml = geminiBlockHtml + claudeBlockHtml;
-                    otherCount = 4;
+                    primaryMetricsHtml = argonBlockHtml + geminiBlockHtml;
+                    otherMetricsHtml = claudeBlockHtml;
+                    otherCount = 2;
                 } else {
+                    // Gemini or Carbon
                     primaryMetricsHtml = geminiBlockHtml;
                     if (c5 >= 0 || cw >= 0) {
                         otherMetricsHtml += claudeBlockHtml;
                         otherCount += 2;
                     }
-                    if (ar >= 0) {
-                        otherMetricsHtml += argonBlockHtml;
-                        otherCount += 1;
-                    }
+                    otherMetricsHtml += argonBlockHtml;
+                    otherCount += 1;
                 }
 
                 const isDrawerOpen = expandedSlots.has(s.slotName);
@@ -2315,7 +2419,7 @@
                 const drawerHtml = otherCount > 0 ? `
                     <div class="other-models-toggle" data-original-label="${origDrawerLabel}" onclick="toggleCardDrawer('${s.slotName}', this, event)">
                         <span>${isDrawerOpen ? '▴ 收起其他模型配额' : origDrawerLabel}</span>
-                        <span style="font-size:10px;opacity:0.75;">${ar >= 0 ? '含 Argon' : 'Claude/GPT'}</span>
+                        <span style="font-size:10px;opacity:0.75;">${(focusGrp === 'Claude' || focusGrp === 'GPT') ? 'Gemini 族' : 'Claude/GPT 族'}</span>
                     </div>
                     <div class="other-models-drawer ${isDrawerOpen ? 'open' : ''}">
                         ${otherMetricsHtml}
@@ -2531,7 +2635,82 @@
             );
         }
 
-        async function triggerBoost() {
+        let pendingBoostCandidate = null;
+
+        function openBoostModal() {
+            const focusGrp = globalData ? getEffectiveFocusGroup(globalData) : "Gemini";
+            let targetSlot = null;
+            let maxQ = -1;
+            if (globalData && globalData.slots) {
+                globalData.slots.forEach(s => {
+                    if (s.isSkipped) return;
+                    const q = getSlotEffectiveMetricForSort(s, focusGrp);
+                    if (q > maxQ) { maxQ = q; targetSlot = s; }
+                });
+            }
+
+            pendingBoostCandidate = targetSlot;
+            const descElem = document.getElementById("boostModalDesc");
+            const boxElem = document.getElementById("boostCandidateBox");
+            const okBtn = document.getElementById("btnConfirmBoost");
+
+            let familyName = "Gemini Models";
+            if (focusGrp === "Claude" || focusGrp === "GPT") familyName = "Claude & GPT Models";
+            else if (focusGrp === "Argon") familyName = "Gemini Models (Argon)";
+            else if (focusGrp === "Carbon") familyName = "Gemini Models (Carbon)";
+
+            if (descElem) {
+                descElem.textContent = `系统已对全池槽位完成实时比对，锁定关注模型组 [${familyName}] 最优解：`;
+            }
+
+            if (boxElem) {
+                if (!targetSlot) {
+                    boxElem.innerHTML = `<div style="color:var(--text-muted);text-align:center;">暂无可用槽位</div>`;
+                    if (okBtn) okBtn.disabled = true;
+                } else if (targetSlot.isActive) {
+                    boxElem.innerHTML = `
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-weight:700;color:#34d399;">★ 当前活跃槽位已经是最佳账号</span>
+                            <span class="status-chip active">使用中</span>
+                        </div>
+                        <div style="color:var(--text-secondary);font-size:12px;">
+                            槽位 <b>[${targetSlot.slotName}]</b> · ${targetSlot.email}<br>
+                            当前 <b>${familyName}</b> 有效配额水位: <b style="color:#34d399;">${maxQ}%</b>
+                        </div>
+                    `;
+                    if (okBtn) okBtn.disabled = false;
+                } else {
+                    boxElem.innerHTML = `
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-weight:700;color:#fff;">推荐跃迁目标: 槽位 [${targetSlot.slotName}]</span>
+                            <span class="status-chip ready">最高配额 ${maxQ}%</span>
+                        </div>
+                        <div style="color:var(--text-secondary);font-size:12px;">
+                            邮箱: <b>${targetSlot.email}</b><br>
+                            模型组: <b>${familyName}</b> ｜ 指纹: <code>${(targetSlot.tokenFingerprint || '').slice(0, 8)}</code><br>
+                            跃迁后将自动同步 Windows Credential 并无损恢复原会话。
+                        </div>
+                    `;
+                    if (okBtn) okBtn.disabled = false;
+                }
+            }
+
+            const modal = document.getElementById("boostModal");
+            if (modal) modal.classList.add("open");
+        }
+
+        function closeBoostModal() {
+            const modal = document.getElementById("boostModal");
+            if (modal) modal.classList.remove("open");
+            pendingBoostCandidate = null;
+        }
+
+        function triggerBoost() {
+            openBoostModal();
+        }
+
+        async function executeBoostConfirmed() {
+            closeBoostModal();
             const focusGrp = globalData ? getEffectiveFocusGroup(globalData) : "Gemini";
             showToast(`正在并行核验 [${focusGrp}] 最优配额槽位并执行 /boost 极速跃迁...`);
             if (isDemoMode && globalData) {
@@ -2797,10 +2976,10 @@
                         statusKey: "ready",
                         isActive: false,
                         gemini5hPct: 100, geminiWeeklyPct: 100, argonWeeklyPct: -1, claude5hPct: 100, claudeWeeklyPct: 100,
-                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "就绪", argonWeeklyCountdown: "不支持",
+                        gemini5hCountdown: "就绪", geminiWeeklyCountdown: "就绪", argonWeeklyCountdown: "Gemini族共池",
                         claude5hCountdown: "就绪", claudeWeeklyCountdown: "就绪",
-                        supportedModels: ["Gemini 3.8 Flash", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B"],
-                        supportsArgon: false, switchCount: 0, lastSwitchedAt: "", tokenFingerprint: "c409e81b", planName: "Pro"
+                        supportedModels: ["Gemini 3.8 Flash", "Gemini 4 Carbon", "Claude 4.6", "GPT-OSS 120B", "Gemini 4 Argon", "Gemini 2.5 Pro"],
+                        supportsArgon: true, switchCount: 0, lastSwitchedAt: "", tokenFingerprint: "c409e81b", planName: "Pro"
                     });
                     recalculateDemoSummary(globalData);
                     renderDashboard(globalData);

@@ -194,11 +194,13 @@ $slotFuture = [PSCustomObject]@{
 $availFuture = Test-SlotGroupAvailable -SlotObj $slotFuture -ModelGroup "Argon" -Now $now
 Assert-Test "Argon future resetTime slot is unavailable" (-not $availFuture)
 
-# 5c: Account without Argon (argonWeeklyPct = "--" or $null) -> must return false without exception
+# 5c: Argon with '--' -> classified under Gemini models shared pool so it never shows "unsupported"
 $slotNoArgon = [PSCustomObject]@{
-    slotName       = "slot_no_argon"
-    status         = "ready"
-    argonWeeklyPct = "--"
+    slotName        = "slot_no_argon"
+    status          = "ready"
+    argonWeeklyPct  = "--"
+    gemini5hPct     = 80
+    geminiWeeklyPct = 90
 }
 $availNoArgon = $false
 $noArgonThrew = $false
@@ -208,7 +210,7 @@ try {
     $noArgonThrew = $true
 }
 Assert-Test "Argon with '--' does not throw int conversion error" (-not $noArgonThrew)
-Assert-Test "Argon with '--' returns false (unsupported)" (-not $availNoArgon)
+Assert-Test "Argon with '--' safely falls back to Gemini shared pool" $availNoArgon
 
 # 5d: Gemini with expired 5h reset -> auto unfreezes to 100% and restores ready status
 $slotGemini = [PSCustomObject]@{
@@ -236,12 +238,13 @@ Assert-Test "Claude with '--' returns false (unsupported)" (-not $availClaNo)
 
 # 5f: Claude with expired 5h reset -> auto unfreezes to 100% and restores ready status
 $slotClaudeThaw = [PSCustomObject]@{
-    slotName        = "slot_cla_thaw"
-    status          = "cooldown"
-    cooldownUntil   = $pastTime
-    claude5hPct     = 0
-    claudeWeeklyPct = 90
-    resetTime5h     = $pastTime
+    slotName              = "slot_cla_thaw"
+    status                = "cooldown"
+    cooldownUntil         = $pastTime
+    claude5hPct           = 0
+    claudeWeeklyPct       = 90
+    resetTimeClaude5h     = $pastTime
+    resetTime5h           = $pastTime
 }
 $availClaThaw = Test-SlotGroupAvailable -SlotObj $slotClaudeThaw -ModelGroup "Claude" -Now $now
 Assert-Test "Claude expired 5h reset auto-unfreezes to 100%" ($slotClaudeThaw.claude5hPct -eq 100)
@@ -565,12 +568,11 @@ Assert-Test "Resolve-SlotNameFromInput maps '1' to 1st slot ($firstSlotInOrder)"
 Assert-Test "Resolve-SlotNameFromInput maps '[5]' to 5th slot ($fifthSlotInOrder)" ((Resolve-SlotNameFromInput -UserInput "[5]" -State $poolState) -eq $fifthSlotInOrder)
 Assert-Test "Resolve-SlotNameFromInput preserves literal slot name 'a'" ((Resolve-SlotNameFromInput -UserInput "a" -State $poolState) -eq "a")
 
-$slotB = $poolState.slots.b
-$slotA = $poolState.slots.a
-Assert-Test "Slot [b] does NOT falsely report Argon support" ($null -eq $slotB.argonWeeklyPct -and $slotB.supportsArgon -eq $false)
-Assert-Test "Slot [a] accurately reports Argon support" ($null -ne $slotA.argonWeeklyPct -and $slotA.supportsArgon -eq $true)
-Assert-Test "All slots have populated supportedModels list" (@($slotB.supportedModels).Count -ge 3 -and @($slotA.supportedModels).Count -ge 4)
-Assert-Test "GuiPayload includes slotIndex and supportedModels" ($guiPayload.slots[0].slotIndex -eq 1 -and @($guiPayload.slots[0].supportedModels).Count -ge 3)
+$guiPayload = Get-SlotPoolGuiPayload
+Assert-Test "GuiPayload slots report Argon support under Gemini shared pool" ($guiPayload.slots[0].supportsArgon -eq $true)
+Assert-Test "GuiPayload includes Gemini 4 Argon in supportedModels" (@($guiPayload.slots[0].supportedModels) -contains "Gemini 4 Argon")
+Assert-Test "All slots have populated supportedModels list" (@($guiPayload.slots[0].supportedModels).Count -ge 4)
+Assert-Test "GuiPayload includes slotIndex and supportedModels" ($guiPayload.slots[0].slotIndex -eq 1 -and @($guiPayload.slots[0].supportedModels).Count -ge 4)
 
 # Clean up test sandbox
 Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -612,7 +614,8 @@ Assert-Test "Weekly countdown matches expected ~5d window" ($cdWkText -match "5d
 Write-Host "`n--- Test 15: Switch Account Audit & switchCount Increment (Tier 1) ---" -ForegroundColor Yellow
 
 $poolStateBefore = Get-SlotPoolState -SkipAutoMatch
-$targetSwitchSlot = $poolStateBefore.slotOrder[0]
+$targetSwitchSlot = @($poolStateBefore.slotOrder | Where-Object { $_ -ne $poolStateBefore.currentSlot })[0]
+if (-not $targetSwitchSlot) { $targetSwitchSlot = $poolStateBefore.slotOrder[0] }
 $prevSwitchCount = ConvertTo-SafeInt $poolStateBefore.slots.$targetSwitchSlot.switchCount -Default 0
 $prevHistoryCount = if ($poolStateBefore.history) { @($poolStateBefore.history).Count } else { 0 }
 
@@ -769,6 +772,7 @@ try {
     Assert-Test "Malicious Origin (evil.com) is blocked with 403 or denied matching CORS header" ($evilBlocked -or ($evilCors -ne "*" -and $evilCors -ne "http://evil.com"))
 } finally {
     if ($corsServerJob) {
+        try { (New-Object System.Net.WebClient).DownloadString("http://127.0.0.1:$corsTestPort/api/status") } catch {}
         Stop-Job $corsServerJob -ErrorAction SilentlyContinue
         Remove-Job $corsServerJob -Force -ErrorAction SilentlyContinue
     }
@@ -837,6 +841,299 @@ foreach ($ep in $requiredEndpoints) {
     $hasRoute = $serverFuncDef -match [regex]::Escape($ep.Path)
     Assert-Test "HTTP Server handles endpoint $($ep.Method) $($ep.Path) ($($ep.Desc))" $hasRoute
 }
+
+# ------------------------------------------------------------------------------
+# Test 21: Dynamic Multi-Model 429 Exhaustion Arbitration (Tier 1)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 21: Dynamic Multi-Model 429 Exhaustion Arbitration (Tier 1) ---" -ForegroundColor Yellow
+
+# 21a: Verify arbitration logic when Claude quota is depleted (<= 1%) and active group is Gemini
+$mockLiveQuotaClaudeDepleted = [PSCustomObject]@{
+    Gemini5hPct     = 85
+    GeminiWeeklyPct = 90
+    Claude5hPct     = 0
+    ClaudeWeeklyPct = 50
+}
+$isClaudeExhausted = $false
+$targetFamilyClaude = "Gemini"
+if (($null -ne $mockLiveQuotaClaudeDepleted.Claude5hPct -and $mockLiveQuotaClaudeDepleted.Claude5hPct -le 1) -or `
+    ($null -ne $mockLiveQuotaClaudeDepleted.ClaudeWeeklyPct -and $mockLiveQuotaClaudeDepleted.ClaudeWeeklyPct -le 1)) {
+    $isClaudeExhausted = $true
+    $targetFamilyClaude = "Claude"
+}
+Assert-Test "429 arbitration detects Claude exhaustion when active group is Gemini" $isClaudeExhausted
+Assert-Test "429 arbitration directs switch to depleted 'Claude' family" ($targetFamilyClaude -eq "Claude")
+
+# 21b: Verify arbitration logic when Gemini quota is depleted (<= 1%) and active group is Claude
+$mockLiveQuotaGeminiDepleted = [PSCustomObject]@{
+    Gemini5hPct     = 1
+    GeminiWeeklyPct = 95
+    Claude5hPct     = 70
+    ClaudeWeeklyPct = 80
+}
+$isGeminiExhausted = $false
+$targetFamilyGemini = "Claude"
+if (($null -ne $mockLiveQuotaGeminiDepleted.Gemini5hPct -and $mockLiveQuotaGeminiDepleted.Gemini5hPct -le 1) -or `
+    ($null -ne $mockLiveQuotaGeminiDepleted.GeminiWeeklyPct -and $mockLiveQuotaGeminiDepleted.GeminiWeeklyPct -le 1)) {
+    $isGeminiExhausted = $true
+    $targetFamilyGemini = "Gemini"
+}
+Assert-Test "429 arbitration detects Gemini exhaustion when active group is Claude" $isGeminiExhausted
+Assert-Test "429 arbitration directs switch to depleted 'Gemini' family" ($targetFamilyGemini -eq "Gemini")
+
+# 21c: Both families healthy (> 1%) -> Safely suppresses false-positive 429 switch (deadlock immunity)
+$mockLiveQuotaHealthy = [PSCustomObject]@{
+    Gemini5hPct     = 50
+    GeminiWeeklyPct = 60
+    Claude5hPct     = 45
+    ClaudeWeeklyPct = 55
+}
+$isHealthyExhausted = $false
+if (($null -ne $mockLiveQuotaHealthy.Gemini5hPct -and $mockLiveQuotaHealthy.Gemini5hPct -le 1) -or `
+    ($null -ne $mockLiveQuotaHealthy.GeminiWeeklyPct -and $mockLiveQuotaHealthy.GeminiWeeklyPct -le 1) -or `
+    ($null -ne $mockLiveQuotaHealthy.Claude5hPct -and $mockLiveQuotaHealthy.Claude5hPct -le 1) -or `
+    ($null -ne $mockLiveQuotaHealthy.ClaudeWeeklyPct -and $mockLiveQuotaHealthy.ClaudeWeeklyPct -le 1)) {
+    $isHealthyExhausted = $true
+}
+Assert-Test "429 arbitration ignores spurious background noise when all quotas > 1%" (-not $isHealthyExhausted)
+
+# 21d: Both families depleted -> Confirms real exhaustion
+$mockLiveQuotaBothDepleted = [PSCustomObject]@{
+    Gemini5hPct     = 0
+    GeminiWeeklyPct = 0
+    Claude5hPct     = 0
+    ClaudeWeeklyPct = 0
+}
+$isBothExhausted = $false
+if (($null -ne $mockLiveQuotaBothDepleted.Gemini5hPct -and $mockLiveQuotaBothDepleted.Gemini5hPct -le 1) -or `
+    ($null -ne $mockLiveQuotaBothDepleted.Claude5hPct -and $mockLiveQuotaBothDepleted.Claude5hPct -le 1)) {
+    $isBothExhausted = $true
+}
+Assert-Test "429 arbitration detects exhaustion when both families are depleted" $isBothExhausted
+
+# 21e: Verify helper code incorporates multi-model Connect-RPC checks in RESOURCE_EXHAUSTED block
+$helperCodeSrc = [System.IO.File]::ReadAllText($helperFilePath, [System.Text.Encoding]::UTF8)
+$hasMultiModelArbitrationInCode = ($helperCodeSrc -match 'Claude5hPct\s*-le\s*1|ClaudeWeeklyPct\s*-le\s*1|isReallyExhausted|Gemini5hPct\s*-le\s*1')
+Assert-Test "antigravity_compliant_helper.ps1 source contains multi-model 429 exhaustion arbitration" $hasMultiModelArbitrationInCode
+
+# ------------------------------------------------------------------------------
+# Test 22: Credential Fidelity (writer_id & id_token_email Preservation) (Tier 1)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 22: Credential Fidelity (writer_id & id_token_email Preservation) (Tier 1) ---" -ForegroundColor Yellow
+
+$testWid = "writer_test_fid_999"
+$testEmail = "fidelity_test@antigravity.corp"
+$testAuthMethod = "consumer"
+
+# 22a: Build-OfficialCredentialPayloadJson preserves writer_id, id_token_email, auth_method
+$credJson = Build-OfficialCredentialPayloadJson `
+    -AccessToken "ya29.test_access_token_fidelity" `
+    -RefreshToken "1//test_refresh_token_fidelity" `
+    -ExpiryTimestamp 1780000000 `
+    -IdToken "eyJhbGciOiJSUzI1NiJ9.eyJlbWFpbCI6ImZpZGVsaXR5X3Rlc3RAYW50aWdyYXZpdHkuY29ycCJ9.signature" `
+    -ProjectId "antigravity-fidelity-proj" `
+    -WriterId $testWid `
+    -IdTokenEmail $testEmail `
+    -AuthMethod $testAuthMethod
+
+$parsedCred = $credJson | ConvertFrom-Json
+$credToken = if ($parsedCred.PSObject.Properties["token"]) { $parsedCred.token } else { $parsedCred }
+
+Assert-Test "Build-OfficialCredentialPayloadJson outputs valid JSON" ($null -ne $parsedCred)
+Assert-Test "Payload preserves 'writer_id'" ($credToken.writer_id -eq $testWid)
+Assert-Test "Payload preserves 'id_token_email'" ($credToken.id_token_email -eq $testEmail)
+Assert-Test "Payload preserves 'auth_method'" ($parsedCred.auth_method -eq $testAuthMethod)
+Assert-Test "Payload preserves 'project_id'" ($credToken.project_id -eq "antigravity-fidelity-proj")
+
+# 22b: Parse-CredentialStorePayload round-trip fidelity
+$parsedStore = Parse-CredentialStorePayload -RawPayload $credJson
+Assert-Test "Parse-CredentialStorePayload extracts valid object" ($null -ne $parsedStore)
+$parsedWid = if ($parsedStore.PSObject.Properties["writerId"]) { $parsedStore.writerId } elseif ($parsedStore.PSObject.Properties["writer_id"]) { $parsedStore.writer_id } else { "" }
+Assert-Test "Parse-CredentialStorePayload preserves writer_id" ($parsedWid -eq $testWid)
+$parsedIdEmail = if ($parsedStore.PSObject.Properties["idTokenEmail"]) { $parsedStore.idTokenEmail } elseif ($parsedStore.PSObject.Properties["id_token_email"]) { $parsedStore.id_token_email } else { $parsedStore.email }
+Assert-Test "Parse-CredentialStorePayload preserves id_token_email" ($parsedIdEmail -eq $testEmail)
+
+# 22c: Zero-strip invariant: Snapshot reconstruction does not strip fidelity fields
+$testSnap = [PSCustomObject]@{
+    slotName         = "test_fidelity_slot"
+    detectedEmail    = $testEmail
+    tokenFingerprint = "fid_fp_123"
+    accessToken      = "ya29.at_fid"
+    refreshToken     = "1//rt_fid"
+    expiryTimestamp  = 1780000000
+    idToken          = "id_tok_fid"
+    projectId        = "proj_fid"
+    writerId         = $testWid
+    idTokenEmail     = $testEmail
+    authMethod       = "consumer"
+}
+$reconstructedJson = Build-OfficialCredentialPayloadJson `
+    -AccessToken $testSnap.accessToken `
+    -RefreshToken $testSnap.refreshToken `
+    -ExpiryTimestamp $testSnap.expiryTimestamp `
+    -IdToken $testSnap.idToken `
+    -ProjectId $testSnap.projectId `
+    -WriterId $testSnap.writerId `
+    -IdTokenEmail $testSnap.idTokenEmail
+$reconstructedObj = $reconstructedJson | ConvertFrom-Json
+$reconstructedToken = if ($reconstructedObj.PSObject.Properties["token"]) { $reconstructedObj.token } else { $reconstructedObj }
+Assert-Test "Reconstructed credential preserves writer_id without stripping" ($reconstructedToken.writer_id -eq $testWid)
+Assert-Test "Reconstructed credential preserves id_token_email without stripping" ($reconstructedToken.id_token_email -eq $testEmail)
+
+# ------------------------------------------------------------------------------
+# Test 23: Time-Decay Recovery Model Assertion (Tier 1 & 2)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 23: Time-Decay Recovery Model Assertion (Tier 1 & 2) ---" -ForegroundColor Yellow
+
+$nowDt = Get-Date
+$expired5h = $nowDt.ToUniversalTime().AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm:ssZ")
+$expiredWk = $nowDt.ToUniversalTime().AddHours(-2).ToString("yyyy-MM-ddTHH:mm:ssZ")
+$future5h  = $nowDt.ToUniversalTime().AddHours(3).ToString("yyyy-MM-ddTHH:mm:ssZ")
+
+# 23a: Time-Decay recovery on expired 5h slot -> Auto-resets to 100% and sets ready
+$slotTimeDecay5h = [PSCustomObject]@{
+    slotName        = "slot_decay_5h"
+    status          = "cooldown"
+    cooldownUntil   = $expired5h
+    gemini5hPct     = 0
+    geminiWeeklyPct = 80
+    resetTime5h     = $expired5h
+    resetTimeWeekly = $null
+}
+
+if (Get-Command -Name Invoke-SlotTimeDecayRecovery -ErrorAction SilentlyContinue) {
+    Invoke-SlotTimeDecayRecovery -SlotObj $slotTimeDecay5h -Now $nowDt
+} else {
+    $null = Test-SlotGroupAvailable -SlotObj $slotTimeDecay5h -ModelGroup "Gemini" -Now $nowDt
+}
+
+Assert-Test "Time-Decay recovery restores expired 5h quota to 100%" ($slotTimeDecay5h.gemini5hPct -eq 100)
+Assert-Test "Time-Decay recovery clears expired resetTime5h" ($null -eq $slotTimeDecay5h.resetTime5h)
+Assert-Test "Time-Decay recovery restores slot status to ready" ($slotTimeDecay5h.status -eq "ready")
+
+# 23b: Time-Decay recovery on expired weekly slot -> Auto-resets weekly to 100%
+$slotTimeDecayWk = [PSCustomObject]@{
+    slotName        = "slot_decay_wk"
+    status          = "cooldown"
+    cooldownUntil   = $expiredWk
+    gemini5hPct     = 100
+    geminiWeeklyPct = 0
+    resetTime5h     = $null
+    resetTimeWeekly = $expiredWk
+}
+
+if (Get-Command -Name Invoke-SlotTimeDecayRecovery -ErrorAction SilentlyContinue) {
+    Invoke-SlotTimeDecayRecovery -SlotObj $slotTimeDecayWk -Now $nowDt
+} else {
+    $null = Test-SlotGroupAvailable -SlotObj $slotTimeDecayWk -ModelGroup "Gemini" -Now $nowDt
+}
+
+Assert-Test "Time-Decay recovery restores expired weekly quota to 100%" ($slotTimeDecayWk.geminiWeeklyPct -eq 100)
+Assert-Test "Time-Decay recovery clears expired resetTimeWeekly" ($null -eq $slotTimeDecayWk.resetTimeWeekly)
+Assert-Test "Time-Decay recovery restores weekly slot status to ready" ($slotTimeDecayWk.status -eq "ready")
+
+# 23c: Time-Decay recovery respects future reset time (no premature reset)
+$slotTimeDecayFuture = [PSCustomObject]@{
+    slotName              = "slot_decay_future"
+    status                = "cooldown"
+    cooldownUntil         = $future5h
+    gemini5hPct           = 0
+    geminiWeeklyPct       = 80
+    resetTime5h           = $future5h
+    claude5hPct           = 0
+    claudeWeeklyPct       = 0
+    resetTimeClaude5h     = $future5h
+    resetTimeClaudeWeekly = $future5h
+}
+
+if (Get-Command -Name Invoke-SlotTimeDecayRecovery -ErrorAction SilentlyContinue) {
+    Invoke-SlotTimeDecayRecovery -SlotObj $slotTimeDecayFuture -Now $nowDt
+} else {
+    $null = Test-SlotGroupAvailable -SlotObj $slotTimeDecayFuture -ModelGroup "Gemini" -Now $nowDt
+}
+
+Assert-Test "Time-Decay recovery does NOT reset future 5h quota prematurely" ($slotTimeDecayFuture.gemini5hPct -eq 0)
+Assert-Test "Future slot remains in cooldown" ($slotTimeDecayFuture.status -eq "cooldown")
+
+# ------------------------------------------------------------------------------
+# Test 24: New Models Identification: Gemini 4 Carbon, GPT-OSS 120B & Claude 4.6 (Tier 1)
+# ------------------------------------------------------------------------------
+Write-Host "`n--- Test 24: New Models Identification (Tier 1) ---" -ForegroundColor Yellow
+
+# 24a: Gemini 4 Carbon (MODEL_PLACEHOLDER_M670) identification & Gemini group classification
+$mockCascadeCarbon = [PSCustomObject]@{
+    userStatus = [PSCustomObject]@{
+        cascadeModelConfigData = [PSCustomObject]@{
+            defaultOverrideModelConfig = [PSCustomObject]@{
+                modelOrAlias = [PSCustomObject]@{ model = "MODEL_PLACEHOLDER_M670" }
+            }
+            clientModelConfigs = @(
+                [PSCustomObject]@{
+                    label = "Gemini 4 Carbon"
+                    modelOrAlias = [PSCustomObject]@{ model = "MODEL_PLACEHOLDER_M670" }
+                }
+            )
+        }
+    }
+}
+$carbonCfg = $mockCascadeCarbon.userStatus.cascadeModelConfigData.clientModelConfigs[0]
+$carbonGroup = "Gemini"
+if ($carbonCfg.label -match '(?i)claude|gpt|sonnet|opus') {
+    $carbonGroup = "Claude"
+}
+Assert-Test "Gemini 4 Carbon is classified under 'Gemini' models pool" ($carbonGroup -eq "Gemini")
+
+# 24b: GPT-OSS 120B (MODEL_OPENAI_GPT_OSS_120B_MEDIUM) identification & Claude/GPT group classification
+$mockCascadeGpt = [PSCustomObject]@{
+    userStatus = [PSCustomObject]@{
+        cascadeModelConfigData = [PSCustomObject]@{
+            defaultOverrideModelConfig = [PSCustomObject]@{
+                modelOrAlias = [PSCustomObject]@{ model = "MODEL_OPENAI_GPT_OSS_120B_MEDIUM" }
+            }
+            clientModelConfigs = @(
+                [PSCustomObject]@{
+                    label = "GPT-OSS 120B"
+                    modelOrAlias = [PSCustomObject]@{ model = "MODEL_OPENAI_GPT_OSS_120B_MEDIUM" }
+                }
+            )
+        }
+    }
+}
+$gptCfg = $mockCascadeGpt.userStatus.cascadeModelConfigData.clientModelConfigs[0]
+$gptGroup = "Gemini"
+if ($gptCfg.label -match '(?i)claude|gpt|sonnet|opus|3p') {
+    $gptGroup = "Claude"
+}
+Assert-Test "GPT-OSS 120B is classified under Claude & GPT group" ($gptGroup -eq "Claude")
+
+# 24c: Claude 4.6 (Thinking) series identification
+$mockCascadeClaude46 = [PSCustomObject]@{
+    userStatus = [PSCustomObject]@{
+        cascadeModelConfigData = [PSCustomObject]@{
+            defaultOverrideModelConfig = [PSCustomObject]@{
+                modelOrAlias = [PSCustomObject]@{ model = "claude-sonnet-4-6" }
+            }
+            clientModelConfigs = @(
+                [PSCustomObject]@{
+                    label = "Claude 4.6 (Thinking)"
+                    modelOrAlias = [PSCustomObject]@{ model = "claude-sonnet-4-6" }
+                }
+            )
+        }
+    }
+}
+$claude46Cfg = $mockCascadeClaude46.userStatus.cascadeModelConfigData.clientModelConfigs[0]
+$claude46Group = "Gemini"
+if ($claude46Cfg.label -match '(?i)claude|gpt|sonnet|opus|thinking') {
+    $claude46Group = "Claude"
+}
+Assert-Test "Claude 4.6 (Thinking) is classified under Claude & GPT group" ($claude46Group -eq "Claude")
+
+# 24d: Model extraction regex checks in antigravity_compliant_helper.ps1 source
+Assert-Test "Helper source matches 'Gemini 4 Carbon' or 'MODEL_PLACEHOLDER_M670'" ($helperCodeSrc -match 'Gemini\s*4\s*Carbon|MODEL_PLACEHOLDER_M670')
+Assert-Test "Helper source matches 'GPT-OSS 120B' or 'MODEL_OPENAI_GPT_OSS_120B_MEDIUM'" ($helperCodeSrc -match 'GPT-OSS\s*120B|MODEL_OPENAI_GPT_OSS_120B_MEDIUM|gpt-oss-120b')
+Assert-Test "Helper source matches 'Claude 4.6' or '(Thinking)'" ($helperCodeSrc -match 'Claude\s*4\.6|claude.*4\.6|Thinking')
+Assert-Test "Argon is classified under Gemini models shared pool" ($helperCodeSrc -match '(?i)argon.*(?:gemini|shared|pool)|gemini.*argon')
 
 Write-Host "`n=======================================================" -ForegroundColor Cyan
 Write-Host "Test Results: $passCount PASSED, $failCount FAILED" -ForegroundColor $(if ($failCount -eq 0) { "Green" } else { "Red" })

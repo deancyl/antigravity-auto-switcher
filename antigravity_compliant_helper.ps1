@@ -2148,6 +2148,33 @@ function Parse-CredentialStorePayload {
 
         $email = Decode-JwtEmail -Jwt $idt
 
+        # 凭据保真：完整保留 id_token_email, writer_id, auth_method (Credential Fidelity)
+        $authMethod = if ($obj.PSObject.Properties["auth_method"] -and $obj.auth_method) {
+            [string]$obj.auth_method
+        } elseif ($tokenNode.PSObject.Properties["auth_method"] -and $tokenNode.auth_method) {
+            [string]$tokenNode.auth_method
+        } else {
+            "consumer"
+        }
+
+        $idTokenEmail = if ($obj.PSObject.Properties["id_token_email"] -and $obj.id_token_email) {
+            [string]$obj.id_token_email
+        } elseif ($tokenNode.PSObject.Properties["id_token_email"] -and $tokenNode.id_token_email) {
+            [string]$tokenNode.id_token_email
+        } elseif ($email) {
+            $email
+        } else {
+            ""
+        }
+
+        $writerId = if ($obj.PSObject.Properties["writer_id"] -and $obj.writer_id) {
+            [string]$obj.writer_id
+        } elseif ($tokenNode.PSObject.Properties["writer_id"] -and $tokenNode.writer_id) {
+            [string]$tokenNode.writer_id
+        } else {
+            ""
+        }
+
         return [PSCustomObject]@{
 
             accessToken     = $at
@@ -2161,6 +2188,18 @@ function Parse-CredentialStorePayload {
             projectId       = $pidVal
 
             email           = $email
+
+            idTokenEmail    = $idTokenEmail
+
+            id_token_email  = $idTokenEmail
+
+            writerId        = $writerId
+
+            writer_id       = $writerId
+
+            authMethod      = $authMethod
+
+            auth_method     = $authMethod
 
             fingerprint     = (Get-StringFingerprint -Text $(if ($rt) { $rt } else { $at }))
 
@@ -2186,7 +2225,13 @@ function Build-OfficialCredentialPayloadJson {
 
         [string]$IdToken = "",
 
-        [string]$ProjectId = ""
+        [string]$ProjectId = "",
+
+        [string]$IdTokenEmail = "",
+
+        [string]$WriterId = "",
+
+        [string]$AuthMethod = "consumer"
 
     )
 
@@ -2218,11 +2263,38 @@ function Build-OfficialCredentialPayloadJson {
 
     }
 
+    # 凭据保真：绝不剔除 writer_id 与 id_token_email
+    if (-not [string]::IsNullOrWhiteSpace($IdTokenEmail)) {
+
+        $tokenMap["id_token_email"] = $IdTokenEmail
+
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($WriterId)) {
+
+        $tokenMap["writer_id"] = $WriterId
+
+    }
+
+    $finalAuthMethod = if (-not [string]::IsNullOrWhiteSpace($AuthMethod)) { $AuthMethod } else { "consumer" }
+
     $rootMap = [ordered]@{
 
         token       = $tokenMap
 
-        auth_method = "consumer"
+        auth_method = $finalAuthMethod
+
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($IdTokenEmail)) {
+
+        $rootMap["id_token_email"] = $IdTokenEmail
+
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($WriterId)) {
+
+        $rootMap["writer_id"] = $WriterId
 
     }
 
@@ -2294,6 +2366,24 @@ function Get-RunningAntigravityProcesses {
         $_.ProcessName -match '^(?i)(Antigravity|agy)$'
 
     })
+
+    if ($all.Count -eq 0) { return @() }
+
+    # SIDECAR PROCESS PROTECTION: 保护 sidecar 进程 (含 --import=...sidecar_sdk)，防止重启与轮换时被误杀
+    $sidecarPids = [System.Collections.Generic.HashSet[int]]::new()
+    try {
+        $cimProcs = @(Get-CimInstance Win32_Process -Filter "Name LIKE 'Antigravity%' OR Name LIKE 'agy%'" -ErrorAction SilentlyContinue)
+        foreach ($cp in $cimProcs) {
+            if ($cp.CommandLine -match '(?i)--import=.*sidecar_sdk|sidecar_sdk') {
+                [void]$sidecarPids.Add([int]$cp.ProcessId)
+            }
+        }
+    } catch {}
+
+    if ($sidecarPids.Count -gt 0) {
+        $filtered = @($all | Where-Object { -not $sidecarPids.Contains($_.Id) })
+        return $filtered
+    }
 
     return $all
 
@@ -3840,7 +3930,11 @@ function Save-CredentialSlot {
 
     }
 
-    $normalizedWinCred = Build-OfficialCredentialPayloadJson -AccessToken $at -RefreshToken $rt -ExpiryTimestamp $expSec -IdToken $idt -ProjectId $pidVal
+    $idtEmail = if ($winParse.idTokenEmail) { $winParse.idTokenEmail } else { $email }
+    $writerId = if ($winParse.writerId) { $winParse.writerId } else { "" }
+    $authMethod = if ($winParse.authMethod) { $winParse.authMethod } else { "consumer" }
+
+    $normalizedWinCred = Build-OfficialCredentialPayloadJson -AccessToken $at -RefreshToken $rt -ExpiryTimestamp $expSec -IdToken $idt -ProjectId $pidVal -IdTokenEmail $idtEmail -WriterId $writerId -AuthMethod $authMethod
 
     $cliTokenRaw = if (Test-Path $AgyCliTokenPath) { Read-Utf8StripBom -Path $AgyCliTokenPath } else { $normalizedWinCred }
 
@@ -3869,6 +3963,12 @@ function Save-CredentialSlot {
         idToken          = $idt
 
         projectId        = $pidVal
+
+        idTokenEmail     = $idtEmail
+
+        writerId         = $writerId
+
+        authMethod       = $authMethod
 
         windowsCred      = $normalizedWinCred
 
@@ -3952,9 +4052,53 @@ function Write-AllStoresForSnapshot {
         $expSec = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 3600
     }
 
-    # 1. 构造标准 Windows 凭据载荷
+    # 凭据保真传承 (Credential Fidelity): 提取并保留 writer_id, id_token_email, auth_method
+    $existingWinCredRaw = $null
+    try { $existingWinCredRaw = [AntigravityCompliantHelper.NativeVaultV4]::ReadGenericCredential($CredTarget) } catch {}
+    $existingParsed = if ($existingWinCredRaw) { Parse-CredentialStorePayload -RawPayload $existingWinCredRaw } else { $null }
+
+    $snapCredParsed = if ($Snapshot.PSObject.Properties["windowsCred"] -and $Snapshot.windowsCred) {
+        Parse-CredentialStorePayload -RawPayload ([string]$Snapshot.windowsCred)
+    } else { $null }
+
+    $idtEmail = ""
+    if ($Snapshot.PSObject.Properties["idTokenEmail"] -and $Snapshot.idTokenEmail) {
+        $idtEmail = [string]$Snapshot.idTokenEmail
+    } elseif ($Snapshot.PSObject.Properties["id_token_email"] -and $Snapshot.id_token_email) {
+        $idtEmail = [string]$Snapshot.id_token_email
+    } elseif ($snapCredParsed -and $snapCredParsed.idTokenEmail) {
+        $idtEmail = [string]$snapCredParsed.idTokenEmail
+    } elseif ($existingParsed -and $existingParsed.idTokenEmail) {
+        $idtEmail = [string]$existingParsed.idTokenEmail
+    } elseif ($email) {
+        $idtEmail = $email
+    }
+
+    $writerId = ""
+    if ($Snapshot.PSObject.Properties["writerId"] -and $Snapshot.writerId) {
+        $writerId = [string]$Snapshot.writerId
+    } elseif ($Snapshot.PSObject.Properties["writer_id"] -and $Snapshot.writer_id) {
+        $writerId = [string]$Snapshot.writer_id
+    } elseif ($snapCredParsed -and $snapCredParsed.writerId) {
+        $writerId = [string]$snapCredParsed.writerId
+    } elseif ($existingParsed -and $existingParsed.writerId) {
+        $writerId = [string]$existingParsed.writerId
+    }
+
+    $authMethod = "consumer"
+    if ($Snapshot.PSObject.Properties["authMethod"] -and $Snapshot.authMethod) {
+        $authMethod = [string]$Snapshot.authMethod
+    } elseif ($Snapshot.PSObject.Properties["auth_method"] -and $Snapshot.auth_method) {
+        $authMethod = [string]$Snapshot.auth_method
+    } elseif ($snapCredParsed -and $snapCredParsed.authMethod) {
+        $authMethod = [string]$snapCredParsed.authMethod
+    } elseif ($existingParsed -and $existingParsed.authMethod) {
+        $authMethod = [string]$existingParsed.authMethod
+    }
+
+    # 1. 构造标准 Windows 凭据载荷 (严格保真传承字段，绝不剥离)
     $winCredPayload = if (-not [string]::IsNullOrWhiteSpace($at) -and -not [string]::IsNullOrWhiteSpace($rt)) {
-        Build-OfficialCredentialPayloadJson -AccessToken $at -RefreshToken $rt -ExpiryTimestamp $expSec -IdToken $idt -ProjectId $pidVal
+        Build-OfficialCredentialPayloadJson -AccessToken $at -RefreshToken $rt -ExpiryTimestamp $expSec -IdToken $idt -ProjectId $pidVal -IdTokenEmail $idtEmail -WriterId $writerId -AuthMethod $authMethod
     } else {
         [string]$Snapshot.windowsCred
     }
@@ -4501,7 +4645,7 @@ function Ensure-SlotObjectSchema {
         resetTimeClaude5h     = $null
         resetTimeClaudeWeekly = $null
         supportedModels       = @()
-        supportsArgon         = $false
+        supportsArgon         = $true
         planName              = $null
         lastQuotaSyncAt       = $null
 
@@ -4589,6 +4733,141 @@ function Save-SlotPoolState {
                 Start-Sleep -Milliseconds 60
             }
         }
+    }
+}
+
+# ============================================================================
+# 3. 时间衰减恢复引擎 (Time-Decay Quota Recovery Engine)
+# 当物理时间超越 resetTime5h 或 resetTimeWeekly 时，自动恢复槽位配额为 100% 并标记 ready，
+# 彻底解决离线槽位请求 Google 403 云端阻断的问题。
+# ============================================================================
+
+function Invoke-SlotTimeDecayRecovery {
+    param(
+        $SlotObj = $null,
+        $State = $null,
+        [DateTime]$Now = (Get-Date)
+    )
+    if ($SlotObj) {
+        Ensure-SlotObjectSchema -SlotObj $SlotObj
+
+        # 1. Gemini 5h 配额衰减恢复
+        $rt5 = Get-SafeProp $SlotObj "resetTime5h"
+        if ($rt5) {
+            try {
+                $rtDt = ConvertTo-LocalDateTime $rt5
+                if ($Now -ge $rtDt) {
+                    Set-SafeProp $SlotObj "gemini5hPct" 100
+                    Set-SafeProp $SlotObj "resetTime5h" $null
+                }
+            } catch {
+                Set-SafeProp $SlotObj "resetTime5h" $null
+            }
+        }
+
+        # 2. Gemini 周配额衰减恢复
+        $rtGw = Get-SafeProp $SlotObj "resetTimeWeekly"
+        if ($rtGw) {
+            try {
+                $rtDt = ConvertTo-LocalDateTime $rtGw
+                if ($Now -ge $rtDt) {
+                    Set-SafeProp $SlotObj "geminiWeeklyPct" 100
+                    Set-SafeProp $SlotObj "resetTimeWeekly" $null
+                }
+            } catch {
+                Set-SafeProp $SlotObj "resetTimeWeekly" $null
+            }
+        }
+
+        # 3. Claude 5h 配额衰减恢复
+        $rtC5 = Get-SafeProp $SlotObj "resetTimeClaude5h"
+        if ($rtC5) {
+            try {
+                $rtDt = ConvertTo-LocalDateTime $rtC5
+                if ($Now -ge $rtDt) {
+                    Set-SafeProp $SlotObj "claude5hPct" 100
+                    Set-SafeProp $SlotObj "resetTimeClaude5h" $null
+                }
+            } catch {
+                Set-SafeProp $SlotObj "resetTimeClaude5h" $null
+            }
+        }
+
+        # 4. Claude 周配额衰减恢复
+        $rtCw = Get-SafeProp $SlotObj "resetTimeClaudeWeekly"
+        if ($rtCw) {
+            try {
+                $rtDt = ConvertTo-LocalDateTime $rtCw
+                if ($Now -ge $rtDt) {
+                    Set-SafeProp $SlotObj "claudeWeeklyPct" 100
+                    Set-SafeProp $SlotObj "resetTimeClaudeWeekly" $null
+                }
+            } catch {
+                Set-SafeProp $SlotObj "resetTimeClaudeWeekly" $null
+            }
+        }
+
+        # 5. Argon 配额衰减恢复 (Gemini models 共享池)
+        $rtAr = Get-SafeProp $SlotObj "resetTimeArgon"
+        if ($rtAr) {
+            try {
+                $rtDt = ConvertTo-LocalDateTime $rtAr
+                if ($Now -ge $rtDt) {
+                    Set-SafeProp $SlotObj "argonWeeklyPct" 100
+                    Set-SafeProp $SlotObj "resetTimeArgon" $null
+                }
+            } catch {
+                Set-SafeProp $SlotObj "resetTimeArgon" $null
+            }
+        }
+
+        # 6. 检查冷却时间并解除限额冷却 (Thaw)
+        $cdUntil = Get-SafeProp $SlotObj "cooldownUntil"
+        $isThawed = $false
+        if ($cdUntil) {
+            try {
+                $cdDt = ConvertTo-LocalDateTime $cdUntil
+                if ($Now -ge $cdDt) { $isThawed = $true }
+            } catch { $isThawed = $true }
+        }
+
+        $g5Ok = ($null -eq $SlotObj.gemini5hPct -or (ConvertTo-SafeInt $SlotObj.gemini5hPct) -gt 1)
+        $gwOk = ($null -eq $SlotObj.geminiWeeklyPct -or (ConvertTo-SafeInt $SlotObj.geminiWeeklyPct) -gt 1)
+        $c5Ok = ($null -eq $SlotObj.claude5hPct -or (ConvertTo-SafeInt $SlotObj.claude5hPct) -gt 1)
+        $cwOk = ($null -eq $SlotObj.claudeWeeklyPct -or (ConvertTo-SafeInt $SlotObj.claudeWeeklyPct) -gt 1)
+
+        $gemRecovered = $g5Ok -and $gwOk -and (-not $SlotObj.resetTime5h) -and (-not $SlotObj.resetTimeWeekly)
+        $claRecovered = $c5Ok -and $cwOk -and (-not $SlotObj.resetTimeClaude5h) -and (-not $SlotObj.resetTimeClaudeWeekly)
+
+        if ($SlotObj.status -eq "cooldown" -and ($isThawed -or $gemRecovered -or $claRecovered)) {
+            Set-SafeProp $SlotObj "status" "ready"
+            Set-SafeProp $SlotObj "cooldownUntil" $null
+            Set-SafeProp $SlotObj "cooldownType" "none"
+        }
+
+        return $SlotObj
+    }
+
+    if ($State -and $State.slots) {
+        $currSlotName = [string]$State.currentSlot
+        $isDirty = $false
+        foreach ($prop in $State.slots.PSObject.Properties) {
+            $sObj = $prop.Value
+            $oldStatus = [string]$sObj.status
+            $oldG5 = $sObj.gemini5hPct
+            $oldGw = $sObj.geminiWeeklyPct
+            [void](Invoke-SlotTimeDecayRecovery -SlotObj $sObj -Now $Now)
+            if ($prop.Name -eq $currSlotName -and $sObj.status -eq "ready") {
+                Set-SafeProp $sObj "status" "active"
+            }
+            if ($sObj.status -ne $oldStatus -or $sObj.gemini5hPct -ne $oldG5 -or $sObj.geminiWeeklyPct -ne $oldGw) {
+                $isDirty = $true
+            }
+        }
+        if ($isDirty) {
+            Save-SlotPoolState -State $State
+        }
+        return $State
     }
 }
 
@@ -4854,6 +5133,9 @@ function Get-SlotPoolState {
             }
 
         }
+
+        # 触发物理时间衰减恢复引擎 (Time-Decay Recovery Engine)
+        [void](Invoke-SlotTimeDecayRecovery -SlotObj $slot -Now $now)
 
         # 若槽位的 5h 重置时间已过、或剩余 100% 满额未消耗、或被历史周限额时间戳 (>5.5h) 污染，自动清理
         $rt5 = Get-SafeProp $slot "resetTime5h"
@@ -5231,11 +5513,14 @@ function Parse-QuotaSummaryPayload {
         $hasArgonInConfigs = $false
         foreach ($cfg in $configs) {
             $lbl = if ($cfg.PSObject.Properties["label"]) { [string]$cfg.label } else { "" }
+            # MODEL SPECIFICATION ALIGNMENT: 识别 Gemini 4 Carbon (MODEL_PLACEHOLDER_M670), GPT-OSS 120B (MODEL_OPENAI_GPT_OSS_120B_MEDIUM), Claude 4.6 (Thinking)
             if ($lbl -match '(?i)gemini\s*3\.8\s*flash' -and (-not $supportedModels.Contains("Gemini 3.8 Flash"))) { $supportedModels.Add("Gemini 3.8 Flash") }
             elseif ($lbl -match '(?i)gemini\s*2\.5\s*pro' -and (-not $supportedModels.Contains("Gemini 2.5 Pro"))) { $supportedModels.Add("Gemini 2.5 Pro") }
+            elseif (($lbl -match '(?i)gemini\s*4\s*carbon|carbon|MODEL_PLACEHOLDER_M670') -and (-not $supportedModels.Contains("Gemini 4 Carbon"))) { $supportedModels.Add("Gemini 4 Carbon") }
             elseif ($lbl -match '(?i)claude.*5\.5' -and (-not $supportedModels.Contains("Claude 5.5"))) { $supportedModels.Add("Claude 5.5"); $hasArgonInConfigs = $true }
+            elseif ($lbl -match '(?i)claude.*4\.6.*thinking' -and (-not $supportedModels.Contains("Claude 4.6 (Thinking)"))) { $supportedModels.Add("Claude 4.6 (Thinking)") }
             elseif ($lbl -match '(?i)claude.*4\.6' -and (-not $supportedModels.Contains("Claude 4.6"))) { $supportedModels.Add("Claude 4.6") }
-            elseif ($lbl -match '(?i)gpt-oss\s*120b' -and (-not $supportedModels.Contains("GPT-OSS 120B"))) { $supportedModels.Add("GPT-OSS 120B") }
+            elseif (($lbl -match '(?i)gpt-oss\s*120b|gpt-oss-120b|MODEL_OPENAI_GPT_OSS_120B_MEDIUM') -and (-not $supportedModels.Contains("GPT-OSS 120B"))) { $supportedModels.Add("GPT-OSS 120B") }
             elseif ($lbl -match '(?i)argon' -and (-not $supportedModels.Contains("Gemini 4 Argon"))) { $supportedModels.Add("Gemini 4 Argon"); $hasArgonInConfigs = $true }
 
             if (-not $cfg.PSObject.Properties["quotaInfo"] -or (-not $cfg.quotaInfo)) { continue }
@@ -5271,7 +5556,7 @@ function Parse-QuotaSummaryPayload {
                         else { if (-not $resetWeekly) { $resetWeekly = $rt } }
                     }
                 }
-            } elseif ($lbl -match '(?i)gemini.*pro|gemini') {
+            } elseif ($lbl -match '(?i)gemini.*pro|gemini.*carbon|carbon|gemini|MODEL_PLACEHOLDER_M670') {
                 if ($null -eq $gemProPct -or $pct -lt $gemProPct) {
                     $gemProPct = $pct
                     if ($rt -and $pct -lt 100) {
@@ -5279,7 +5564,7 @@ function Parse-QuotaSummaryPayload {
                         else { if (-not $resetWeekly) { $resetWeekly = $rt } }
                     }
                 }
-            } elseif ($lbl -match '(?i)claude|gpt') {
+            } elseif ($lbl -match '(?i)claude|gpt|MODEL_OPENAI_GPT_OSS_120B_MEDIUM|thinking') {
                 if ($null -eq $minClaudePct -or $pct -lt $minClaudePct) {
                     $minClaudePct = $pct
                     if ($rt -and $pct -lt 100) {
@@ -5289,7 +5574,8 @@ function Parse-QuotaSummaryPayload {
                 }
             }
         }
-        if ($null -eq $supportsArgon) { $supportsArgon = $hasArgonInConfigs }
+        # Argon 严格归入 Gemini 共享池 (Gemini models shared pool)，默认均支持
+        if ($null -eq $supportsArgon) { $supportsArgon = $true }
         if ($null -eq $argonWeekly -and $null -ne $minArgonPct) { $argonWeekly = $minArgonPct }
         if ($null -eq $gemini5h) {
             if ($null -ne $gemFlashPct -and $null -ne $gemProPct) {
@@ -5317,17 +5603,22 @@ function Parse-QuotaSummaryPayload {
             $dName = if ($mVal.PSObject.Properties["displayName"] -and $mVal.displayName) { [string]$mVal.displayName } else { $mProp.Name }
             if ([string]::IsNullOrWhiteSpace($dName) -or $mProp.Name -match '(?i)tab_|lite|autocomplete|embed') { continue }
 
+            # MODEL SPECIFICATION ALIGNMENT: fetchAvailableModels 模型提取与识别
             if ($dName -match '(?i)gemini\s*3\.8\s*flash' -or $mProp.Name -match '(?i)gemini-3\.8-flash') {
                 if (-not $supportedModels.Contains("Gemini 3.8 Flash")) { $supportedModels.Add("Gemini 3.8 Flash") }
             } elseif ($dName -match '(?i)gemini\s*2\.5\s*pro' -or $mProp.Name -match '(?i)gemini-2\.5-pro') {
                 if (-not $supportedModels.Contains("Gemini 2.5 Pro")) { $supportedModels.Add("Gemini 2.5 Pro") }
+            } elseif ($dName -match '(?i)gemini\s*4\s*carbon|carbon' -or $mProp.Name -match '(?i)gemini-4-carbon|MODEL_PLACEHOLDER_M670') {
+                if (-not $supportedModels.Contains("Gemini 4 Carbon")) { $supportedModels.Add("Gemini 4 Carbon") }
             } elseif ($dName -match '(?i)claude.*5\.5' -or $mProp.Name -match '(?i)claude-.*-5-5') {
                 if (-not $supportedModels.Contains("Claude 5.5")) { $supportedModels.Add("Claude 5.5") }
                 if (-not $supportedModels.Contains("Gemini 4 Argon")) { $supportedModels.Add("Gemini 4 Argon") }
                 $hasArgonInModels = $true
+            } elseif ($dName -match '(?i)claude.*4\.6.*thinking' -or $mProp.Name -match '(?i)claude-.*-4-6.*thinking') {
+                if (-not $supportedModels.Contains("Claude 4.6 (Thinking)")) { $supportedModels.Add("Claude 4.6 (Thinking)") }
             } elseif ($dName -match '(?i)claude.*4\.6' -or $mProp.Name -match '(?i)claude-.*-4-6') {
                 if (-not $supportedModels.Contains("Claude 4.6")) { $supportedModels.Add("Claude 4.6") }
-            } elseif ($dName -match '(?i)gpt-oss\s*120b' -or $mProp.Name -match '(?i)gpt-oss-120b') {
+            } elseif ($dName -match '(?i)gpt-oss\s*120b' -or $mProp.Name -match '(?i)gpt-oss-120b|MODEL_OPENAI_GPT_OSS_120B_MEDIUM') {
                 if (-not $supportedModels.Contains("GPT-OSS 120B")) { $supportedModels.Add("GPT-OSS 120B") }
             } elseif ($dName -match '(?i)argon' -or $mProp.Name -match '(?i)argon') {
                 if (-not $supportedModels.Contains("Gemini 4 Argon")) { $supportedModels.Add("Gemini 4 Argon") }
@@ -5377,7 +5668,7 @@ function Parse-QuotaSummaryPayload {
                 }
             }
         }
-        if ($null -eq $supportsArgon) { $supportsArgon = $hasArgonInModels }
+        if ($null -eq $supportsArgon) { $supportsArgon = $true }
         if ($null -eq $argonWeekly -and $null -ne $minArg) { $argonWeekly = $minArg }
         if ($null -eq $gemini5h -and $null -ne $minGem) { $gemini5h = $minGem }
         if ($null -eq $claude5h -and $null -ne $minCla) { $claude5h = $minCla }
@@ -5713,16 +6004,13 @@ function Apply-QuotaSnapshotToSlotObject {
 
     $arRaw = Get-SafeProp $QuotaSnap "ArgonWeeklyPct"
     $ar = ConvertTo-SafeInt $arRaw -Default -1
-    $supArgon = [bool](Get-SafeProp $QuotaSnap "SupportsArgon" $false)
+    # MODEL SPECIFICATION ALIGNMENT: Classify Argon under Gemini models shared pool so it never shows "unsupported"
+    Set-SafeProp $SlotObj "supportsArgon" $true
     if ($ar -ge 0) {
         Set-SafeProp $SlotObj "argonWeeklyPct" $ar
-        Set-SafeProp $SlotObj "supportsArgon" $true
-    } elseif (-not $supArgon) {
-        # 明确不支持 Argon 时清空残留的虚假 Argon 数据（修复槽位 b 误报 Argon 的问题）
+    } else {
+        # 无独立 Argon 桶时归入 Gemini 共享池，继承 Gemini 周配额
         Set-SafeProp $SlotObj "argonWeeklyPct" $null
-        Set-SafeProp $SlotObj "resetTimeArgon" $null
-        Set-SafeProp $SlotObj "resetTimeArgonWeekly" $null
-        Set-SafeProp $SlotObj "supportsArgon" $false
     }
 
     $c5Raw = Get-SafeProp $QuotaSnap "Claude5hPct"
@@ -5925,11 +6213,25 @@ function Get-CurrentActiveModelInfo {
                         if ($matchedCfg) {
                             $lbl = [string]$matchedCfg.label
                             $mId = [string]$matchedCfg.modelOrAlias.model
+                            # 宏观双族对齐：Argon 归入 Gemini 模型共享池 (Gemini models shared pool)
                             $grp = "Gemini"
-                            if ($lbl -match '(?i)argon') {
-                                $grp = "Argon"
+                            if ($mId -eq "MODEL_PLACEHOLDER_M670" -or $lbl -match '(?i)carbon') {
+                                $grp = "Gemini"
+                                if ([string]::IsNullOrWhiteSpace($lbl) -or $lbl -match '(?i)placeholder') { $lbl = "Gemini 4 Carbon" }
+                            } elseif ($mId -eq "MODEL_OPENAI_GPT_OSS_120B_MEDIUM" -or $lbl -match '(?i)gpt-oss\s*120b') {
+                                $grp = "Claude"
+                                if ([string]::IsNullOrWhiteSpace($lbl) -or $lbl -match '(?i)placeholder') { $lbl = "GPT-OSS 120B" }
+                            } elseif ($lbl -match '(?i)claude.*4\.6.*thinking') {
+                                $grp = "Claude"
+                                if ([string]::IsNullOrWhiteSpace($lbl) -or $lbl -match '(?i)placeholder') { $lbl = "Claude 4.6 (Thinking)" }
+                            } elseif ($lbl -match '(?i)argon') {
+                                # Argon 归入 Gemini 共享池 (Gemini models shared pool)，不单独拆立不可达模型组
+                                $grp = "Gemini"
+                                if ([string]::IsNullOrWhiteSpace($lbl) -or $lbl -match '(?i)placeholder') { $lbl = "Gemini 4 Argon" }
                             } elseif ($lbl -match '(?i)claude|sonnet|opus|gpt|3p') {
                                 $grp = "Claude"
+                            } else {
+                                $grp = "Gemini"
                             }
                             $ret = [PSCustomObject]@{
                                 ModelId   = $mId
@@ -5972,27 +6274,18 @@ function Test-SlotGroupAvailable {
     if (-not $SlotObj) { return $false }
     Ensure-SlotObjectSchema -SlotObj $SlotObj
 
-    if ($ModelGroup -eq "Argon") {
-        # 1. 冷却重置优先检测：必须先检测是否到达重置时间 (resetTimeArgon) 并执行自动解冻 (恢复为 100%)
-        $rtAr = Get-SafeProp $SlotObj "resetTimeArgon"
-        if ($rtAr) {
-            $thaw = ConvertTo-LocalDateTime $rtAr
-            if ($thaw -and $Now -ge $thaw) {
-                Set-SafeProp $SlotObj "argonWeeklyPct" 100
-                Set-SafeProp $SlotObj "resetTimeArgon" $null
-                if ($SlotObj.status -eq "cooldown") {
-                    Set-SafeProp $SlotObj "status" "ready"
-                    Set-SafeProp $SlotObj "cooldownUntil" $null
-                }
-            }
-        }
+    # 优先执行物理时间衰减恢复 (Time-Decay Recovery)
+    [void](Invoke-SlotTimeDecayRecovery -SlotObj $SlotObj -Now $Now)
 
-        # 2. 权限检测：若该账号无 argonWeeklyPct 字段或为 --/空，表示未开通 Argon 权限
+    if ($ModelGroup -eq "Argon") {
+        # Argon 属于 Gemini 模型共享池 (Gemini models shared pool)
         $arRaw = Get-SafeProp $SlotObj "argonWeeklyPct"
         $arVal = ConvertTo-SafeInt $arRaw -Default -1
-        if ($arVal -lt 0) { return $false }
+        # 若无独立 Argon 配额，则回退至 Gemini 共享池进行判定，绝不报不支持
+        if ($arVal -lt 0) {
+            return (Test-SlotGroupAvailable -SlotObj $SlotObj -ModelGroup "Gemini" -Now $Now)
+        }
 
-        # 3. 额度检测：若额度 <= 1%，且冷却倒计时仍在未来，视为限额冷却中
         if ($arVal -le 1) {
             $rtArCheck = Get-SafeProp $SlotObj "resetTimeArgon"
             if ($rtArCheck) {
@@ -6116,8 +6409,13 @@ function Test-SlotNeedsLiveVerify {
         return $true
     }
     if ($ModelGroup -eq "Argon") {
+        # Argon 属于 Gemini 共享池 (Gemini models shared pool)
         $ar = Get-SafeProp $SlotObj "argonWeeklyPct"
-        if ($null -eq $ar -or ([string]$ar).Trim() -eq "") { return $true }
+        if ($null -eq $ar -or ([string]$ar).Trim() -eq "") {
+            $gw = Get-SafeProp $SlotObj "geminiWeeklyPct"
+            if ($null -eq $gw -or ([string]$gw).Trim() -eq "") { return $true }
+            return $false
+        }
     } elseif ($ModelGroup -eq "Claude") {
         $c5 = Get-SafeProp $SlotObj "claude5hPct"
         $cw = Get-SafeProp $SlotObj "claudeWeeklyPct"
@@ -7181,7 +7479,9 @@ function Invoke-DaemonMonitorWorkerLoop {
 
         $now = Get-Date
 
+        # 3. TIME-DECAY QUOTA ENGINE: 守护主循环执行物理时间衰减恢复，解除 offline 槽位 Google 403 云端阻断
         $pool = Get-SlotPoolState
+        $pool = Invoke-SlotTimeDecayRecovery -State $pool -Now $now
 
         $currSlot = [string]$pool.currentSlot
 
@@ -7378,30 +7678,67 @@ function Invoke-DaemonMonitorWorkerLoop {
                         $matchedText = $Matches[0]
                         $now = Get-Date
                         if (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds) {
-                            $activeGrp = Get-CurrentActiveModelGroup
-                            # 强制先检查本地 RPC 当前活跃模型组真实配额，若剩余配额 > 1% 则直接忽略，严防因后台子任务报错误判切号
-                            $liveLocalQuota = Get-LocalLanguageServerQuota
-                            $isReallyExhausted = $true
-                            if ($liveLocalQuota) {
-                                if ($activeGrp -eq "Argon") {
-                                    if ($null -ne $liveLocalQuota.ArgonWeeklyPct -and $liveLocalQuota.ArgonWeeklyPct -gt 1) { $isReallyExhausted = $false }
-                                } elseif ($activeGrp -eq "Claude") {
-                                    if (($null -ne $liveLocalQuota.Claude5hPct -and $liveLocalQuota.Claude5hPct -gt 1) -and ($null -ne $liveLocalQuota.ClaudeWeeklyPct -and $liveLocalQuota.ClaudeWeeklyPct -gt 1)) { $isReallyExhausted = $false }
-                                } else {
-                                    if (($null -ne $liveLocalQuota.Gemini5hPct -and $liveLocalQuota.Gemini5hPct -gt 1) -and ($null -ne $liveLocalQuota.GeminiWeeklyPct -and $liveLocalQuota.GeminiWeeklyPct -gt 1)) { $isReallyExhausted = $false }
-                                }
+                            # 1. 429 DEADLOCK FIX: 实时查询本地 Connect-RPC，检查实际耗尽的模型族，严防静态模型组误判导致的 429 死锁
+                            $liveLocalQuota = Get-LocalLanguageServerQuota -ForceRefresh
+                            if (-not $liveLocalQuota) {
+                                $liveLocalQuota = Get-LocalLanguageServerQuota
                             }
-                            if ($isReallyExhausted) {
-                                if (($now - $lastSwitchTime).TotalSeconds -ge $debounceSeconds) {
-                                    $Script:PendingIdleSwitchNoticeSent = $false
-                                    $lastSwitchTime = $now
-                                    $reasonStr = "系统日志捕获限额特征且本地配额已见底 (<=1%): '$matchedText' (来源: $([System.IO.Path]::GetFileName($filePath)))"
-                                    Write-DaemonLog $reasonStr 'WARN'
-                                    [void](Switch-ToNextAvailableSlot -Reason $reasonStr -AutoRestartApp:$true -TargetModelGroup $activeGrp)
-                                    continue
+                            $activeGrp = Get-CurrentActiveModelGroup
+
+                            $isReallyExhausted = $false
+                            $depletedFamily = $null
+                            $exhaustReason = ""
+
+                            if ($liveLocalQuota) {
+                                # 检测 Claude/GPT 族是否耗尽或禁用 (<= 1% 或 disabled)
+                                $claudeExhausted = ($null -ne $liveLocalQuota.Claude5hPct -and $liveLocalQuota.Claude5hPct -le 1) -or
+                                                   ($null -ne $liveLocalQuota.ClaudeWeeklyPct -and $liveLocalQuota.ClaudeWeeklyPct -le 1) -or
+                                                   $liveLocalQuota.IsClaude5hExhausted -or
+                                                   $liveLocalQuota.IsClaudeWeeklyExhausted -or
+                                                   $liveLocalQuota.Claude5hDisabled
+
+                                # 检测 Gemini 族 (含常规组与 Argon 共池) 是否耗尽或禁用 (<= 1% 或 disabled)
+                                $geminiExhausted = ($null -ne $liveLocalQuota.Gemini5hPct -and $liveLocalQuota.Gemini5hPct -le 1) -or
+                                                   ($null -ne $liveLocalQuota.GeminiWeeklyPct -and $liveLocalQuota.GeminiWeeklyPct -le 1) -or
+                                                   $liveLocalQuota.Is5hExhausted -or
+                                                   $liveLocalQuota.IsWeeklyExhausted -or
+                                                   ($null -ne $liveLocalQuota.ArgonWeeklyPct -and $liveLocalQuota.ArgonWeeklyPct -le 1) -or
+                                                   $liveLocalQuota.IsArgonExhausted
+
+                                if ($activeGrp -eq "Claude" -and $claudeExhausted) {
+                                    $isReallyExhausted = $true
+                                    $depletedFamily = "Claude"
+                                    $exhaustReason = "当前活跃 [Claude/GPT] 族配额已耗尽或禁用 (Claude5hPct <= 1% 或 ClaudeWeeklyPct <= 1%)"
+                                } elseif ($activeGrp -ne "Claude" -and $geminiExhausted) {
+                                    $isReallyExhausted = $true
+                                    $depletedFamily = "Gemini"
+                                    $exhaustReason = "当前活跃 [Gemini] 族配额已耗尽或禁用 (Gemini5hPct <= 1% 或 GeminiWeeklyPct <= 1%)"
+                                } elseif ($claudeExhausted) {
+                                    $isReallyExhausted = $true
+                                    $depletedFamily = "Claude"
+                                    $exhaustReason = "检测到 [Claude/GPT] 族配额已耗尽或禁用 (Claude5hPct <= 1% 或 ClaudeWeeklyPct <= 1%)"
+                                } elseif ($geminiExhausted) {
+                                    $isReallyExhausted = $true
+                                    $depletedFamily = "Gemini"
+                                    $exhaustReason = "检测到 [Gemini] 族配额已耗尽或禁用 (Gemini5hPct <= 1% 或 GeminiWeeklyPct <= 1%)"
                                 }
                             } else {
-                                $ignoreMsg = "日志捕获限额特征 [$matchedText] (来源: $([System.IO.Path]::GetFileName($filePath)))，但本地当前模型组 [$activeGrp] 剩余配额充足，已安全忽略后台误报"
+                                # 本地 Connect-RPC 离线时，按日志捕获限额保守处理，信任 activeGrp
+                                $isReallyExhausted = $true
+                                $depletedFamily = if ($activeGrp) { $activeGrp } else { "Gemini" }
+                                $exhaustReason = "本地 Connect-RPC 离线，按日志捕获限额特征处置"
+                            }
+
+                            if ($isReallyExhausted) {
+                                $Script:PendingIdleSwitchNoticeSent = $false
+                                $lastSwitchTime = $now
+                                $targetSlotGroup = if ($depletedFamily) { $depletedFamily } else { $activeGrp }
+                                $reasonStr = "系统日志捕获限额特征且本地 Connect-RPC 证实限额 ($exhaustReason): '$matchedText' (来源: $([System.IO.Path]::GetFileName($filePath)))"
+                                Write-DaemonLog $reasonStr 'WARN'
+                                [void](Switch-ToNextAvailableSlot -Reason $reasonStr -AutoRestartApp:$true -TargetModelGroup $targetSlotGroup)
+                                continue
+                            } else {
+                                $ignoreMsg = "日志捕获限额特征 [$matchedText] (来源: $([System.IO.Path]::GetFileName($filePath)))，但本地 Connect-RPC 检查显示 Gemini 与 Claude/GPT 剩余配额均充足 (>1%)，已安全忽略后台瞬态误报"
                                 Write-Host ("[*] " + $ignoreMsg) -ForegroundColor DarkGray
                                 Write-DaemonLog $ignoreMsg "INFO"
                             }
@@ -7875,7 +8212,8 @@ function Show-SlotPoolDashboard {
 
             $gemStr = if ($g5Val -ge 0 -or $gwVal -ge 0) { "{0,3}% / {1,3}%" -f $(if ($g5Val -ge 0) { $g5Val } else { "--" }), $(if ($gwVal -ge 0) { $gwVal } else { "--" }) } else { "  -- /  -- " }
             $claStr = if ($c5Val -ge 0 -or $cwVal -ge 0) { "{0,3}% / {1,3}%" -f $(if ($c5Val -ge 0) { $c5Val } else { "--" }), $(if ($cwVal -ge 0) { $cwVal } else { "--" }) } else { "  -- /  -- " }
-            $arCell = $(if ($arVal -ge 0) { "周:{0,3}%" -f $arVal } else { "不支持 " })
+            # Argon 属于 Gemini 模型共享池 (Gemini models shared pool)
+            $arCell = $(if ($arVal -ge 0) { "周:{0,3}%" -f $arVal } else { "共池   " })
 
             $minGem   = if ($g5Val -ge 0 -and $gwVal -ge 0) { [Math]::Min($g5Val, $gwVal) } elseif ($g5Val -ge 0) { $g5Val } else { $gwVal }
             $minCla   = if ($c5Val -ge 0 -and $cwVal -ge 0) { [Math]::Min($c5Val, $cwVal) } elseif ($c5Val -ge 0) { $c5Val } else { $cwVal }
@@ -7892,10 +8230,10 @@ function Show-SlotPoolDashboard {
                 $statusText = "★使用中"
                 $statusColor = "Green"
             } elseif ($activeGrp -eq "Argon") {
-                if ($arVal -lt 0) {
-                    $statusText = "不支持"
-                    $statusColor = "DarkGray"
-                } elseif ($arVal -le 1) {
+                if ($arVal -ge 0 -and $arVal -le 1) {
+                    $statusText = "周限额"
+                    $statusColor = "Magenta"
+                } elseif ($gwVal -ge 0 -and $gwVal -le 1) {
                     $statusText = "周限额"
                     $statusColor = "Magenta"
                 } else {
@@ -8496,14 +8834,18 @@ function Get-SlotPoolGuiPayload {
 
         $cd5  = Get-QuotaThawCountdownText -ResetTimeStr $rt5Prop -Pct $g5Val -Type "5h" -Now $now
         $cdWk = Get-QuotaThawCountdownText -ResetTimeStr $rtWkProp -Pct $gwVal -Type "weekly" -Now $now
-        $cdAr = if ($arVal -ge 0) { Get-QuotaThawCountdownText -ResetTimeStr $rtArProp -Pct $arVal -Type "weekly" -Now $now } else { "不支持" }
+        # Argon 归入 Gemini 模型共享池 (Gemini models shared pool)
+        $cdAr = if ($arVal -ge 0) { Get-QuotaThawCountdownText -ResetTimeStr $rtArProp -Pct $arVal -Type "weekly" -Now $now } else { "Gemini族共池" }
         $cdC5 = Get-QuotaThawCountdownText -ResetTimeStr $rtC5Prop -Pct $c5Val -Type "5h" -Now $now
         $cdCW = Get-QuotaThawCountdownText -ResetTimeStr $rtCWProp -Pct $cwVal -Type "weekly" -Now $now
 
         $supMods = @(Get-SafeProp $s "supportedModels" @())
         if ($supMods.Count -eq 0) {
-            $supMods = @("Gemini 3.8 Flash", "Gemini 2.5 Pro", "Claude 4.6", "GPT-OSS 120B")
-            if ($arVal -ge 0) { $supMods += "Gemini 4 Argon" }
+            $supMods = @("Gemini 3.8 Flash", "Gemini 4 Carbon", "Claude 4.6", "Claude 4.6 (Thinking)", "GPT-OSS 120B", "Gemini 4 Argon", "Gemini 2.5 Pro")
+        } else {
+            if (-not ($supMods -contains "Gemini 4 Carbon")) { $supMods += "Gemini 4 Carbon" }
+            if (-not ($supMods -contains "GPT-OSS 120B")) { $supMods += "GPT-OSS 120B" }
+            if (-not ($supMods -contains "Gemini 4 Argon")) { $supMods += "Gemini 4 Argon" }
         }
 
         $slotsList.Add([ordered]@{
@@ -8526,7 +8868,7 @@ function Get-SlotPoolGuiPayload {
             claudeWeeklyCountdown  = $cdCW
             countdown              = "5h: $cd5 · 周: $cdWk"
             supportedModels        = $supMods
-            supportsArgon          = ($arVal -ge 0)
+            supportsArgon          = $true
             switchCount            = (ConvertTo-SafeInt (Get-SafeProp $s "switchCount") -Default 0)
             tokenFingerprint       = [string](Get-SafeProp $s "tokenFingerprint" "")
             planName               = [string](Get-SafeProp $s "planName" "Pro")
